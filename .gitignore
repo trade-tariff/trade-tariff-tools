@@ -1,0 +1,5 @@
+# Avoid pushing neovim perf logs
+.nvimlog
+
+# Used for release notes generation
+/repos
