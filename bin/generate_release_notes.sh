@@ -53,7 +53,7 @@ log_for() {
       # Construct the link to the pull request
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
       # Extract the author's name from the Git log
-      author=$(echo "$line" | awk -F\| '{print $3}' | sed 's/^\s*//;s/\s*$//')
+      author=$(echo "$line" | awk -F\| '{print $3}')
       # Use the GitHub REST API to retrieve the author's profile information, including their GitHub username
       username=$(curl --silent "https://api.github.com/search/users?q=$author+in:email" | jq -r '.items[0].login')
 
@@ -67,7 +67,6 @@ log_for() {
 
       # Replace the commit message with a markdown link to the pull request, including the author's GitHub username
       echo "* <${pr_link}|${message}> by ${username}"
-      # echo "* <${pr_link}|${message}>"
     done <<< "$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')"
   else
     # Print a message indicating that there are no merge commits
