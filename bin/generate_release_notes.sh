@@ -42,8 +42,8 @@ log_for() {
   echo
 
   # Check if there are merge commits in the specified range
-  merge_commits=$(git rev-list HEAD...$sha1 --merges)
-  if [ -n "$merge_commits" ]; then
+  merge_commits=$(git rev-list HEAD..."$sha1" --merges)
+  if [ "$merge_commits" != "" ]; then
     # Print the merge logs
     while read -r line; do
       message=$(echo "$line" | awk -F\| '{print $1}')
@@ -52,9 +52,22 @@ log_for() {
       pr_number=$(echo "$subject_line" | sed 's/^Merge pull request #\([0-9]*\).*$/\1/g')
       # Construct the link to the pull request
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
-      # Replace the commit message with a markdown link to the pull request
-      echo "* <${pr_link}|${message}>"
-    done <<< "$(git --no-pager log --merges HEAD...$sha1 --format="format:%b|%s" --grep 'Merge pull request')"
+      # Extract the author's name from the Git log
+      author=$(echo "$line" | awk -F\| '{print $3}')
+      # Use the GitHub REST API to retrieve the author's profile information, including their GitHub username
+      username=$(curl --silent "https://api.github.com/search/users?q=$author+in:email" | jq -r '.items[0].login')
+
+      # if the username is null then default to the author's name
+      if [ "$username" == "null" ]; then
+        username=$author
+      else
+        # otherwise generate a link to the author's GitHub profile
+        username="<https://github.com/$username|$username>"
+      fi
+
+      # Replace the commit message with a markdown link to the pull request, including the author's GitHub username
+      echo "* <${pr_link}|${message}> by ${username}"
+    done <<< "$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')"
   else
     # Print a message indicating that there are no merge commits
     echo "Nothing to release."
