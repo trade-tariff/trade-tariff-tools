@@ -20,17 +20,21 @@ git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-duty-
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-admin.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-search-query-parser.git
 
+if [ -f ".github_authors_cache" ]; then
+  rm .github_authors_cache
+  touch .github_authors_cache
+else
+  touch .github_authors_cache
+fi
+
+cache_file="$PWD/.github_authors_cache"
+
 cachedFetchAuthor() {
   local email="$1"
-  local cache_file="../.github_authors_cache"
 
-  if [ ! -f "$cache_file" ]; then
-    touch "$cache_file"
-  fi
-
-  result=$(grep "^$email|" "$cache_file")
+  result=$(grep "^$email," "$cache_file")
   if [ "$result" != "" ]; then
-    author=$(echo "$result" | cut -d "|" -f 2)
+    author=$(echo "$result" | awk -F, '{print $2}')
   else
     author=$(curl -s "https://api.github.com/search/users?q=$email+in:email" | jq -r '.items[0].login')
 
@@ -40,7 +44,7 @@ cachedFetchAuthor() {
       author="<https://github.com/$author|$author>"
     fi
 
-    echo "$email|$author" >> "$cache_file"
+    echo "$email,$author" >> "$cache_file"
   fi
 
   # Return the author
