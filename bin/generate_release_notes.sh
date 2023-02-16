@@ -20,6 +20,37 @@ git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-duty-
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-admin.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-search-query-parser.git
 
+if [ -f ".github_authors_cache" ]; then
+  rm .github_authors_cache
+  touch .github_authors_cache
+else
+  touch .github_authors_cache
+fi
+
+cache_file="$PWD/.github_authors_cache"
+
+cachedFetchAuthor() {
+  local email="$1"
+
+  result=$(grep "^$email," "$cache_file")
+  if [ "$result" != "" ]; then
+    author=$(echo "$result" | awk -F, '{print $2}')
+  else
+    author=$(curl -s "https://api.github.com/search/users?q=$email+in:email" | jq -r '.items[0].login')
+
+    if [ "$author" == "null" ]; then
+      author="$email"
+    else
+      author="<https://github.com/$author|$author>"
+    fi
+
+    echo "$email,$author" >> "$cache_file"
+  fi
+
+  # Return the author
+  echo "$author"
+}
+
 # Log function to print the logs for a repository
 log_for() {
   local url=$1
@@ -48,22 +79,11 @@ log_for() {
     while read -r line; do
       message=$(echo "$line" | awk -F\| '{print $1}')
       subject_line=$(echo "$line" | awk -F\| '{print $2}')
-      # Extract the pull request number from the commit message
+      email=$(echo "$line" | awk -F\| '{print $3}')
+      username=$(cachedFetchAuthor "$email")
       pr_number=$(echo "$subject_line" | sed 's/^Merge pull request #\([0-9]*\).*$/\1/g')
-      # Construct the link to the pull request
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
-      # Extract the author's name from the Git log
-      author=$(echo "$line" | awk -F\| '{print $3}')
-      # Use the GitHub REST API to retrieve the author's profile information, including their GitHub username
-      username=$(curl --silent "https://api.github.com/search/users?q=$author+in:email" | jq -r '.items[0].login')
 
-      # if the username is null then default to the author's name
-      if [ "$username" == "null" ]; then
-        username=$author
-      else
-        # otherwise generate a link to the author's GitHub profile
-        username="<https://github.com/$username|$username>"
-      fi
 
       # Replace the commit message with a markdown link to the pull request, including the author's GitHub username
       echo "* <${pr_link}|${message}> by ${username}"
