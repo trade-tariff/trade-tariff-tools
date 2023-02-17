@@ -112,7 +112,7 @@ last_n_logs_for() {
   local days=$2
   local sha1=""
 
-  sha1=$(git rev-parse HEAD)
+  sha1=$(git rev-parse --short HEAD)
 
   # Change to the specified repository or exit if unable to do so
   cd "$repo" || exit
