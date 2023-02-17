@@ -7,13 +7,19 @@ if [ -d "repos" ]; then
   rm -rf repos
 fi
 
-# Create a directory to store the repositories
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+if [[ -z "$GITHUB_TOKEN" ]]; then
+  echo "Error: GITHUB_TOKEN environment variable not set"
+  exit 1
+fi
+
+auth_header="Authorization: token $GITHUB_TOKEN"
+
 mkdir repos
 
-# Change to the newly created directory or exit if unable to do so
-cd repos || exit
+cd repos || exit 1
 
-# Clone the specified repositories
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-frontend.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-backend.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-duty-calculator.git
@@ -29,6 +35,67 @@ else
 fi
 
 cache_file="$PWD/.github_authors_cache"
+
+function fetch_build_status() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_sha=$(curl -s -H $auth_header "https://api.github.com/repos/trade-tariff/$repo/pulls/$pr_number" | jq -r '.head.sha')
+
+  local commit_status=$(curl -s -H $auth_header "https://api.github.com/repos/trade-tariff/$repo/commits/$pr_sha/status")
+
+  if echo "$commit_status" | grep -q "API rate limit exceeded"; then
+    echo ":question: Build"
+  else
+    local build_status=$(echo "$commit_status" | jq '.statuses')
+
+    if [[ "$build_status" == "" || "$build_status" == "[]" ]]; then
+      echo "No builds"
+    else
+      local unique_statuses=("$(echo "$build_status" | jq -r '.[].state' | sort -u)")
+
+      if [[ "$unique_statuses" == "success" ]]; then
+        echo ":white_check_mark: Build"
+      else
+        echo ":x: Build"
+      fi
+    fi
+  fi
+}
+
+function fetch_approval_status() {
+  local repo="$1"
+  local pr_number="$2"
+
+  local reviews=$(curl -s -H $auth_header "https://api.github.com/repos/trade-tariff/${repo}/pulls/${pr_number}/reviews")
+
+  if echo "$reviews" | grep -q "API rate limit exceeded"; then
+    echo ":question: approved"
+  else
+    local approved_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "APPROVED")' | jq -s)
+    local changes_requested_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "CHANGES_REQUESTED" and .user.login != "dependabot[bot]")')
+    local num_approved_reviews=$(echo "$approved_reviews" | jq -r 'map(.user.login) | unique | length')
+
+    if [[ "$reviews" == "" || "$reviews" == "[]" ]]; then
+      echo "No reviews"
+    elif [[ "$approved_reviews" == "" ]]; then
+      echo ":x: Not approved"
+    elif [[ "$changes_requested_reviews" != "" ]]; then
+      echo ":x: Changes requested"
+    else
+      echo ":white_check_mark: Approved (${num_approved_reviews})"
+    fi
+  fi
+}
+
+function check_pr_status() {
+  local repo="$1"
+  local pr_number="$2"
+
+  build_status=$(fetch_build_status "$repo" "$pr_number")
+  approval_status=$(fetch_approval_status "$repo" "$pr_number")
+
+  echo "${approval_status}, ${build_status}"
+}
 
 cachedFetchAuthor() {
   local email="$1"
@@ -48,7 +115,6 @@ cachedFetchAuthor() {
     echo "$email,$author" >> "$cache_file"
   fi
 
-  # Return the author
   echo "$author"
 }
 
@@ -56,7 +122,6 @@ function print_merge_logs() {
   local merge_commits=$1
 
   if [ "$merge_commits" != "" ]; then
-    # Print the merge logs
     while read -r line; do
       message=$(echo "$line" | awk -F\| '{print $1}')
       subject_line=$(echo "$line" | awk -F\| '{print $2}')
@@ -64,49 +129,39 @@ function print_merge_logs() {
       username=$(cachedFetchAuthor "$email")
       pr_number=$(echo "$subject_line" | sed 's/^Merge pull request #\([0-9]*\).*$/\1/g')
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
+      pr_status="($(check_pr_status "$repo" "$pr_number"))"
 
-      # Replace the commit message with a markdown link to the pull request, including the author's GitHub username
-      echo "* <${pr_link}|${message}> by ${username}"
+      echo "- <${pr_link}|${message}> by ${username} ${pr_status}"
     done <<< "$merge_commits"
   else
-    # Print a message indicating that there are no merge commits
     echo "Nothing to release."
     echo
   fi
 }
 
-# Log function to print the logs for a repository
 log_for() {
   local url=$1
   local repo=$2
   local sha1=""
 
-  # Retrieve the SHA-1 hash from the specified URL
   sha1=$(curl --silent "$url" | jq '.git_sha1' | tr -d '"')
 
-  # Change to the specified repository or exit if unable to do so
   cd "$repo" || exit
 
-  # Print the name of the repository
   echo
   echo "*$repo*"
   echo
 
-  # Print the SHA-1 hash
   echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
   echo
 
-  # Check if there are merge commits in the specified range
   merge_commits=$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')
   print_merge_logs "$merge_commits"
   echo
 
-  # Change back to the parent directory
   cd ..
 }
 
-# Retrieves the last n days of merge commits for a repository
-# and prints them in a format that can be used in Slack
 last_n_logs_for() {
   local repo=$1
   local days=$2
@@ -114,35 +169,29 @@ last_n_logs_for() {
 
   sha1=$(git rev-parse --short HEAD)
 
-  # Change to the specified repository or exit if unable to do so
   cd "$repo" || exit
 
-  # Print the name of the repository
   echo
   echo "*$repo*"
   echo
 
-  # Print the SHA-1 hash
   echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
   echo
 
-  # Check if there are merge commits in the specified range
   merge_commits=$(git log --merges --since="$days days ago" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
   print_merge_logs "$merge_commits"
 }
 
-# Function to print the logs for all repositories
 all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend"
   log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend"
   log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator"
   log_for "https://tariff-admin-production.london.cloudapps.digital/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
-  last_n_logs_for "trade-tariff-api-docs" 4
+  last_n_logs_for "trade-tariff-api-docs" 3
 }
 
 all_logs
 
-# Clear repos directory if script ran locally and we need to rerun
 rm -rf repos

@@ -19,3 +19,4 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CHANNEL: "trade_tariff"
           SLACK_USERNAME: 'Release Bot'
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
