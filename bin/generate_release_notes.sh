@@ -26,6 +26,11 @@ git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-duty-
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-admin.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-search-query-parser.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-api-docs.git
+git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-testing.git
+git clone --quiet --depth 100 https://github.com/trade-tariff/process-appendix-5a.git
+git clone --quiet --depth 100 https://github.com/trade-tariff/download-CDS-files.git
+git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-platform-terragrunt.git
+git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git
 
 if [ -f ".github_authors_cache" ]; then
   rm .github_authors_cache
@@ -181,6 +186,8 @@ last_n_logs_for() {
   merge_commits=$(git log --merges --since="$days days ago" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
   print_merge_logs "$merge_commits"
+
+  cd ..
 }
 
 all_logs() {
@@ -190,6 +197,11 @@ all_logs() {
   log_for "https://tariff-admin-production.london.cloudapps.digital/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
   last_n_logs_for "trade-tariff-api-docs" 3
+  last_n_logs_for "trade-tariff-testing" 3
+  last_n_logs_for "process-appendix-5a" 3
+  last_n_logs_for "download-CDS-files" 3
+  last_n_logs_for "trade-tariff-platform-terragrunt" 3
+  last_n_logs_for "trade-tariff-platform-terraform-modules" 3
 }
 
 all_logs
