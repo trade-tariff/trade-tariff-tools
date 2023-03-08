@@ -97,9 +97,9 @@ function check_pr_status() {
   local pr_number="$2"
 
   build_status=$(fetch_build_status "$repo" "$pr_number")
-  # approval_status=$(fetch_approval_status "$repo" "$pr_number")
+  approval_status=$(fetch_approval_status "$repo" "$pr_number")
 
-  echo $build_status
+  echo "${build_status} ${approval_status}"
 }
 
 cachedFetchAuthor() {
@@ -134,9 +134,9 @@ function print_merge_logs() {
       username=$(cachedFetchAuthor "$email")
       pr_number=$(echo "$subject_line" | sed 's/^Merge pull request #\([0-9]*\).*$/\1/g')
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
-      pr_status="$(check_pr_status "$repo" "$pr_number")"
+      # pr_status="$(check_pr_status "$repo" "$pr_number")"
 
-      echo "- <${pr_link}|${message}> by ${username} ${pr_status}"
+      echo "- <${pr_link}|${message}> by ${username}"
     done <<< "$merge_commits"
   else
     echo "Nothing to release."
