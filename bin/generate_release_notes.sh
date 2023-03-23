@@ -44,9 +44,9 @@ cache_file="$PWD/.github_authors_cache"
 function fetch_build_status() {
   local repo="$1"
   local pr_number="$2"
-  local pr_sha=$(curl -s -H $auth_header "https://api.github.com/repos/trade-tariff/$repo/pulls/$pr_number" | jq -r '.head.sha')
+  local pr_sha=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/$repo/pulls/$pr_number" | jq -r '.head.sha')
 
-  local commit_status=$(curl -s -H $auth_header "https://api.github.com/repos/trade-tariff/$repo/commits/$pr_sha/status")
+  local commit_status=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/$repo/commits/$pr_sha/status")
 
   if echo "$commit_status" | grep -q "API rate limit exceeded"; then
     echo ":question: Build"
@@ -71,7 +71,7 @@ function fetch_approval_status() {
   local repo="$1"
   local pr_number="$2"
 
-  local reviews=$(curl -s -H $auth_header "https://api.github.com/repos/trade-tariff/${repo}/pulls/${pr_number}/reviews")
+  local reviews=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/${repo}/pulls/${pr_number}/reviews")
 
   if echo "$reviews" | grep -q "API rate limit exceeded"; then
     echo ":question: approved"
@@ -125,8 +125,17 @@ cachedFetchAuthor() {
 
 function print_merge_logs() {
   local merge_commits=$1
+  local repo=$2
+  local sha1=$3
 
   if [ "$merge_commits" != "" ]; then
+    echo
+    echo "*$repo*"
+    echo
+
+    echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
+    echo
+
     while read -r line; do
       message=$(echo "$line" | awk -F\| '{print $1}')
       subject_line=$(echo "$line" | awk -F\| '{print $2}')
@@ -138,8 +147,7 @@ function print_merge_logs() {
 
       echo "- <${pr_link}|${message}> by ${username}"
     done <<< "$merge_commits"
-  else
-    echo "Nothing to release."
+
     echo
   fi
 }
@@ -149,20 +157,12 @@ log_for() {
   local repo=$2
   local sha1=""
 
-  sha1=$(curl --silent "$url" | jq '.git_sha1' | tr -d '"')
-
   cd "$repo" || exit
 
-  echo
-  echo "*$repo*"
-  echo
-
-  echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
-  echo
-
+  sha1=$(curl --silent "$url" | jq '.git_sha1' | tr -d '"')
   merge_commits=$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')
-  print_merge_logs "$merge_commits"
-  echo
+
+  print_merge_logs "$merge_commits" "$repo" "$sha1"
 
   cd ..
 }
@@ -172,20 +172,12 @@ last_n_logs_for() {
   local days=$2
   local sha1=""
 
-  sha1=$(git rev-parse --short HEAD)
-
   cd "$repo" || exit
 
-  echo
-  echo "*$repo*"
-  echo
-
-  echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
-  echo
-
+  sha1=$(git rev-parse --short HEAD)
   merge_commits=$(git log --merges --since="$days days ago" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits"
+  print_merge_logs "$merge_commits" "$repo" "$sha1"
 
   cd ..
 }
