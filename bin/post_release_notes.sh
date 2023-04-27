@@ -7,9 +7,10 @@ webhook_url="$SLACK_WEBHOOK"
 channel="#$SLACK_CHANNEL"
 username="$SLACK_USERNAME"
 message=$(bash bin/generate_release_notes.sh)
+escaped_message=$(echo "$message" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
 payload="{
   \"channel\": \"$channel\",
-  \"text\": \"$message\",
+  \"text\": \"$escaped_message\",
   \"username\": \"$username\",
   \"mrkdwn\": true
 }"
