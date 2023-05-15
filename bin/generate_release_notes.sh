@@ -31,6 +31,7 @@ git clone --quiet --depth 100 https://github.com/trade-tariff/process-appendix-5
 git clone --quiet --depth 100 https://github.com/trade-tariff/download-CDS-files.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-platform-terragrunt.git
 git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git
+git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-reporting.git
 
 if [ -f ".github_authors_cache" ]; then
   rm .github_authors_cache
@@ -194,6 +195,7 @@ all_logs() {
   last_n_logs_for "download-CDS-files" 5
   last_n_logs_for "trade-tariff-platform-terragrunt" 5
   last_n_logs_for "trade-tariff-platform-terraform-modules" 5
+  last_n_logs_for "trade-tariff-reporting" 5
 }
 
 all_logs
