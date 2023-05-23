@@ -20,18 +20,25 @@ mkdir repos
 
 cd repos || exit 1
 
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-frontend.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-backend.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-duty-calculator.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-admin.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-search-query-parser.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-api-docs.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-testing.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/process-appendix-5a.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/download-CDS-files.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-platform-terragrunt.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git
-git clone --quiet --depth 100 https://github.com/trade-tariff/trade-tariff-reporting.git
+repos=(
+  "trade-tariff-frontend"
+  "trade-tariff-backend"
+  "trade-tariff-duty-calculator"
+  "trade-tariff-admin"
+  "trade-tariff-search-query-parser"
+  "trade-tariff-api-docs"
+  "trade-tariff-testing"
+  "process-appendix-5a"
+  "download-CDS-files"
+  "trade-tariff-platform-terraform"
+  "trade-tariff-platform-terraform-modules"
+  "trade-tariff-platform-terraform-common"
+  "trade-tariff-reporting"
+)
+
+for repo in "${repos[@]}"; do
+  git clone --quiet --depth 100 "https://github.com/trade-tariff/$repo.git"
+done
 
 if [ -f ".github_authors_cache" ]; then
   rm .github_authors_cache
@@ -193,7 +200,8 @@ all_logs() {
   last_n_logs_for "trade-tariff-testing" 5
   last_n_logs_for "process-appendix-5a" 5
   last_n_logs_for "download-CDS-files" 5
-  last_n_logs_for "trade-tariff-platform-terragrunt" 5
+  last_n_logs_for "trade-tariff-platform-terraform" 5
+  last_n_logs_for "trade-tariff-platform-terraform-common" 5
   last_n_logs_for "trade-tariff-platform-terraform-modules" 5
   last_n_logs_for "trade-tariff-reporting" 5
 }
