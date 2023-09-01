@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+
+# This script is used to load commodities and their descriptions as part of
+# tasks to populate the Stop Press Notice news items
+
+# You can call it with scripts/fetch-commodities.py path-to-commodities.txt
+
+import requests
+import sys
+
+url = "https://staging.trade-tariff.service.gov.uk/api/v2/commodities/"
+
+def fetch_commodity_description(commodity_code):
+  full_url = url + commodity_code
+  request = requests.get(full_url)
+
+  description = request.json()['data']['attributes']['description']
+  return [commodity_code, description]
+  
+
+if __name__ == "__main__":
+  path = sys.argv[1]
+
+  print("| Commodity Code | Description |")
+  print("| -------------- | ----------- |")
+  with open(path) as f:
+    commodity_codes = f.readlines()
+
+  for commodity_code in commodity_codes:
+      code, description = fetch_commodity_description(commodity_code.strip())
+      # Needs to be production as this goes into a stop press notice
+      commodity_url = "https://www.trade-tariff.service.gov.uk/commodities/{}#export".format(code)
+      stop_press_markdown_link = "[{}]({})".format(code, commodity_url)
+      print("| {} | {} |".format(stop_press_markdown_link, description))
