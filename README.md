@@ -24,11 +24,11 @@ For example, this will produce:
 
 | Commodity Code | Description |
 | -------------- | ----------- |
-| [3824999214](https://www.trade-tariff.service.gov.uk/commodities/3824999214#export) | Other |
-| [1516209831](https://www.trade-tariff.service.gov.uk/commodities/1516209831#export) | Consigned from the United Kingdom |
-| [1516209822](https://www.trade-tariff.service.gov.uk/commodities/1516209822#export) | Consigned from the United Kingdom |
-| [1516209823](https://www.trade-tariff.service.gov.uk/commodities/1516209823#export) | Consigned from China |
-| [1516209832](https://www.trade-tariff.service.gov.uk/commodities/1516209832#export) | Consigned from China |
-| [1518009122](https://www.trade-tariff.service.gov.uk/commodities/1518009122#export) | Consigned from the United Kingdom |
-| [1518009123](https://www.trade-tariff.service.gov.uk/commodities/1518009123#export) | Consigned from China |
-| [1518009131](https://www.trade-tariff.service.gov.uk/commodities/1518009131#export) | Consigned from the United Kingdom |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/3824999214" target="_blank">3824999214</a> | Other |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1516209831" target="_blank">1516209831</a> | Consigned from the United Kingdom |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1516209822" target="_blank">1516209822</a> | Consigned from the United Kingdom |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1516209823" target="_blank">1516209823</a> | Consigned from China |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1516209832" target="_blank">1516209832</a> | Consigned from China |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1518009122" target="_blank">1518009122</a> | Consigned from the United Kingdom |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1518009123" target="_blank">1518009123</a> | Consigned from China |
+| <a href="https://www.trade-tariff.service.gov.uk/commodities/1518009131" target="_blank">1518009131</a> | Consigned from the United Kingdom |

@@ -29,6 +29,6 @@ if __name__ == "__main__":
   for commodity_code in commodity_codes:
       code, description = fetch_commodity_description(commodity_code.strip())
       # Needs to be production as this goes into a stop press notice
-      commodity_url = "https://www.trade-tariff.service.gov.uk/commodities/{}#export".format(code)
-      stop_press_markdown_link = "[{}]({})".format(code, commodity_url)
-      print("| {} | {} |".format(stop_press_markdown_link, description))
+      commodity_url = "https://www.trade-tariff.service.gov.uk/commodities/{}".format(code)
+      stop_press_link = "<a href=\"{}\" target=\"_blank\">{}</a>".format(commodity_url, code)
+      print("| {} | {} |".format(stop_press_link, description))
