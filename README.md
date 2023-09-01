@@ -12,11 +12,15 @@ I installed requests by running:
 pip install requests
 ```
 
+Update the commodities.txt file with your commodities
+
 And run the script with:
 
 ```shell
-./fetch-commodities test-commodities.txt
+./fetch-commodities
 ```
+
+In VScode for windows you should be able to right click the python file and hit run
 
 This should print a markdown table you can copy into your Stop Press Notice
 
