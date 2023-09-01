@@ -1,34 +1,52 @@
 #!/usr/bin/env python
 
-# This script is used to load commodities and their descriptions as part of
+# This script is used to load goods nomenclatures and their descriptions as part of
 # tasks to populate the Stop Press Notice news items
-
-# You can call it with scripts/fetch-commodities.py path-to-commodities.txt
+#
+# You can call it with bin/fetch-commodities
+#
+# It will print a markdown table
 
 import requests
-import sys
 
-url = "https://staging.trade-tariff.service.gov.uk/api/v2/commodities/"
+url = "https://staging.trade-tariff.service.gov.uk"
 
-def fetch_commodity_description(commodity_code):
-  full_url = url + commodity_code
-  request = requests.get(full_url)
 
-  description = request.json()['data']['attributes']['description']
-  return [commodity_code, description]
-  
+# Fetch the type of the goods nomenclature via an HTML search and follow the location
+# to know whether our link should be:
+# - a chapter
+# - a heading
+# - a subheading
+# - a commodity
+# Subsequently, fetch the description of the goods nomenclature via the API
+# and return the link and description based on the type
+def fetch_goods_nomenclature_link_and_description(commodity_code):
+    search_url = url + "/search?q={}".format(commodity_code)
+    request = requests.get(search_url, allow_redirects=True)
+    # Fetch the last two path parts /commodities/0101210000
+    location = request.url.split("/")[-2:]
+    location = "/".join(location)
+    api_location = "/api/v2/{}".format(location)
+    ui_location = "/{}".format(location)
+    request = requests.get(url + api_location, allow_redirects=True)
+    description = request.json()["data"]["attributes"]["description"]
+
+    # Needs to be production as this goes into a stop press notice
+    path = "https://www.trade-tariff.service.gov.uk{}".format(ui_location)
+    link = '<a href="{}" target="_blank">{}</a>'.format(path, commodity_code)
+
+    return [link, description]
+
 
 if __name__ == "__main__":
-  path = "commodities.txt"
+    print("| Commodity Code | Description |")
+    print("| -------------- | ----------- |")
+    with open("commodities.txt") as f:
+        commodity_codes = f.readlines()
 
-  print("| Commodity Code | Description |")
-  print("| -------------- | ----------- |")
-  with open(path) as f:
-    commodity_codes = f.readlines()
-
-  for commodity_code in commodity_codes:
-      code, description = fetch_commodity_description(commodity_code.strip())
-      # Needs to be production as this goes into a stop press notice
-      commodity_url = "https://www.trade-tariff.service.gov.uk/commodities/{}".format(code)
-      stop_press_link = "<a href=\"{}\" target=\"_blank\">{}</a>".format(commodity_url, code)
-      print("| {} | {} |".format(stop_press_link, description))
+        for commodity_code in commodity_codes:
+            (
+                goods_nomenclature_link,
+                description,
+            ) = fetch_goods_nomenclature_link_and_description(commodity_code.strip())
+            print("| {} | {} |".format(goods_nomenclature_link, description))
