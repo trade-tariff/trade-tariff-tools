@@ -3,6 +3,8 @@
 set -o errexit
 set -o nounset
 
+source bin/fetch-deployers
+
 if [ -d "repos" ]; then
   rm -rf repos
 fi
@@ -209,5 +211,6 @@ all_logs() {
 }
 
 all_logs
+fetch_and_present_deployers
 
 rm -rf repos

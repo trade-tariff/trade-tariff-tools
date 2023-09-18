@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+EXCLUDED_DEPLOYERS="${EXCLUDED_DEPLOYERS:-}"
+
+fetch_deployer_info() {
+  deployer=$1
+
+  curl \
+    --silent \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    https://api.github.com/users/"$deployer" \
+    | jq -r '.name // .email // .login'
+}
+
+fetch_primary_deployer() {
+  deployers=$1
+  deployer=$(echo "$deployers" | cut -d' ' -f1)
+  deployer_info=$(fetch_deployer_info "$deployer")
+
+  echo "*Primary Deployer: $deployer_info*"
+}
+
+fetch_secondary_deployer() {
+  deployers=$1
+  deployer=$(echo "$deployers" | cut -d' ' -f2)
+  deployer_info=$(fetch_deployer_info "$deployer")
+
+  echo "Secondary Deployer: $deployer_info"
+}
+
+fetch_n_deployers() {
+  curl --silent \
+       -H "Authorization: token $GITHUB_TOKEN" \
+       -H "Accept: application/vnd.github.v3+json" \
+       https://api.github.com/orgs/trade-tariff/teams/trade-tariff-write/members \
+       | jq -r '.[] | select(.login | test("^'"$EXCLUDED_DEPLOYERS"'$") | not) | .login' \
+       | shuf -n2 \
+       | tr '\n' ' '
+}
+
+fetch_and_present_deployers() {
+  deployers=$(fetch_n_deployers)
+  primary_deployer=$(fetch_primary_deployer "$deployers")
+  secondary_deployer=$(fetch_secondary_deployer "$deployers")
+
+  echo
+  echo "_Today's deployers are:_"
+  echo
+  echo "$primary_deployer"
+  echo "$secondary_deployer"
+}
