@@ -33,9 +33,7 @@ repos=(
   "process-appendix-5a"
   "download-CDS-files"
   "trade-tariff-platform-aws-terraform"
-  "trade-tariff-platform-terraform"
   "trade-tariff-platform-terraform-modules"
-  "trade-tariff-platform-terraform-common"
   "trade-tariff-reporting"
 )
 
@@ -204,8 +202,6 @@ all_logs() {
   last_n_logs_for "process-appendix-5a" 5
   last_n_logs_for "download-CDS-files" 5
   last_n_logs_for "trade-tariff-platform-aws-terraform" 5
-  last_n_logs_for "trade-tariff-platform-terraform" 5
-  last_n_logs_for "trade-tariff-platform-terraform-common" 5
   last_n_logs_for "trade-tariff-platform-terraform-modules" 5
   last_n_logs_for "trade-tariff-reporting" 5
 }
