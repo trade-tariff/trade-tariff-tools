@@ -28,6 +28,7 @@ repos=(
   "trade-tariff-duty-calculator"
   "trade-tariff-admin"
   "trade-tariff-search-query-parser"
+  "trade-tariff-lambdas-fpo-search"
   "trade-tariff-api-docs"
   "trade-tariff-testing"
   "process-appendix-5a"
@@ -197,6 +198,7 @@ all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator"
   log_for "https://tariff-admin-production.london.cloudapps.digital/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
+  log_for "https://search.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-lambdas-fpo-search"
   last_n_logs_for "trade-tariff-api-docs" 5
   last_n_logs_for "trade-tariff-testing" 5
   last_n_logs_for "process-appendix-5a" 5
