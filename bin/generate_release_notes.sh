@@ -23,23 +23,23 @@ mkdir repos
 cd repos || exit 1
 
 repos=(
-  "trade-tariff-frontend"
-  "trade-tariff-backend"
-  "trade-tariff-duty-calculator"
-  "trade-tariff-admin"
-  "trade-tariff-search-query-parser"
-  "trade-tariff-lambdas-fpo-search"
-  "trade-tariff-api-docs"
-  "trade-tariff-testing"
-  "process-appendix-5a"
-  "download-CDS-files"
-  "trade-tariff-platform-aws-terraform"
-  "trade-tariff-platform-terraform-modules"
-  "trade-tariff-reporting"
+  "https://github.com/trade-tariff/trade-tariff-frontend.git"
+  "https://github.com/trade-tariff/trade-tariff-backend.git"
+  "https://github.com/trade-tariff/trade-tariff-duty-calculator.git"
+  "https://github.com/trade-tariff/trade-tariff-admin.git"
+  "https://github.com/trade-tariff/trade-tariff-search-query-parser.git"
+  "https://${GITHUB_TOKEN}@github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
+  "https://github.com/trade-tariff/trade-tariff-api-docs.git"
+  "https://github.com/trade-tariff/trade-tariff-testing.git"
+  "https://github.com/trade-tariff/process-appendix-5a.git"
+  "https://github.com/trade-tariff/download-CDS-files.git"
+  "https://github.com/trade-tariff/trade-tariff-platform-aws-terraform.git"
+  "https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git"
+  "https://github.com/trade-tariff/trade-tariff-reporting.git"
 )
 
 for repo in "${repos[@]}"; do
-  git clone --quiet --depth 100 "https://github.com/trade-tariff/$repo.git"
+  git clone --quiet --depth 100 $repo
 done
 
 if [ -f ".github_authors_cache" ]; then
