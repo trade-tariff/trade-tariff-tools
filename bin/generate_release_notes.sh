@@ -39,7 +39,7 @@ repos=(
 )
 
 for repo in "${repos[@]}"; do
-  git clone --quiet --depth 100 $repo
+  git clone --quiet --depth 100 "$repo"
 done
 
 if [ -f ".github_authors_cache" ]; then
@@ -54,21 +54,21 @@ cache_file="$PWD/.github_authors_cache"
 function fetch_build_status() {
   local repo="$1"
   local pr_number="$2"
-  local pr_sha=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/$repo/pulls/$pr_number" | jq -r '.head.sha')
+  pr_sha=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/$repo/pulls/$pr_number" | jq -r '.head.sha')
 
-  local commit_status=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/$repo/commits/$pr_sha/status")
+  commit_status=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/$repo/commits/$pr_sha/status")
 
   if echo "$commit_status" | grep -q "API rate limit exceeded"; then
     echo ":question: Build"
   else
-    local build_status=$(echo "$commit_status" | jq '.statuses')
+    build_status=$(echo "$commit_status" | jq '.statuses')
 
     if [[ "$build_status" == "" || "$build_status" == "[]" ]]; then
       echo "No builds"
     else
-      local unique_statuses=("$(echo "$build_status" | jq -r '.[].state' | sort -u)")
+      unique_statuses=("$(echo "$build_status" | jq -r '.[].state' | sort -u)")
 
-      if [[ "$unique_statuses" == "success" ]]; then
+      if [[ "${unique_statuses[*]}" == "success" ]]; then
         echo ":white_check_mark: Build"
       else
         echo ":x: Build"
@@ -81,14 +81,14 @@ function fetch_approval_status() {
   local repo="$1"
   local pr_number="$2"
 
-  local reviews=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/${repo}/pulls/${pr_number}/reviews")
+  reviews=$(curl -s -H "$auth_header" "https://api.github.com/repos/trade-tariff/${repo}/pulls/${pr_number}/reviews")
 
   if echo "$reviews" | grep -q "API rate limit exceeded"; then
     echo ":question: approved"
   else
-    local approved_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "APPROVED")' | jq -s)
-    local changes_requested_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "CHANGES_REQUESTED" and .user.login != "dependabot[bot]")')
-    local num_approved_reviews=$(echo "$approved_reviews" | jq -r 'map(.user.login) | unique | length')
+    approved_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "APPROVED")' | jq -s)
+    changes_requested_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "CHANGES_REQUESTED" and .user.login != "dependabot[bot]")')
+    num_approved_reviews=$(echo "$approved_reviews" | jq -r 'map(.user.login) | unique | length')
 
     if [[ "$reviews" == "" || "$reviews" == "[]" ]]; then
       echo "No reviews"
@@ -196,7 +196,7 @@ all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend"
   log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend"
   log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator"
-  log_for "https://tariff-admin-production.london.cloudapps.digital/healthcheck" "trade-tariff-admin"
+  log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
   log_for "https://search.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-lambdas-fpo-search"
   last_n_logs_for "trade-tariff-api-docs" 5
