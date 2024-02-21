@@ -36,3 +36,31 @@ For example, this will produce:
 | <a href="https://www.trade-tariff.service.gov.uk/commodities/1518009122" target="_blank">1518009122</a> | Consigned from the United Kingdom |
 | <a href="https://www.trade-tariff.service.gov.uk/commodities/1518009123" target="_blank">1518009123</a> | Consigned from China |
 | <a href="https://www.trade-tariff.service.gov.uk/commodities/1518009131" target="_blank">1518009131</a> | Consigned from the United Kingdom |
+
+### bin/ecsexec.sh
+
+Script to get an ECS Exec shell up on the AWS environment you are currently in. By default it will start a `rails console`
+
+Its intended copied to the AWS Console where there are limited shell tools but will probably work fine locally with AWS Session Manager
+
+```shell
+ecsexec.sh <service> [<command>]
+```
+
+eg, to get a rails console for the XI service
+
+```shell
+ecsexec.sh xi
+```
+
+eg, to start a bash shell for the UK service
+
+```shell
+ecsexec.sh uk sh
+```
+
+eg, to run a rake task for XI
+
+```shell
+ecsexec.sh xi "bundle exec rake tariff:jobs"
+```
