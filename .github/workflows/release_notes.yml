@@ -19,7 +19,7 @@ jobs:
 
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: "trade_tariff"
+          SLACK_CHANNEL: "ott-core"
           SLACK_USERNAME: "Release Bot"
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
           EXCLUDED_DEPLOYERS: ${{ vars.EXCLUDED_DEPLOYERS }}
