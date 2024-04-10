@@ -21,5 +21,5 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CHANNEL: "ott-core"
           SLACK_USERNAME: "Release Bot"
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EXCLUDED_DEPLOYERS: ${{ vars.EXCLUDED_DEPLOYERS }}
