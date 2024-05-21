@@ -37,6 +37,7 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git"
   "https://github.com/trade-tariff/trade-tariff-reporting.git"
   "https://github.com/trade-tariff/trade-tariff-tech-docs.git"
+  "https://github.com/trade-tariff/trade-tariff-fpo-dev-hub-e2e.git"
 )
 
 for repo in "${repos[@]}"; do
@@ -208,6 +209,7 @@ all_logs() {
   last_n_logs_for "trade-tariff-platform-terraform-modules" 5
   last_n_logs_for "trade-tariff-reporting" 5
   last_n_logs_for "trade-tariff-tech-docs" 5
+  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e" 5
 }
 
 all_logs
