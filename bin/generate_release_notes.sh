@@ -28,7 +28,7 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-duty-calculator.git"
   "https://github.com/trade-tariff/trade-tariff-admin.git"
   "https://github.com/trade-tariff/trade-tariff-search-query-parser.git"
-  "https://${GITHUB_TOKEN}@github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
+  "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
   "https://github.com/trade-tariff/trade-tariff-api-docs.git"
   "https://github.com/trade-tariff/trade-tariff-testing.git"
   "https://github.com/trade-tariff/process-appendix-5a.git"
@@ -181,7 +181,7 @@ log_for() {
 
 last_n_logs_for() {
   local repo=$1
-  local days=$2
+  local days=${2:-5}
   local sha1=""
 
   cd "$repo" || exit
@@ -201,15 +201,16 @@ all_logs() {
   log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
   log_for "https://search.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-lambdas-fpo-search"
-  last_n_logs_for "trade-tariff-api-docs" 5
-  last_n_logs_for "trade-tariff-testing" 5
-  last_n_logs_for "process-appendix-5a" 5
-  last_n_logs_for "download-CDS-files" 5
-  last_n_logs_for "trade-tariff-platform-aws-terraform" 5
-  last_n_logs_for "trade-tariff-platform-terraform-modules" 5
-  last_n_logs_for "trade-tariff-reporting" 5
-  last_n_logs_for "trade-tariff-tech-docs" 5
-  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e" 5
+  last_n_logs_for "trade-tariff-api-docs"
+  last_n_logs_for "trade-tariff-testing"
+  last_n_logs_for "process-appendix-5a"
+  last_n_logs_for "download-CDS-files"
+  last_n_logs_for "trade-tariff-platform-aws-terraform"
+  last_n_logs_for "trade-tariff-platform-terraform-modules"
+  last_n_logs_for "trade-tariff-reporting"
+  last_n_logs_for "trade-tariff-tech-docs"
+  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e"
+  last_n_logs_for "trade-tariff-lambdas-fpo-search"
 }
 
 all_logs
