@@ -28,7 +28,6 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-duty-calculator.git"
   "https://github.com/trade-tariff/trade-tariff-admin.git"
   "https://github.com/trade-tariff/trade-tariff-search-query-parser.git"
-  "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
   "https://github.com/trade-tariff/trade-tariff-api-docs.git"
   "https://github.com/trade-tariff/trade-tariff-testing.git"
   "https://github.com/trade-tariff/process-appendix-5a.git"
@@ -39,8 +38,9 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-tech-docs.git"
   "https://github.com/trade-tariff/trade-tariff-fpo-dev-hub-e2e.git"
   "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
-  "https://github.com/trade-tariff/trade-tariff-dev-hub-frontend.git
-  "https://github.com/trade-tariff/trade-tariff-dev-hub-backend.git
+  "https://github.com/trade-tariff/trade-tariff-dev-hub-frontend.git"
+  "https://github.com/trade-tariff/trade-tariff-dev-hub-backend.git"
+  "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection"
 )
 
 for repo in "${repos[@]}"; do
@@ -208,7 +208,6 @@ all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator"
   log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
-  log_for "https://search.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-lambdas-fpo-search"
   last_n_logs_for "trade-tariff-api-docs"
   last_n_logs_for "trade-tariff-testing"
   last_n_logs_for "process-appendix-5a"
