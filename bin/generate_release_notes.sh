@@ -147,9 +147,9 @@ function print_merge_logs() {
   if [ "$merge_commits" != "" ]; then
     echo
     if [ "$release_type" == "continuous" ]; then
-      echo "*$repo* (manual deployment)"
-    else
       echo "*$repo* (continuous deployment)"
+    else
+      echo "*$repo* (manual deployment)"
     fi
     echo
 
