@@ -28,7 +28,6 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-duty-calculator.git"
   "https://github.com/trade-tariff/trade-tariff-admin.git"
   "https://github.com/trade-tariff/trade-tariff-search-query-parser.git"
-  "https://${GITHUB_TOKEN}@github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
   "https://github.com/trade-tariff/trade-tariff-api-docs.git"
   "https://github.com/trade-tariff/trade-tariff-testing.git"
   "https://github.com/trade-tariff/process-appendix-5a.git"
@@ -38,6 +37,10 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-reporting.git"
   "https://github.com/trade-tariff/trade-tariff-tech-docs.git"
   "https://github.com/trade-tariff/trade-tariff-fpo-dev-hub-e2e.git"
+  "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
+  "https://github.com/trade-tariff/trade-tariff-dev-hub-frontend.git"
+  "https://github.com/trade-tariff/trade-tariff-dev-hub-backend.git"
+  "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection"
 )
 
 for repo in "${repos[@]}"; do
@@ -139,10 +142,15 @@ function print_merge_logs() {
   local merge_commits=$1
   local repo=$2
   local sha1=$3
+  local release_type=$4
 
   if [ "$merge_commits" != "" ]; then
     echo
-    echo "*$repo*"
+    if [ "$release_type" == "continuous" ]; then
+      echo "*$repo* (continuous deployment)"
+    else
+      echo "*$repo* (manual deployment)"
+    fi
     echo
 
     echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
@@ -174,14 +182,14 @@ log_for() {
   sha1=$(curl --silent "$url" | jq '.git_sha1' | tr -d '"')
   merge_commits=$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits" "$repo" "$sha1"
+  print_merge_logs "$merge_commits" "$repo" "$sha1" "batched"
 
   cd ..
 }
 
 last_n_logs_for() {
   local repo=$1
-  local days=$2
+  local days=${2:-5}
   local sha1=""
 
   cd "$repo" || exit
@@ -189,7 +197,7 @@ last_n_logs_for() {
   sha1=$(git rev-parse --short HEAD)
   merge_commits=$(git log --merges --since="$days days ago" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits" "$repo" "$sha1"
+  print_merge_logs "$merge_commits" "$repo" "$sha1" "continuous"
 
   cd ..
 }
@@ -200,16 +208,19 @@ all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator"
   log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin"
   log_for "https://www.trade-tariff.service.gov.uk/api/search/healthcheck" "trade-tariff-search-query-parser"
-  log_for "https://search.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-lambdas-fpo-search"
-  last_n_logs_for "trade-tariff-api-docs" 5
-  last_n_logs_for "trade-tariff-testing" 5
-  last_n_logs_for "process-appendix-5a" 5
-  last_n_logs_for "download-CDS-files" 5
-  last_n_logs_for "trade-tariff-platform-aws-terraform" 5
-  last_n_logs_for "trade-tariff-platform-terraform-modules" 5
-  last_n_logs_for "trade-tariff-reporting" 5
-  last_n_logs_for "trade-tariff-tech-docs" 5
-  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e" 5
+  last_n_logs_for "trade-tariff-api-docs"
+  last_n_logs_for "trade-tariff-testing"
+  last_n_logs_for "process-appendix-5a"
+  last_n_logs_for "download-CDS-files"
+  last_n_logs_for "trade-tariff-platform-aws-terraform"
+  last_n_logs_for "trade-tariff-platform-terraform-modules"
+  last_n_logs_for "trade-tariff-reporting"
+  last_n_logs_for "trade-tariff-tech-docs"
+  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e"
+  last_n_logs_for "trade-tariff-lambdas-fpo-search"
+  last_n_logs_for "trade-tariff-lambdas-fpo-model-garbage-collection"
+  last_n_logs_for "trade-tariff-dev-hub-frontend"
+  last_n_logs_for "trade-tariff-dev-hub-backend"
 }
 
 all_logs
