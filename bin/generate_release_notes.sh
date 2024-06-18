@@ -142,10 +142,15 @@ function print_merge_logs() {
   local merge_commits=$1
   local repo=$2
   local sha1=$3
+  local release_type=$4
 
   if [ "$merge_commits" != "" ]; then
     echo
-    echo "*$repo*"
+    if [ "$release_type" == "continuous" ]; then
+      echo "*$repo* (manual deployment)"
+    else
+      echo "*$repo* (continuous deployment)"
+    fi
     echo
 
     echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
@@ -177,7 +182,7 @@ log_for() {
   sha1=$(curl --silent "$url" | jq '.git_sha1' | tr -d '"')
   merge_commits=$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits" "$repo" "$sha1"
+  print_merge_logs "$merge_commits" "$repo" "$sha1" "batched"
 
   cd ..
 }
@@ -192,7 +197,7 @@ last_n_logs_for() {
   sha1=$(git rev-parse --short HEAD)
   merge_commits=$(git log --merges --since="$days days ago" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits" "$repo" "$sha1"
+  print_merge_logs "$merge_commits" "$repo" "$sha1" "continuous"
 
   cd ..
 }
