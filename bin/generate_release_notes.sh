@@ -42,6 +42,7 @@ repos=(
   "https://github.com/trade-tariff/trade-tariff-dev-hub-backend.git"
   "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection"
   "https://github.com/trade-tariff/trade-tariff-lambdas-database-replication"
+  "https://github.com/trade-tariff/trade-tariff-commodi-tea"
 )
 
 for repo in "${repos[@]}"; do
@@ -223,6 +224,7 @@ all_logs() {
   last_n_logs_for "trade-tariff-dev-hub-frontend"
   last_n_logs_for "trade-tariff-dev-hub-backend"
   last_n_logs_for "trade-tariff-lambdas-database-replication"
+  last_n_logs_for "trade-tariff-commodi-tea"
 }
 
 all_logs
