@@ -200,8 +200,8 @@ log_for() {
 
 last_n_logs_for() {
   local repo=$1
-  local days=${2:-5}
-  local release_type=$3
+  local release_type=$2
+  local days=${3:-5}
   local sha1=""
 
   cd "$repo" || exit
