@@ -147,19 +147,20 @@ function print_merge_logs() {
 
   if [ "$merge_commits" != "" ]; then
     echo
-    case "$release_type"; in
-    "continuous")
-      echo "*$repo* (continuous deployment)"
-      ;;
-    "manual")
-      echo "*$repo* (manual deployment)"
-      ;;
-    "n/a")
-      echo "*$repo* (no deployment)"
-      ;;
-    *)
-      echo "*$repo*"
-      ;;
+
+    case "$release_type" in
+      "continuous")
+        echo "*$repo* (continuous deployment)"
+        ;;
+      "manual")
+        echo "*$repo* (manual deployment)"
+        ;;
+      "n/a")
+        echo "*$repo* (no deployment)"
+        ;;
+      *)
+        echo "*$repo*"
+        ;;
     esac
 
     echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
