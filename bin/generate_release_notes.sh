@@ -133,7 +133,7 @@ cachedFetchAuthor() {
       author="<https://github.com/$author|$author>"
     fi
 
-    echo "$email,$author" >> "$cache_file"
+    echo "$email,$author" >>"$cache_file"
   fi
 
   echo "$author"
@@ -147,12 +147,20 @@ function print_merge_logs() {
 
   if [ "$merge_commits" != "" ]; then
     echo
-    if [ "$release_type" == "continuous" ]; then
+    case "$release_type"; in
+    "continuous")
       echo "*$repo* (continuous deployment)"
-    else
+      ;;
+    "manual")
       echo "*$repo* (manual deployment)"
-    fi
-    echo
+      ;;
+    "n/a")
+      echo "*$repo* (no deployment)"
+      ;;
+    *)
+      echo "*$repo*"
+      ;;
+    esac
 
     echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
     echo
@@ -167,7 +175,7 @@ function print_merge_logs() {
       # pr_status="$(check_pr_status "$repo" "$pr_number")"
 
       echo "- <${pr_link}|${message}> by ${username}"
-    done <<< "$merge_commits"
+    done <<<"$merge_commits"
 
     echo
   fi
@@ -176,6 +184,7 @@ function print_merge_logs() {
 log_for() {
   local url=$1
   local repo=$2
+  local release_type=$3
   local sha1=""
 
   cd "$repo" || exit
@@ -183,7 +192,7 @@ log_for() {
   sha1=$(curl --silent "$url" | jq '.git_sha1' | tr -d '"')
   merge_commits=$(git --no-pager log --merges HEAD..."$sha1" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits" "$repo" "$sha1" "batched"
+  print_merge_logs "$merge_commits" "$repo" "$sha1" "$release_type"
 
   cd ..
 }
@@ -191,6 +200,7 @@ log_for() {
 last_n_logs_for() {
   local repo=$1
   local days=${2:-5}
+  local release_type=$3
   local sha1=""
 
   cd "$repo" || exit
@@ -198,31 +208,31 @@ last_n_logs_for() {
   sha1=$(git rev-parse --short HEAD)
   merge_commits=$(git log --merges --since="$days days ago" --format="format:%b|%s|%ae" --grep 'Merge pull request')
 
-  print_merge_logs "$merge_commits" "$repo" "$sha1" "continuous"
+  print_merge_logs "$merge_commits" "$repo" "$sha1" "$release_type"
 
   cd ..
 }
 
 all_logs() {
-  log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend"
-  log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend"
-  log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator"
-  log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin"
-  last_n_logs_for "trade-tariff-api-docs"
-  last_n_logs_for "trade-tariff-testing"
-  last_n_logs_for "process-appendix-5a"
-  last_n_logs_for "download-CDS-files"
-  last_n_logs_for "trade-tariff-platform-aws-terraform"
-  last_n_logs_for "trade-tariff-platform-terraform-modules"
-  last_n_logs_for "trade-tariff-reporting"
-  last_n_logs_for "trade-tariff-tech-docs"
-  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e"
-  last_n_logs_for "trade-tariff-lambdas-fpo-search"
-  last_n_logs_for "trade-tariff-lambdas-fpo-model-garbage-collection"
-  last_n_logs_for "trade-tariff-dev-hub-frontend"
-  last_n_logs_for "trade-tariff-dev-hub-backend"
-  last_n_logs_for "trade-tariff-lambdas-database-replication"
-  last_n_logs_for "trade-tariff-commodi-tea"
+  log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend" "manual"
+  log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend" "manual"
+  log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator" "manual"
+  log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin" "n/a"
+  last_n_logs_for "trade-tariff-api-docs" "continuous"
+  last_n_logs_for "trade-tariff-testing" "n/a"
+  last_n_logs_for "process-appendix-5a" "continuous"
+  last_n_logs_for "download-CDS-files" "n/a"
+  last_n_logs_for "trade-tariff-platform-aws-terraform" "manual"
+  last_n_logs_for "trade-tariff-platform-terraform-modules" "n/a"
+  last_n_logs_for "trade-tariff-reporting" "continuous"
+  last_n_logs_for "trade-tariff-tech-docs" "continuous"
+  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e" "continuous"
+  last_n_logs_for "trade-tariff-lambdas-fpo-search" "continuous"
+  last_n_logs_for "trade-tariff-lambdas-fpo-model-garbage-collection" "continuous"
+  last_n_logs_for "trade-tariff-dev-hub-frontend" "continuous"
+  last_n_logs_for "trade-tariff-dev-hub-backend" "continuous"
+  last_n_logs_for "trade-tariff-lambdas-database-replication" "continuous"
+  last_n_logs_for "trade-tariff-commodi-tea" "continuous"
 }
 
 all_logs
