@@ -218,7 +218,7 @@ all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend" "manual"
   log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend" "manual"
   log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator" "manual"
-  log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin" "n/a"
+  log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin" "manual"
   last_n_logs_for "trade-tariff-api-docs" "continuous"
   last_n_logs_for "trade-tariff-testing" "n/a"
   last_n_logs_for "process-appendix-5a" "continuous"
