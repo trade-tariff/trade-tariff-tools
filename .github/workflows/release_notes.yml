@@ -3,7 +3,7 @@ name: Release Notes
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 7 * * 1,4"
+    - cron: "25 7 * * 1,4"
 
 jobs:
   release_notes:
