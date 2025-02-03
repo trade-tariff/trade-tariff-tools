@@ -22,4 +22,3 @@ jobs:
           SLACK_CHANNEL: "ott-core"
           SLACK_USERNAME: "Release Bot"
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
-          EXCLUDED_DEPLOYERS: ${{ vars.EXCLUDED_DEPLOYERS }}

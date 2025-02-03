@@ -3,8 +3,6 @@
 set -o errexit
 set -o nounset
 
-source bin/fetch-deployers
-
 if [ -d "repos" ]; then
   rm -rf repos
 fi
@@ -173,8 +171,10 @@ function print_merge_logs() {
       username=$(cachedFetchAuthor "$email")
       pr_number=$(echo "$subject_line" | sed 's/^Merge pull request #\([0-9]*\).*$/\1/g')
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
-      # pr_status="$(check_pr_status "$repo" "$pr_number")"
 
+      if [ "$username"] == "https://github.com" ]; then
+        username="$email"
+      fi
       echo "- <${pr_link}|${message}> by ${username}"
     done <<<"$merge_commits"
 
@@ -237,6 +237,5 @@ all_logs() {
 }
 
 all_logs
-fetch_and_present_deployers
 
 rm -rf repos
