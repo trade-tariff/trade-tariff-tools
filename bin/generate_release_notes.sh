@@ -125,17 +125,13 @@ cachedFetchAuthor() {
   else
     author=$(curl -s "https://api.github.com/search/users?q=$email+in:email" | jq -r '.items[0].login')
 
-    if [ "$author" == "null" ]; then
+    if [[ "$author" == "null" || -z "$author" ]]; then
       author="$email"
     else
       author="<https://github.com/$author|$author>"
     fi
 
     echo "$email,$author" >>"$cache_file"
-  fi
-
-  if [ "$author"] == "<https://github.com>" ]; then
-    author="$email"
   fi
 
   echo "$author"

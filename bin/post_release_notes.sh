@@ -17,4 +17,7 @@ payload="{
   \"mrkdwn\": true
 }"
 
+
+echo "Payload: $payload"
+
 curl -X POST -H "Content-type: application/json" --data "$payload" "$webhook_url"
