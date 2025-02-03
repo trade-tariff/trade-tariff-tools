@@ -134,6 +134,10 @@ cachedFetchAuthor() {
     echo "$email,$author" >>"$cache_file"
   fi
 
+  if [ "$author"] == "<https://github.com>" ]; then
+    author="$email"
+  fi
+
   echo "$author"
 }
 
@@ -172,9 +176,6 @@ function print_merge_logs() {
       pr_number=$(echo "$subject_line" | sed 's/^Merge pull request #\([0-9]*\).*$/\1/g')
       pr_link="https://github.com/trade-tariff/${repo}/pull/${pr_number}"
 
-      if [ "$username"] == "https://github.com" ]; then
-        username="$email"
-      fi
       echo "- <${pr_link}|${message}> by ${username}"
     done <<<"$merge_commits"
 
