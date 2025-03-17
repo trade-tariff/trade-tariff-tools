@@ -35,7 +35,7 @@ runs:
     - uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.9.8
-    - uses: ./.github/actions/setup-ssh
+    - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
       with:
         ssh-key: ${{ inputs.ssh-key }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
