@@ -1,6 +1,10 @@
 name: 'Apply Terraform'
 description: 'Run a terraform apply command to apply the changes.'
 
+env:
+  TF_INPUT: 0
+  TF_IN_AUTOMATION: 1
+
 inputs:
   environment:
     required: true
