@@ -48,7 +48,7 @@ runs:
           exit 1
         fi
 
-        RELEASE_IMAGE_NAME="${{ inputs.ecr-url }}:$(release-$(date +"%Y%m%d-%H%M"))"
+        RELEASE_IMAGE_NAME="${{ inputs.ecr-url }}:release-$(date +"%Y%m%d-%H%M")"
 
         docker pull $EXISTING_IMAGE_NAME
         docker tag $EXISTING_IMAGE_NAME $RELEASE_IMAGE_NAME
