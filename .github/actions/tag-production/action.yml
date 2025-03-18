@@ -12,6 +12,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ env.IAM_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
     - id: resolved-ref
       run: |
         REF=${{ inputs.ref }}
