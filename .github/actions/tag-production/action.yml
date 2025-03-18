@@ -42,7 +42,7 @@ runs:
           --image-ids imageTag="$REF" \
           --region "${{ inputs.region }}" \
           > /dev/null 2>&1; then
-          echo "::notice::Image $EXISTING_IMAGE_NAME already exists in ECR. Creating a tag for this release.
+          echo "::notice::Image $EXISTING_IMAGE_NAME already exists in ECR. Creating a tag for this release."
         else
           echo "::error::Image $EXISTING_IMAGE_NAME not found in ECR. Fatal skipping tagging"
           exit 1
