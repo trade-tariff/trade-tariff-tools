@@ -10,6 +10,7 @@ import requests
 # You can call it with python3 bin/ott_search_stat.py
 #
 # results will be populate into  search_results.xlsx with three different sheets,
+# results will be populate into  search_results.xlsx with three different sheets,
 # one per each section in front end search result page
 
 
@@ -22,6 +23,7 @@ def get_goods_nomenclature_item_id(data):
 
     # Case 2: Nested inside reference
     reference = source.get("reference", {})
+    return reference.get("goods_nomenclature_item_id", "N/A")
     return reference.get("goods_nomenclature_item_id", "N/A")
 
 
@@ -43,17 +45,7 @@ workbook.create_sheet("Other Results")
 
 for sheet_name in workbook.sheetnames:
     sheet = workbook[sheet_name]
-    sheet.append(
-        [
-            "Query",
-            "Type",
-            "Commodity 1",
-            "Commodity 2",
-            "Commodity 3",
-            "Commodity 4",
-            "Commodity 5",
-        ]
-    )
+    sheet.append(["Query", "Type", "Commodity 1", "Commodity 2", "Commodity 3", "Commodity 4", "Commodity 5"])
 
 
 with open("queries.txt", "r") as file:
