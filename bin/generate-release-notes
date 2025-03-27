@@ -3,8 +3,6 @@
 set -o errexit
 set -o nounset
 
-source bin/fetch-deployers
-
 if [ -d "repos" ]; then
   rm -rf repos
 fi
@@ -16,8 +14,6 @@ if [[ -z "$GITHUB_TOKEN" ]]; then
   exit 1
 fi
 
-auth_header="Authorization: token $GITHUB_TOKEN"
-
 mkdir repos
 
 cd repos || exit 1
@@ -25,15 +21,11 @@ cd repos || exit 1
 repos=(
   "https://github.com/trade-tariff/trade-tariff-frontend.git"
   "https://github.com/trade-tariff/trade-tariff-backend.git"
-  "https://github.com/trade-tariff/trade-tariff-duty-calculator.git"
   "https://github.com/trade-tariff/trade-tariff-admin.git"
   "https://github.com/trade-tariff/trade-tariff-api-docs.git"
   "https://github.com/trade-tariff/trade-tariff-platform-aws-terraform.git"
   "https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git"
-  "https://github.com/trade-tariff/trade-tariff-tech-docs.git"
-  "https://github.com/trade-tariff/trade-tariff-fpo-dev-hub-e2e.git"
   "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-search.git"
-  "https://github.com/trade-tariff/trade-tariff-lambdas-fpo-model-garbage-collection"
 )
 
 for repo in "${repos[@]}"; do
@@ -147,18 +139,13 @@ last_n_logs_for() {
 all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend" "manual"
   log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend" "manual"
-  log_for "https://www.trade-tariff.service.gov.uk/duty-calculator/healthcheck" "trade-tariff-duty-calculator" "manual"
   log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin" "manual"
   last_n_logs_for "trade-tariff-api-docs" "continuous"
   last_n_logs_for "trade-tariff-platform-aws-terraform" "manual"
   last_n_logs_for "trade-tariff-platform-terraform-modules" "n/a"
-  last_n_logs_for "trade-tariff-tech-docs" "continuous"
-  last_n_logs_for "trade-tariff-fpo-dev-hub-e2e" "continuous"
   last_n_logs_for "trade-tariff-lambdas-fpo-search" "continuous"
-  last_n_logs_for "trade-tariff-lambdas-fpo-model-garbage-collection" "continuous"
 }
 
 all_logs
-fetch_and_present_deployers
 
 rm -rf repos
