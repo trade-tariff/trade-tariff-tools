@@ -15,11 +15,10 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Post release notes to slack
-        run: bash bin/post_release_notes.sh
+        run: bash bin/post-release-notes
 
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CHANNEL: "ott-core"
           SLACK_USERNAME: "Release Bot"
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
-          EXCLUDED_DEPLOYERS: ${{ vars.EXCLUDED_DEPLOYERS }}
