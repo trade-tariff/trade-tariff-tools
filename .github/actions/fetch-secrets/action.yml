@@ -1,0 +1,29 @@
+name: "Fetch AWS Secrets"
+description: "Retrieve AWS Secrets Manager secrets and store them in a file of environment variables"
+
+inputs:
+  secret-name:
+    description: "Name of the secret in AWS Secrets Manager"
+    required: true
+  env-file:
+    description: 'Path to the environment file'
+    required: false
+    default: '.env'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ env.IAM_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Fetch and store secrets
+      run: |
+        aws secretsmanager get-secret-value \
+          --secret-id "${{ inputs.secret-name }}" \
+          --query "SecretString" \
+          --output text \
+          | jq -r 'to_entries | map("(.key)=(.value)") | join("\n")' > ${{ inputs.env-file }}
+      shell: bash
