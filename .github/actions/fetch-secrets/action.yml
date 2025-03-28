@@ -25,5 +25,5 @@ runs:
           --secret-id "${{ inputs.secret-name }}" \
           --query "SecretString" \
           --output text \
-          | jq -r 'to_entries | map("(.key)=(.value)") | join("\n")' > ${{ inputs.env-file }}
+          | jq -r 'to_entries | map("\(.key)=\(.value)") | join("\n")' > ${{ inputs.env-file }}
       shell: bash
