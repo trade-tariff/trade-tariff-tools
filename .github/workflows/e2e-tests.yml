@@ -20,6 +20,10 @@ on:
         description: 'The basic auth password'
         required: false
         type: string
+    secrets:
+      basic_password:
+        description: 'The basic auth password'
+        required: true
   workflow_dispatch:
     inputs: 
       test-url:
@@ -52,20 +56,12 @@ jobs:
             echo "ADMIN_URL=${{ github.event.inputs.admin-test-url }}" >> $GITHUB_ENV
             echo "BASE_URL=${{ github.event.inputs.test-url }}" >> $GITHUB_ENV
             echo "REF=${{ github.event.inputs.ref }}" >> $GITHUB_ENV
-            if [ "${{ github.event.inputs.basic-password }}" ]; then
-              echo "BASIC_PASSWORD=${{ github.event.inputs.basic-password }}" >> $GITHUB_ENV
-            else
-              echo "BASIC_PASSWORD=${{ secrets.BASIC_PASSWORD }}" >> $GITHUB_ENV
-            fi
+            echo "BASIC_PASSWORD=${{ secrets.BASIC_PASSWORD }}" >> $GITHUB_ENV
           else
             echo "ADMIN_URL=${{ inputs.admin-test-url }}" >> $GITHUB_ENV
             echo "BASE_URL=${{ inputs.test-url }}" >> $GITHUB_ENV
             echo "REF=${{ inputs.ref }}" >> $GITHUB_ENV
-            if [ "${{ inputs.basic-password }}" ]; then
-              echo "BASIC_PASSWORD=${{ inputs.basic-password }}" >> $GITHUB_ENV
-            else
-              echo "BASIC_PASSWORD=${{ secrets.BASIC_PASSWORD }}" >> $GITHUB_ENV
-            fi
+            echo "BASIC_PASSWORD=${{ secrets.BASIC_PASSWORD }}" >> $GITHUB_ENV
           fi
       - uses: actions/checkout@v4
         with:
@@ -80,5 +76,5 @@ jobs:
         env:
           ADMIN_URL: ${{ env.ADMIN_URL }}
           BASE_URL: ${{ env.BASE_URL }}
-          BASIC_PASSWORD: ${{ env.BASIC_PASSWORD }}
+          BASIC_PASSWORD: ${{ 
           CI: true
