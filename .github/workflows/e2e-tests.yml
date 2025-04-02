@@ -14,6 +14,10 @@ common-inputs: &common-inputs
     description: 'The e2e-test repo reference to run with'
     type: string
     default: 'main'
+  basic-password:
+    description: 'The basic auth password'
+    required: false
+    type: string
 
 on:
   workflow_call:
@@ -29,18 +33,39 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        repository: trade-tariff/trade-tariff-e2e-tests
-        ref: ${{ github.event.inputs.ref }}
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - run: npm install -g yarn && yarn
-    - run: yarn playwright install --with-deps chromium
-    - run: yarn run test
-      env:
-        ADMIN_URL: ${{ inputs.admin-test-url }}
-        BASE_URL: ${{ inputs.test-url }}
-        BASIC_PASSWORD: ${{ secrets.BASIC_PASSWORD }}
-        CI: true
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ADMIN_URL=${{ github.event.inputs.admin-test-url }}" >> $GITHUB_ENV
+            echo "BASE_URL=${{ github.event.inputs.test-url }}" >> $GITHUB_ENV
+            echo "REF=${{ github.event.inputs.ref }}" >> $GITHUB_ENV
+            if [ "${{ github.event.inputs.basic-password }}" ]; then
+              echo "BASIC_PASSWORD=${{ github.event.inputs.basic-password }}" >> $GITHUB_ENV
+            else
+              echo "BASIC_PASSWORD=${{ secrets.BASIC_PASSWORD }}" >> $GITHUB_ENV
+            fi
+          else
+            echo "ADMIN_URL=${{ inputs.admin-test-url }}" >> $GITHUB_ENV
+            echo "BASE_URL=${{ inputs.test-url }}" >> $GITHUB_ENV
+            echo "REF=${{ inputs.ref }}" >> $GITHUB_ENV
+            if [ "${{ inputs.basic-password }}" ]; then
+              echo "BASIC_PASSWORD=${{ inputs.basic-password }}" >> $GITHUB_ENV
+            else
+              echo "BASIC_PASSWORD=${{ secrets.BASIC_PASSWORD }}" >> $GITHUB_ENV
+            fi
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: trade-tariff/trade-tariff-e2e-tests
+          ref: ${{ env.REF }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: npm install -g yarn && yarn
+      - run: yarn playwright install --with-deps chromium
+      - run: yarn run test
+        env:
+          ADMIN_URL: ${{ env.ADMIN_URL }}
+          BASE_URL: ${{ env.BASE_URL }}
+          BASIC_PASSWORD: ${{ env.BASIC_PASSWORD }}
+          CI: true
