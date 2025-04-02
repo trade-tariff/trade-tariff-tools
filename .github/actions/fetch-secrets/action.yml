@@ -20,10 +20,11 @@ runs:
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Fetch and store secrets
+      shell: bash
       run: |
         aws secretsmanager get-secret-value \
           --secret-id "${{ inputs.secret-name }}" \
           --query "SecretString" \
           --output text \
-          | jq -r 'to_entries | map("\(.key)=\(.value)") | join("\n")' > ${{ inputs.env-file }}
-      shell: bash
+          | jq -r 'to_entries[] | "\(.key)=\"\(.value)\""' > "${{ inputs.env-file }}"
+      
