@@ -23,7 +23,7 @@ on:
     secrets:
       basic_password:
         description: 'The basic auth password'
-        required: true
+        required: false
   workflow_dispatch:
     inputs:
       test-url:
