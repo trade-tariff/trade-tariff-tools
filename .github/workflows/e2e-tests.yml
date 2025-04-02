@@ -49,7 +49,7 @@ jobs:
     - run: yarn playwright install --with-deps chromium
     - run: yarn run test
       env:
-        ADMIN_URL: ${{ github.event.inputs.admin-test-url }}
-        BASE_URL: ${{ github.event.inputs.test-url }}
+        ADMIN_URL: ${{ inputs.admin-test-url || github.event.inputs.admin-test-url }}
+        BASE_URL: ${{ inputs.test-url || github.event.inputs.test-url }}
         BASIC_PASSWORD: ${{ secrets.BASIC_PASSWORD }}
         CI: true
