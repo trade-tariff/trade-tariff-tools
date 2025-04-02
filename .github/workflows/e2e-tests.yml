@@ -1,31 +1,44 @@
 name: e2e-tests
 
-common-inputs: &common-inputs
-  test-url:
-    description: 'The URL to run the E2E tests against'
-    required: true
-    type: string
-  admin-test-url:
-    description: 'The admin URL to run the E2E tests against'
-    required: false
-    type: string
-    default: 'https://admin.dev.trade-tariff.service.gov.uk'
-  ref:
-    description: 'The e2e-test repo reference to run with'
-    type: string
-    default: 'main'
-  basic-password:
-    description: 'The basic auth password'
-    required: false
-    type: string
-
 on:
   workflow_call:
     inputs: 
-      <<: *common-inputs
+      test-url:
+        description: 'The URL to run the E2E tests against'
+        required: true
+        type: string
+      admin-test-url:
+        description: 'The admin URL to run the E2E tests against'
+        required: false
+        type: string
+        default: 'https://admin.dev.trade-tariff.service.gov.uk'
+      ref:
+        description: 'The e2e-test repo reference to run with'
+        type: string
+        default: 'main'
+      basic-password:
+        description: 'The basic auth password'
+        required: false
+        type: string
   workflow_dispatch:
     inputs: 
-      <<: *common-inputs
+      test-url:
+        description: 'The URL to run the E2E tests against'
+        required: true
+        type: string
+      admin-test-url:
+        description: 'The admin URL to run the E2E tests against'
+        required: false
+        type: string
+        default: 'https://admin.dev.trade-tariff.service.gov.uk'
+      ref:
+        description: 'The e2e-test repo reference to run with'
+        type: string
+        default: 'main'
+      basic-password:
+        description: 'The basic auth password'
+        required: false
+        type: string
 
 jobs:
   test:
