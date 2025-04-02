@@ -2,7 +2,7 @@ name: e2e-tests
 
 on:
   workflow_call:
-    inputs: 
+    inputs:
       test-url:
         description: 'The URL to run the E2E tests against'
         required: true
@@ -25,7 +25,7 @@ on:
         description: 'The basic auth password'
         required: true
   workflow_dispatch:
-    inputs: 
+    inputs:
       test-url:
         description: 'The URL to run the E2E tests against'
         required: true
@@ -76,5 +76,5 @@ jobs:
         env:
           ADMIN_URL: ${{ env.ADMIN_URL }}
           BASE_URL: ${{ env.BASE_URL }}
-          BASIC_PASSWORD: ${{ 
+          BASIC_PASSWORD: ${{ env.BASIC_PASSWORD }}
           CI: true
