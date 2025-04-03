@@ -21,7 +21,6 @@ cd repos || exit 1
 repos=(
   "https://github.com/trade-tariff/trade-tariff-frontend.git"
   "https://github.com/trade-tariff/trade-tariff-backend.git"
-  "https://github.com/trade-tariff/trade-tariff-admin.git"
   "https://github.com/trade-tariff/trade-tariff-api-docs.git"
   "https://github.com/trade-tariff/trade-tariff-platform-aws-terraform.git"
   "https://github.com/trade-tariff/trade-tariff-platform-terraform-modules.git"
@@ -72,18 +71,18 @@ function print_merge_logs() {
     echo
 
     case "$release_type" in
-      "continuous")
-        echo "*$repo* (continuous deployment)"
-        ;;
-      "manual")
-        echo "*$repo* (manual deployment)"
-        ;;
-      "n/a")
-        echo "*$repo* (no deployment)"
-        ;;
-      *)
-        echo "*$repo*"
-        ;;
+    "continuous")
+      echo "*$repo* (continuous deployment)"
+      ;;
+    "manual")
+      echo "*$repo* (manual deployment)"
+      ;;
+    "n/a")
+      echo "*$repo* (no deployment)"
+      ;;
+    *)
+      echo "*$repo*"
+      ;;
     esac
 
     echo "_<https://github.com/trade-tariff/$repo/commit/$sha1|${sha1}>_"
@@ -139,7 +138,6 @@ last_n_logs_for() {
 all_logs() {
   log_for "https://www.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-frontend" "manual"
   log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend" "manual"
-  log_for "https://admin.trade-tariff.service.gov.uk/healthcheck" "trade-tariff-admin" "manual"
   last_n_logs_for "trade-tariff-api-docs" "continuous"
   last_n_logs_for "trade-tariff-platform-aws-terraform" "manual"
   last_n_logs_for "trade-tariff-platform-terraform-modules" "n/a"
