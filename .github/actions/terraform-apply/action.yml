@@ -44,7 +44,7 @@ runs:
         ssh-key: ${{ inputs.ssh-key }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
       shell: bash
-    - run: cd terraform && terraform apply -var-file=config_${{ inputs.environment }}.tfvars -auto-approve
+    - run: cd terraform && terraform apply -var-file=config_${{ inputs.environment }}.tfvars -auto-approve -lock-timeout=10m
       shell: bash
       env:
         TF_VAR_docker_tag: ${{ steps.resolved-ref.outputs.RESOLVED_REF }}
