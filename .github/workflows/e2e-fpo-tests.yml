@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: trade-tariff/trade-tariff-e2e-tests
+          repository: trade-tariff/trade-tariff-fpo-dev-hub-e2e
           ref: ${{ env.REF }}
 
       - uses: actions/setup-node@v4
