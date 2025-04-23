@@ -1,4 +1,5 @@
-name: e2e-tests
+
+name: e2e-fpo-tests
 
 on:
   workflow_call:
@@ -7,22 +8,16 @@ on:
         description: 'The URL to run the E2E tests against'
         required: true
         type: string
-      admin-test-url:
-        description: 'The admin URL to run the E2E tests against'
-        required: false
-        type: string
-        default: 'https://admin.dev.trade-tariff.service.gov.uk'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
-      basic-password:
-        description: 'The basic auth password'
-        required: false
-        type: string
     secrets:
-      basic_password:
-        description: 'The basic auth password'
+      scp-username:
+        description: 'The scp auth username'
+        required: false
+      scp-password:
+        description: 'The scp auth password'
         required: false
   workflow_dispatch:
     inputs:
@@ -30,17 +25,16 @@ on:
         description: 'The URL to run the E2E tests against'
         required: true
         type: string
-      admin-test-url:
-        description: 'The admin URL to run the E2E tests against'
-        required: false
-        type: string
-        default: 'https://admin.dev.trade-tariff.service.gov.uk'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
-      basic-password:
-        description: 'The basic auth password'
+      scp-username:
+        description: 'The scp auth username'
+        required: false
+        type: string
+      scp-password:
+        description: 'The scp auth password'
         required: false
         type: string
 
@@ -54,14 +48,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             {
-              echo "ADMIN_URL=${{ github.event.inputs.admin-test-url }}"
-              echo "BASE_URL=${{ github.event.inputs.test-url }}"
+              echo "URL=${{ github.event.inputs.test-url }}"
               echo "REF=${{ github.event.inputs.ref }}"
             } >> "$GITHUB_ENV"
           else
             {
-              echo "ADMIN_URL=${{ inputs.admin-test-url }}"
-              echo "BASE_URL=${{ inputs.test-url }}"
+              echo "URL=${{ inputs.test-url }}"
               echo "REF=${{ inputs.ref }}"
             } >> "$GITHUB_ENV"
           fi
@@ -88,7 +80,7 @@ jobs:
 
       - run: yarn run test
         env:
-          ADMIN_URL: ${{ env.ADMIN_URL }}
-          BASE_URL: ${{ env.BASE_URL }}
-          BASIC_PASSWORD: ${{ secrets.BASIC_PASSWORD }}
+          URL: ${{ env.URL }}
+          SCP_USERNAME: ${{ secrets.scp-username }}
+          SCP_PASSWORD: ${{ secrets.scp-password }}
           CI: true
