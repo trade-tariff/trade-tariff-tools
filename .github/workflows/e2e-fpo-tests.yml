@@ -4,10 +4,10 @@ name: e2e-fpo-tests
 on:
   workflow_call:
     inputs:
-      test-url:
-        description: 'The URL to run the E2E tests against'
-        required: true
+      test-environment:
+        description: 'The e2e-test environment to run against'
         type: string
+        default: 'development'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
@@ -21,10 +21,10 @@ on:
         required: false
   workflow_dispatch:
     inputs:
-      test-url:
-        description: 'The URL to run the E2E tests against'
-        required: true
+      test-environment:
+        description: 'The e2e-test environment to run against'
         type: string
+        default: 'development'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
@@ -48,12 +48,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             {
-              echo "URL=${{ github.event.inputs.test-url }}"
+              echo "PLAYWRIGHT_ENV=${{ github.event.inputs.test-environment }}"
               echo "REF=${{ github.event.inputs.ref }}"
             } >> "$GITHUB_ENV"
           else
             {
-              echo "URL=${{ inputs.test-url }}"
+              echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
               echo "REF=${{ inputs.ref }}"
             } >> "$GITHUB_ENV"
           fi
@@ -80,7 +80,7 @@ jobs:
 
       - run: yarn run test
         env:
-          URL: ${{ env.URL }}
+          PLAYWRIGHT_ENV: ${{ env.PLAYWRIGHT_ENV }}
           SCP_USERNAME: ${{ secrets.scp-username }}
           SCP_PASSWORD: ${{ secrets.scp-password }}
           CI: true
