@@ -1,53 +1,42 @@
-name: e2e-tests
+
+name: e2e-fpo-tests
 
 on:
   workflow_call:
     inputs:
-      test-url:
-        description: 'The URL to run the E2E tests against'
-        required: true
+      test-environment:
+        description: 'The e2e-test environment to run against'
         type: string
-      admin-test-url:
-        description: 'The admin URL to run the E2E tests against'
-        required: false
-        type: string
-        default: 'https://admin.dev.trade-tariff.service.gov.uk'
+        default: 'development'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
-      basic-password:
-        description: 'The basic auth password'
-        required: false
-        type: string
     secrets:
-      basic_password:
-        description: 'The basic auth password'
+      scp-username:
+        description: 'The scp auth username'
+        required: false
+      scp-password:
+        description: 'The scp auth password'
         required: false
   workflow_dispatch:
     inputs:
-      test-url:
-        description: 'The URL to run the E2E tests against'
-        required: true
+      test-environment:
+        description: 'The e2e-test environment to run against'
         type: string
-      admin-test-url:
-        description: 'The admin URL to run the E2E tests against'
-        required: false
-        type: string
-        default: 'https://admin.dev.trade-tariff.service.gov.uk'
+        default: 'development'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
-      basic-password:
-        description: 'The basic auth password'
+      scp-username:
+        description: 'The scp auth username'
         required: false
         type: string
-
-permissions:
-  contents: read
-  id-token: write
-  pull-requests: write
+      scp-password:
+        description: 'The scp auth password'
+        required: false
+        type: string
 
 jobs:
   test:
@@ -59,21 +48,19 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             {
-              echo "ADMIN_URL=${{ github.event.inputs.admin-test-url }}"
-              echo "BASE_URL=${{ github.event.inputs.test-url }}"
+              echo "PLAYWRIGHT_ENV=${{ github.event.inputs.test-environment }}"
               echo "REF=${{ github.event.inputs.ref }}"
             } >> "$GITHUB_ENV"
           else
             {
-              echo "ADMIN_URL=${{ inputs.admin-test-url }}"
-              echo "BASE_URL=${{ inputs.test-url }}"
+              echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
               echo "REF=${{ inputs.ref }}"
             } >> "$GITHUB_ENV"
           fi
 
       - uses: actions/checkout@v4
         with:
-          repository: trade-tariff/trade-tariff-e2e-tests
+          repository: trade-tariff/trade-tariff-fpo-dev-hub-e2e
           ref: ${{ env.REF }}
 
       - uses: actions/setup-node@v4
@@ -93,7 +80,7 @@ jobs:
 
       - run: yarn run test
         env:
-          ADMIN_URL: ${{ env.ADMIN_URL }}
-          BASE_URL: ${{ env.BASE_URL }}
-          BASIC_PASSWORD: ${{ secrets.BASIC_PASSWORD }}
+          PLAYWRIGHT_ENV: ${{ env.PLAYWRIGHT_ENV }}
+          SCP_USERNAME: ${{ secrets.scp-username }}
+          SCP_PASSWORD: ${{ secrets.scp-password }}
           CI: true
