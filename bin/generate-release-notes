@@ -19,7 +19,6 @@ mkdir repos
 cd repos || exit 1
 
 repos=(
-  "https://github.com/trade-tariff/trade-tariff-backend.git"
   "https://github.com/trade-tariff/trade-tariff-platform-aws-terraform.git"
 )
 
@@ -132,7 +131,6 @@ last_n_logs_for() {
 }
 
 all_logs() {
-  log_for "https://www.trade-tariff.service.gov.uk/api/v2/healthcheck" "trade-tariff-backend" "manual"
   last_n_logs_for "trade-tariff-platform-aws-terraform" "manual"
 }
 
