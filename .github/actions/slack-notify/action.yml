@@ -18,7 +18,7 @@ runs:
   steps:
     - uses: rtCamp/action-slack-notify@v2
       env:
-        SLACK_CHANNEL: "deployments"
+        SLACK_CHANNEL: ${{ inputs.slack_channel }}
         SLACK_USERNAME: "Deploy Bot"
         SLACK_WEBHOOK: ${{ inputs.slack_webhook }}
         SLACK_ICON_EMOJI: ":robot_face:"
