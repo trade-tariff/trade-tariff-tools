@@ -1,0 +1,13 @@
+name: 'Setup terraform docs'
+description: 'Setup terraform docs'
+
+inputs:
+  terraform_docs_version:
+    required: false
+    default: '0.20.0'
+
+runs:
+  using: 'composite'
+  steps:
+    - run: GOBIN=/usr/local/bin/ go install github.com/terraform-docs/terraform-docs@v${{ inputs.terraform_docs_version }}
+      shell: bash
