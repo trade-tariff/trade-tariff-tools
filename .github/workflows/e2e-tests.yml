@@ -16,33 +16,10 @@ on:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
-      basic-password:
-        description: 'The basic auth password'
-        required: false
-        type: string
     secrets:
       basic_password:
         description: 'The basic auth password'
         required: false
-  workflow_dispatch:
-    inputs:
-      test-url:
-        description: 'The URL to run the E2E tests against'
-        required: true
-        type: string
-      admin-test-url:
-        description: 'The admin URL to run the E2E tests against'
-        required: false
-        type: string
-        default: 'https://admin.dev.trade-tariff.service.gov.uk'
-      ref:
-        description: 'The e2e-test repo reference to run with'
-        type: string
-        default: 'main'
-      basic-password:
-        description: 'The basic auth password'
-        required: false
-        type: string
 
 jobs:
   test:
@@ -50,45 +27,22 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - name: Set environment variables
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            {
-              echo "ADMIN_URL=${{ github.event.inputs.admin-test-url }}"
-              echo "BASE_URL=${{ github.event.inputs.test-url }}"
-              echo "REF=${{ github.event.inputs.ref }}"
-            } >> "$GITHUB_ENV"
-          else
-            {
-              echo "ADMIN_URL=${{ inputs.admin-test-url }}"
-              echo "BASE_URL=${{ inputs.test-url }}"
-              echo "REF=${{ inputs.ref }}"
-            } >> "$GITHUB_ENV"
-          fi
-
       - uses: actions/checkout@v4
         with:
           repository: trade-tariff/trade-tariff-e2e-tests
-          ref: ${{ env.REF }}
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          cache: 'yarn'
 
-      - uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - run: npm install -g yarn && yarn
+      - run: yarn install
 
       - run: yarn playwright install --with-deps chromium
 
       - run: yarn run test
         env:
-          ADMIN_URL: ${{ env.ADMIN_URL }}
-          BASE_URL: ${{ env.BASE_URL }}
-          BASIC_PASSWORD: ${{ secrets.BASIC_PASSWORD }}
+          ADMIN_URL: ${{ inputs.admin-test-url }}
+          BASE_URL: ${{ inputs.test-url }}
+          BASIC_PASSWORD: ${{ secrets.basic_password }}
           CI: true
