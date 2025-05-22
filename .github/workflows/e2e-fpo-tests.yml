@@ -13,29 +13,9 @@ on:
         default: 'main'
     secrets:
       scp-username:
-        description: 'The scp auth username'
-        required: false
+        description: 'The Government Gateway username'
       scp-password:
-        description: 'The scp auth password'
-        required: false
-  workflow_dispatch:
-    inputs:
-      test-environment:
-        description: 'The e2e-test environment to run against'
-        type: string
-        default: 'development'
-      ref:
-        description: 'The e2e-test repo reference to run with'
-        type: string
-        default: 'main'
-      scp-username:
-        description: 'The scp auth username'
-        required: false
-        type: string
-      scp-password:
-        description: 'The scp auth password'
-        required: false
-        type: string
+        description: 'The Government Gateway password'
 
 jobs:
   test:
@@ -43,43 +23,22 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - name: Set environment variables
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            {
-              echo "PLAYWRIGHT_ENV=${{ github.event.inputs.test-environment }}"
-              echo "REF=${{ github.event.inputs.ref }}"
-            } >> "$GITHUB_ENV"
-          else
-            {
-              echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
-              echo "REF=${{ inputs.ref }}"
-            } >> "$GITHUB_ENV"
-          fi
-
       - uses: actions/checkout@v4
         with:
           repository: trade-tariff/trade-tariff-fpo-dev-hub-e2e
-          ref: ${{ env.REF }}
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          cache: 'yarn'
 
-      - uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - run: npm install -g yarn && yarn
+      - run: yarn
 
       - run: yarn playwright install --with-deps chromium
 
       - run: yarn run test
         env:
-          PLAYWRIGHT_ENV: ${{ env.PLAYWRIGHT_ENV }}
+          PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
           SCP_USERNAME: ${{ secrets.scp-username }}
           SCP_PASSWORD: ${{ secrets.scp-password }}
           CI: true
