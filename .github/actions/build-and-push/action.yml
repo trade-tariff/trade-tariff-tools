@@ -32,6 +32,16 @@ runs:
 
         echo RESOLVED_REF=$(git rev-parse --short "$REF") >> "$GITHUB_OUTPUT"
       shell: bash
+    - id: extract-build-args
+      run: |
+        build_args=""
+        for arg in ${{ inputs.build-args }}; do
+          build_args="$build_args --build-arg $arg"
+        done
+
+        echo "::notice::Build arguments extracted: $build_args"
+        echo BUILD_ARGS="$build_args" >> "$GITHUB_OUTPUT"
+      shell: bash
     - run: |
         # Extract repository name and registry id from ecr-url (assumes format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>)
         REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
@@ -54,10 +64,6 @@ runs:
         fi
 
         echo "$REF" > REVISION
-        build_args=""
-        for arg in ${{ inputs.build-args }}; do
-          build_args="$build_args --build-arg $arg"
-        done
-        docker build -t "$IMAGE_NAME" . $build_args
+        docker build -t "$IMAGE_NAME" . ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
         docker push "$IMAGE_NAME"
       shell: bash
