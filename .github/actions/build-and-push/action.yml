@@ -18,7 +18,7 @@ runs:
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ env.IAM_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ inputs.region }}
     - id: resolved-ref
       run: |
         REF=${{ inputs.ref }}

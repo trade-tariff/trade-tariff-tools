@@ -9,6 +9,9 @@ inputs:
     description: 'Path to the environment file'
     required: false
     default: '.env'
+  region:
+    required: false
+    default: 'eu-west-2'
 
 runs:
   using: "composite"
@@ -17,7 +20,7 @@ runs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ env.IAM_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ inputs.region }}
 
     - name: Fetch and store secrets
       shell: bash
@@ -27,4 +30,3 @@ runs:
           --query "SecretString" \
           --output text \
           | jq -r 'to_entries[] | "\(.key)=\"\(.value)\""' > "${{ inputs.env-file }}"
-      

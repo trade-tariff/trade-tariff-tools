@@ -12,6 +12,9 @@ inputs:
   ref:
     required: true
     description: 'The git ref to deploy.'
+  region:
+    required: false
+    default: 'eu-west-2'
   ssh-key:
     required: true
     description: 'The SSH key to use for fetching modules from github.'
@@ -35,7 +38,7 @@ runs:
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ env.IAM_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ inputs.region }}
     - uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.11.0
