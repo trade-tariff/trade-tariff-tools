@@ -1,0 +1,145 @@
+name: Deploy to ECS
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to plan and apply against
+        type: string
+        required: true
+      app-name:
+        description: The app name to push the Docker image to
+        type: string
+        required: true
+    secrets:
+      ssh-key:
+        description: The SSH key to use for accessing github repos (implicitly with terraform init)
+        required: true
+      slack-webhook:
+        description: The Slack webhook URL to send notifications to
+        required: true
+      basic-password:
+        description: The basic auth password
+        required: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      admin_test_url: ${{ steps.config.outputs.test_url }}
+      docker_tag: ${{ steps.config.outputs.docker_tag }}
+      ecr_url: ${{ steps.config.outputs.ecr_url }}
+      iam_role_arn: ${{ steps.config.outputs.iam_role_arn }}
+      ruby_version: ${{ steps.config.outputs.ruby_version }}
+      slack_channel: ${{ steps.config.outputs.slack_channel }}
+      test_url: ${{ steps.config.outputs.test_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: config
+        run: |
+          case "${{ inputs.environment }}" in
+            development)
+              ACCOUNT_ID="844815912454"
+              ADMIN_TEST_URL=https://admin.dev.trade-tariff.service.gov.uk
+              SLACK_CHANNEL=deployments
+              TEST_URL=https://dev.trade-tariff.service.gov.uk
+              ;;
+            staging)
+              ACCOUNT_ID="451934005581"
+              ADMIN_TEST_URL=https://admin.staging.trade-tariff.service.gov.uk
+              SLACK_CHANNEL=deployments
+              TEST_URL=https://staging.trade-tariff.service.gov.uk
+              ;;
+            production)
+              ACCOUNT_ID="382373577178"
+              ADMIN_TEST_URL=https://admin.trade-tariff.service.gov.uk
+              SLACK_CHANNEL=production-deployments
+              TEST_URL=https://www.trade-tariff.service.gov.uk
+              ;;
+            *)
+              echo "Invalid environment: ${{ inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "admin_test_url=${ADMIN_TEST_URL}"
+            echo "docker_tag=$(git rev-parse --short HEAD)"
+            echo "ecr_url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/${{ inputs.app-name }}-production"
+            echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role"
+            echo "ruby_version=$(cat .ruby-version)"
+            echo "slack_channel=${SLACK_CHANNEL}"
+            echo "test_url=${TEST_URL}"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: configure
+    steps:
+      - uses: actions/checkout@v4
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@main
+        with:
+          environment: ${{ inputs.environment }}
+          ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+          ssh-key: ${{ secrets.ssh-key }}
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
+        with:
+          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.21"
+          ecr-url: ${{ needs.configure.outputs.ecr_url }}
+          ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - configure
+      - build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
+        with:
+          environment: ${{ inputs.environment }}
+          ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+          ssh-key: ${{ secrets.ssh-key }}
+
+  tag:
+    if: ${{ inputs.environment == 'production' }}
+    runs-on: ubuntu-latest
+    needs:
+      - configure
+      - deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@main
+        with:
+          ecr-url: ${{ needs.configure.outputs.ecr_url }}
+          ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+
+  e2e-test:
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@main
+    needs:
+      - configure
+      - deploy
+    with:
+      test-url: ${{ needs.configure.outputs.test_url }}
+      admin-test-url: ${{ needs.configure.outputs.admin_test_url }}
+    secrets:
+      basic_password: ${{ secrets.basic-password }}
+
+  notify:
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+      - configure
+      - e2e-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
+        with:
+          result: ${{ needs.e2e-test.result }}
+          slack_webhook: ${{ secrets.slack-webhook }}
+          slack_channel: ${{ needs.configure.outputs.slack_channel }}
+      - run: if [[ "${{ needs.e2e-test.result }}" != "success" ]]; then exit 1; fi
