@@ -77,12 +77,12 @@ jobs:
     needs: configure
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@HMRC-1288-dry-workflows
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@HMRC-1288-dry-workflows
         with:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
@@ -95,7 +95,7 @@ jobs:
       - build
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@HMRC-1288-dry-workflows
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
@@ -109,13 +109,13 @@ jobs:
       - deploy
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@HMRC-1288-dry-workflows
         with:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
 
   e2e-test:
-    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@main
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@HMRC-1288-dry-workflows
     needs:
       - configure
       - deploy
@@ -133,7 +133,7 @@ jobs:
       - e2e-test
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@HMRC-1288-dry-workflows
         with:
           result: ${{ needs.e2e-test.result }}
           slack_webhook: ${{ secrets.slack-webhook }}
