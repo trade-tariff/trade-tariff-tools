@@ -77,13 +77,13 @@ jobs:
     needs: configure
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@HMRC-1288-dry-workflows
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@main
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@HMRC-1288-dry-workflows
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
         with:
           build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.21"
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
@@ -97,7 +97,7 @@ jobs:
       - build
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@HMRC-1288-dry-workflows
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
@@ -112,14 +112,14 @@ jobs:
       - deploy
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@HMRC-1288-dry-workflows
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@main
         with:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
 
   e2e-test:
-    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@HMRC-1288-dry-workflows
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@main
     needs:
       - configure
       - deploy
@@ -137,7 +137,7 @@ jobs:
       - e2e-test
     steps:
       - uses: actions/checkout@v4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@HMRC-1288-dry-workflows
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
           result: ${{ needs.e2e-test.result }}
           slack_webhook: ${{ secrets.slack-webhook }}
