@@ -81,12 +81,14 @@ jobs:
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
           ssh-key: ${{ secrets.ssh-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@HMRC-1288-dry-workflows
         with:
+          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.21"
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
-          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.21"
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -99,6 +101,7 @@ jobs:
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
           ssh-key: ${{ secrets.ssh-key }}
 
   tag:
@@ -113,6 +116,7 @@ jobs:
         with:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
 
   e2e-test:
     uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@HMRC-1288-dry-workflows
