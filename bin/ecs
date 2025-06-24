@@ -26,10 +26,9 @@ ARGUMENTS:
                    If not provided, opens an interactive shell
 
 EXAMPLES:
-    $SCRIPT_NAME                                    # Interactive shell
-    $SCRIPT_NAME 'bundle exec rails console'       # Rails console
-    $SCRIPT_NAME 'bundle exec rails db:migrate'    # Database migration
-    $SCRIPT_NAME 'cat /app/version'                # Check app version
+    $SCRIPT_NAME                                               # Interactive shell
+    $SCRIPT_NAME 'bundle exec rails console'                   # Rails console
+    $SCRIPT_NAME 'bundle exec rails db:rollback db:migrate'    # Database migration
 
 SPECIAL BEHAVIOR:
     - If selecting 'backend-job' service with no running tasks, automatically starts a new task
