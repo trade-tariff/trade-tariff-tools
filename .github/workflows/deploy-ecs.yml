@@ -37,7 +37,7 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
-      admin_test_url: ${{ steps.config.outputs.test_url }}
+      admin_test_url: ${{ steps.config.outputs.admin_test_url }}
       docker_tag: ${{ steps.config.outputs.docker_tag }}
       ecr_url: ${{ steps.config.outputs.ecr_url }}
       iam_role_arn: ${{ steps.config.outputs.iam_role_arn }}
