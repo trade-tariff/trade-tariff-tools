@@ -1,0 +1,47 @@
+name: 'Stop ECS services'
+description: 'Stop specified ECS services in a given environment.'
+
+inputs:
+  service-names:
+    required: true
+    description: 'Space-separated list of ECS service names to stop.'
+  environment:
+    required: true
+  region:
+    required: false
+    default: 'eu-west-2'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4
+    - id: config
+      run: |
+        case "${{ inputs.environment }}" in
+          development)
+            ACCOUNT_ID="844815912454"
+            ;;
+          staging)
+            ACCOUNT_ID="451934005581"
+            ;;
+          production)
+            ACCOUNT_ID="382373577178"
+            ;;
+          *)
+            echo "Invalid environment: ${{ inputs.environment }}"
+            exit 1
+            ;;
+        esac
+
+        echo "role_to_assume=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ steps.config.outputs.role_to_assume }}
+        aws-region: ${{ inputs.region }}
+    - run: |
+        for SERVICE_NAME in ${{ inputs.service-names }}; do
+          echo "::notice::Stopping ECS service: $SERVICE_NAME"
+          aws ecs update-service --cluster "trade-tariff-cluster-${{ inputs.environment }}" --service "$SERVICE_NAME" --desired-count 0 --region "${{ inputs.region }}"
+        done
+        echo "::notice::Successfully stopped ECS services: ${{ inputs.service-names }}"
+      shell: bash
