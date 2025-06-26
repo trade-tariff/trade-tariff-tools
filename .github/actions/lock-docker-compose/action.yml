@@ -9,7 +9,7 @@ inputs:
 
 runs:
   using: composite
-  steps: 
+  steps:
     - run: |
         mkdir -p ~/.docker/cli-plugins/
         curl -sSL https://github.com/docker/compose/releases/download/${{ inputs.version }}/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
