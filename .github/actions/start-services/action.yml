@@ -51,5 +51,5 @@ runs:
             --desired-count "${{ inputs.desired_count }}" \
             --region "${{ inputs.region }}"
         done
-        echo "::notice::Successfully stopped ECS services: ${{ inputs.service-names }}"
+        echo "::notice::Successfully started ECS services: ${{ inputs.service-names }}"
       shell: bash
