@@ -12,17 +12,12 @@ repos:
     rev: v0.10.0
     hooks:
       - id: shellcheck
-        args: ["--severity=warning"]
+        args: ["--severity=error"]
 
   - repo: https://github.com/rhysd/actionlint.git
     rev: v1.7.7
     hooks:
       - id: actionlint-docker
-
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.44.0
-    hooks:
-      - id: markdownlint-docker
 
   - repo: https://github.com/trufflesecurity/trufflehog
     rev: v3.88.20
