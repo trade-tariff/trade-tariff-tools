@@ -41,6 +41,10 @@ jobs:
       - name: Lock Docker Compose to v2.36.0
         uses: ./.github/actions/lock-docker-compose
 
+      - uses: ./.github/actions/setup-ssh
+        with:
+          ssh-key: ${{ secrets.PRIVATE_SSH_KEY }}
+
       - run: npm install -g preevy
 
       - name: Clean up preview environments
