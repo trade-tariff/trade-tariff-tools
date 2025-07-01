@@ -22,19 +22,6 @@ runs:
       with:
         role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
-    - id: resolved-ref
-      run: |
-        REF=${{ inputs.ref }}
-
-        if ! git rev-parse --verify "$REF" 2>/dev/null; then
-          echo "::error::The ref $REF does not exist in the Git repository."
-          exit 1
-        else
-          echo "::notice::Resolved ref: $(git rev-parse --short "$REF")"
-        fi
-
-        echo RESOLVED_REF=$(git rev-parse --short "$REF") >> "$GITHUB_OUTPUT"
-      shell: bash
     - id: extract-build-args
       run: |
         build_args=""
@@ -49,7 +36,7 @@ runs:
         # Extract repository name and registry id from ecr-url (assumes format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>)
         REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
         REGISTRY_ID=$(echo "${{ inputs.ecr-url }}" | cut -d'.' -f1)
-        REF=${{ steps.resolved-ref.outputs.RESOLVED_REF }}
+        REF=${{ inputs.ref }}
         IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
 
         aws ecr get-login-password --region ${{ inputs.region }} \

@@ -21,6 +21,16 @@ on:
         type: string
         default: ''
         required: false
+      checkout-repo:
+        description: The repository to checkout (defaults to current repo)
+        type: string
+        default: ''
+        required: false
+      checkout-ref:
+        description: The ref to checkout (defaults to current ref)
+        type: string
+        default: ''
+        required: false
     secrets:
       ssh-key:
         description: The SSH key to use for accessing github repos (implicitly with terraform init)
@@ -49,8 +59,14 @@ jobs:
       ruby_version: ${{ steps.config.outputs.ruby_version }}
       slack_channel: ${{ steps.config.outputs.slack_channel }}
       test_url: ${{ steps.config.outputs.test_url }}
+      actual_repo: ${{ steps.config.outputs.actual_repo }}
+      actual_ref: ${{ steps.config.outputs.actual_ref }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.checkout-repo || github.repository }}
+          ref: ${{ inputs.checkout-ref || github.ref }}
+
       - id: config
         run: |
           case "${{ inputs.environment }}" in
@@ -78,14 +94,26 @@ jobs:
               ;;
           esac
 
+          ACTUAL_REF="${{ inputs.checkout-ref || github.ref }}"
+          ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
+
+          if ! git rev-parse --verify "$ACTUAL_REF" 2>/dev/null; then
+            echo "::error::The ref $ACTUAL_REF does not exist in the Git repository."
+            exit 1
+          else
+            echo "::notice::Resolved ref: $(git rev-parse --short "$ACTUAL_REF")"
+          fi
+
           {
             echo "admin_test_url=${ADMIN_TEST_URL}"
-            echo "docker_tag=$(git rev-parse --short HEAD)"
+            echo "docker_tag=$(git rev-parse --short "$ACTUAL_REF")"
             echo "ecr_url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/${{ inputs.app-name }}-production"
             echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role"
             echo "ruby_version=$(cat .ruby-version)"
             echo "slack_channel=${SLACK_CHANNEL}"
             echo "test_url=${TEST_URL}"
+            echo "actual_ref=${ACTUAL_REF}"
+            echo "actual_repo=${ACTUAL_REPO}"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -93,6 +121,9 @@ jobs:
     needs: configure
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.configure.outputs.actual_repo }}
+          ref: ${{ needs.configure.outputs.actual_ref }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@main
         with:
           environment: ${{ inputs.environment }}
@@ -113,6 +144,9 @@ jobs:
       - build
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.configure.outputs.actual_repo }}
+          ref: ${{ needs.configure.outputs.actual_ref }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:
           environment: ${{ inputs.environment }}
@@ -128,6 +162,9 @@ jobs:
       - deploy
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.configure.outputs.actual_repo }}
+          ref: ${{ needs.configure.outputs.actual_ref }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@main
         with:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
@@ -166,6 +203,9 @@ jobs:
       - e2e-test-fpo
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.configure.outputs.actual_repo }}
+          ref: ${{ needs.configure.outputs.actual_ref }}
       - id: result
         run: |
           TEST_FLAVOUR="${{ inputs.test-flavour }}"
