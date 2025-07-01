@@ -16,6 +16,11 @@ on:
         type: string
         default: 'tariff'
         required: false
+      build-args:
+        description: Additional space-separated build arguments for the Docker image
+        type: string
+        default: ''
+        required: false
     secrets:
       ssh-key:
         description: The SSH key to use for accessing github repos (implicitly with terraform init)
@@ -96,7 +101,7 @@ jobs:
           ssh-key: ${{ secrets.ssh-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
         with:
-          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.21"
+          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.21 ${{ inputs.build-args }}"
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
