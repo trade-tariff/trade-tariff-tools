@@ -110,6 +110,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: configure
     steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
+        with:
+          ssh-key: ${{ secrets.ssh-key }}
       - uses: actions/checkout@v4
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
@@ -133,6 +136,9 @@ jobs:
       - configure
       - build
     steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
+        with:
+          ssh-key: ${{ secrets.ssh-key }}
       - uses: actions/checkout@v4
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
@@ -151,6 +157,9 @@ jobs:
       - configure
       - deploy
     steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
+        with:
+          ssh-key: ${{ secrets.ssh-key }}
       - uses: actions/checkout@v4
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
@@ -189,6 +198,9 @@ jobs:
       - e2e-test-tariff
       - e2e-test-fpo
     steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
+        with:
+          ssh-key: ${{ secrets.ssh-key }}
       - uses: actions/checkout@v4
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
