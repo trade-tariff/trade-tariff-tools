@@ -3,19 +3,15 @@ name: e2e-tests
 on:
   workflow_call:
     inputs:
-      test-url:
-        description: 'The URL to run the E2E tests against'
+      test-environment:
+        description: 'The e2e-test environment to run against'
+        type: string
         required: true
-        type: string
-      admin-test-url:
-        description: 'The admin URL to run the E2E tests against'
-        required: false
-        type: string
-        default: 'https://admin.dev.trade-tariff.service.gov.uk'
       ref:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
+        required: false
     secrets:
       basic_password:
         description: 'The basic auth password'
@@ -42,7 +38,6 @@ jobs:
 
       - run: yarn run test
         env:
-          ADMIN_URL: ${{ inputs.admin-test-url }}
-          BASE_URL: ${{ inputs.test-url }}
+          PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
           BASIC_PASSWORD: ${{ secrets.basic_password }}
           CI: true
