@@ -52,13 +52,11 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
-      admin_test_url: ${{ steps.config.outputs.admin_test_url }}
       docker_tag: ${{ steps.config.outputs.docker_tag }}
       ecr_url: ${{ steps.config.outputs.ecr_url }}
       iam_role_arn: ${{ steps.config.outputs.iam_role_arn }}
       ruby_version: ${{ steps.config.outputs.ruby_version }}
       slack_channel: ${{ steps.config.outputs.slack_channel }}
-      test_url: ${{ steps.config.outputs.test_url }}
       actual_repo: ${{ steps.config.outputs.actual_repo }}
       actual_ref: ${{ steps.config.outputs.actual_ref }}
     steps:
@@ -72,21 +70,15 @@ jobs:
           case "${{ inputs.environment }}" in
             development)
               ACCOUNT_ID="844815912454"
-              ADMIN_TEST_URL=https://admin.dev.trade-tariff.service.gov.uk
               SLACK_CHANNEL=deployments
-              TEST_URL=https://dev.trade-tariff.service.gov.uk
               ;;
             staging)
               ACCOUNT_ID="451934005581"
-              ADMIN_TEST_URL=https://admin.staging.trade-tariff.service.gov.uk
               SLACK_CHANNEL=deployments
-              TEST_URL=https://staging.trade-tariff.service.gov.uk
               ;;
             production)
               ACCOUNT_ID="382373577178"
-              ADMIN_TEST_URL=https://admin.trade-tariff.service.gov.uk
               SLACK_CHANNEL=production-deployments
-              TEST_URL=https://www.trade-tariff.service.gov.uk
               ;;
             *)
               echo "Invalid environment: ${{ inputs.environment }}"
@@ -105,13 +97,11 @@ jobs:
           fi
 
           {
-            echo "admin_test_url=${ADMIN_TEST_URL}"
             echo "docker_tag=$(git rev-parse --short "$ACTUAL_REF")"
             echo "ecr_url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/${{ inputs.app-name }}-production"
             echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role"
             echo "ruby_version=$(cat .ruby-version)"
             echo "slack_channel=${SLACK_CHANNEL}"
-            echo "test_url=${TEST_URL}"
             echo "actual_ref=${ACTUAL_REF}"
             echo "actual_repo=${ACTUAL_REPO}"
           } >> "$GITHUB_OUTPUT"
@@ -174,12 +164,9 @@ jobs:
   e2e-test-tariff:
     if: ${{ inputs.test-flavour == 'tariff' }}
     uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@main
-    needs:
-      - configure
-      - deploy
+    needs: deploy
     with:
-      test-url: ${{ needs.configure.outputs.test_url }}
-      admin-test-url: ${{ needs.configure.outputs.admin_test_url }}
+      test-environment: ${{ inputs.environment }}
     secrets:
       basic_password: ${{ secrets.basic-password }}
 
