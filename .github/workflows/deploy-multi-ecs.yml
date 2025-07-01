@@ -1,0 +1,92 @@
+name: Deploy Multiple Apps to ECS
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to deploy to
+        type: string
+        required: true
+      apps:
+        description: JSON array of apps to deploy (e.g. '[{"name":"tariff-frontend","repo":"trade-tariff/trade-tariff-frontend","ref":"main"},{"name":"tariff-backend","repo":"trade-tariff/trade-tariff-backend"}]')
+        type: string
+        required: true
+      test-flavour:
+        description: "The flavour of tests to run. Options: 'tariff', 'fpo', 'none'"
+        type: string
+        default: tariff
+    secrets:
+      ssh-key:
+        required: true
+      slack-webhook:
+        required: true
+      basic-password:
+        required: false
+      scp-username:
+        required: false
+      scp-password:
+        required: false
+
+jobs:
+  deploy-all:
+    strategy:
+      matrix:
+        app: ${{ fromJson(inputs.apps) }}
+      fail-fast: false
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
+    with:
+      app-name: ${{ matrix.app.name }}
+      environment: ${{ inputs.environment }}
+      test-flavour: none
+      checkout-ref: ${{ matrix.app.ref || 'main' }}
+      checkout-repo: ${{ matrix.app.repo }}
+    secrets:
+      ssh-key: ${{ secrets.ssh-key }}
+      slack-webhook: ${{ secrets.slack-webhook }}
+      basic-password: ${{ secrets.basic-password }}
+      scp-username: ${{ secrets.scp-username }}
+      scp-password: ${{ secrets.scp-password }}
+
+  e2e-test-tariff:
+    if: ${{ inputs.test-flavour == 'tariff' }}
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests.yml@main
+    needs: deploy-all
+    with:
+      test-environment: ${{ inputs.environment }}
+    secrets:
+      basic_password: ${{ secrets.basic-password }}
+
+  e2e-test-fpo:
+    if: ${{ inputs.test-flavour == 'fpo' }}
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-fpo-tests.yml@main
+    needs: deploy-all
+    with:
+      test-environment: ${{ inputs.environment }}
+    secrets:
+      scp-username: ${{ secrets.scp-username }}
+      scp-password: ${{ secrets.scp-password }}
+
+  notify-completion:
+    if: always()
+    needs:
+      - deploy-all
+      - e2e-test-tariff
+      - e2e-test-fpo
+    runs-on: ubuntu-latest
+    steps:
+      - id: result
+        run: |
+          TEST_FLAVOUR="${{ inputs.test-flavour }}"
+
+          if [[ "$TEST_FLAVOUR" == "tariff" ]]; then
+            echo "result=${{ needs.e2e-test-tariff.result }}" >> "$GITHUB_OUTPUT"
+          elif [[ "$TEST_FLAVOUR" == "fpo" ]]; then
+            echo "result=${{ needs.e2e-test-fpo.result }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=${{ needs.deploy-all.result }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
+        with:
+          result: ${{ steps.result.outputs.result }}
+          slack_webhook: ${{ secrets.slack-webhook }}
+          slack_channel: deployments
