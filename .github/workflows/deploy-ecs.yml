@@ -60,6 +60,10 @@ jobs:
       actual_repo: ${{ steps.config.outputs.actual_repo }}
       actual_ref: ${{ steps.config.outputs.actual_ref }}
     steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
+        with:
+          ssh-key: ${{ secrets.ssh-key }}
+
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.checkout-repo || github.repository }}
