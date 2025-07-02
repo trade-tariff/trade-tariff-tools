@@ -28,6 +28,22 @@ on:
         required: false
 
 jobs:
+  start-all:
+    if: ${{ inputs.environment == 'development' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: ${{ fromJson(inputs.apps) }}
+      fail-fast: false
+    steps:
+      - id: parse-service-names
+        run: |
+          echo "service-names=$(echo '${{ matrix.app.service-names }}' | jq -r '.[]')" >> "$GITHUB_OUTPUT"
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/start-services@main
+        with:
+          service-names: ${{ steps.parse-service-names.outputs.service-names }}
+          environment: development
+
   deploy-all:
     strategy:
       matrix:
