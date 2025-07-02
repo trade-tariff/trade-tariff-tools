@@ -13,9 +13,6 @@ inputs:
   ref:
     required: true
     description: 'The git ref to deploy.'
-  ssh-key:
-    required: true
-    description: 'The SSH key to use for fetching modules from github.'
   role-to-assume:
     description: 'The IAM role ARN to assume for AWS operations.'
     required: true
@@ -32,9 +29,6 @@ runs:
     - uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
-    - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
-      with:
-        ssh-key: ${{ inputs.ssh-key }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
       shell: bash
     - run: cd terraform && terraform apply -var-file=config_${{ inputs.environment }}.tfvars -auto-approve -lock-timeout=10m
