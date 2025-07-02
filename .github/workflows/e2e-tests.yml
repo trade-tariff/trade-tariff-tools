@@ -12,6 +12,14 @@ on:
         type: string
         default: 'main'
         required: false
+      base-url:
+        description: 'The base URL for the e2e tests'
+        type: string
+        required: false
+      admin-url:
+        description: 'The admin URL for the e2e tests'
+        type: string
+        required: false
     secrets:
       basic_password:
         description: 'The basic auth password'
@@ -19,7 +27,6 @@ on:
 
 jobs:
   test:
-    environment: development
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -36,8 +43,17 @@ jobs:
 
       - run: yarn playwright install --with-deps chromium
 
+      - run: |
+          {
+            if [ -n "${{ inputs.admin-url }}" ]; then
+              echo "ADMIN_URL=${{ inputs.admin-url }}"
+            fi
+            if [ -n "${{ inputs.base-url }}" ]; then
+              echo "BASE_URL=${{ inputs.base-url }}"
+            fi
+            echo "BASIC_PASSWORD=${{ secrets.basic_password }}"
+            echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
+            echo "CI=true"
+          } >> "$GITHUB_ENV"
+
       - run: yarn run test
-        env:
-          PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
-          BASIC_PASSWORD: ${{ secrets.basic_password }}
-          CI: true
