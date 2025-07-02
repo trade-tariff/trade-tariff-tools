@@ -43,8 +43,6 @@ runs:
         aws-region: ${{ inputs.region }}
     - run: |
         for SERVICE_NAME in ${{ inputs.service-names }}; do
-          echo "::notice::Starting ECS service: $SERVICE_NAME"
-
           aws ecs update-service \
             --cluster "trade-tariff-cluster-${{ inputs.environment }}" \
             --service "$SERVICE_NAME" \
