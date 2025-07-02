@@ -95,15 +95,13 @@ jobs:
               ;;
           esac
 
-          ACTUAL_REF="${{ inputs.checkout-ref || github.ref }}"
-          ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
-
-          if ! git rev-parse --verify "$ACTUAL_REF" 2>/dev/null; then
-            echo "::error::The ref $ACTUAL_REF does not exist in the Git repository."
-            exit 1
+          if [ -z "${{ inputs.checkout-ref }}" ]; then
+            ACTUAL_REF="$(git rev-parse --abbrev-ref HEAD)"
           else
-            echo "::notice::Resolved ref: $(git rev-parse --short "$ACTUAL_REF")"
+            ACTUAL_REF="${{ inputs.checkout-ref }}"
           fi
+
+          ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
 
           {
             echo "docker_tag=$(git rev-parse --short "$ACTUAL_REF")"
