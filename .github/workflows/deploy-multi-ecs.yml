@@ -55,7 +55,7 @@ jobs:
       app-name: ${{ matrix.app.name }}
       environment: ${{ inputs.environment }}
       test-flavour: none
-      checkout-ref: ${{ matrix.app.ref || 'main' }}
+      checkout-ref: ${{ matrix.app.ref }}
       checkout-repo: ${{ matrix.app.repo }}
       notify: false
     secrets:

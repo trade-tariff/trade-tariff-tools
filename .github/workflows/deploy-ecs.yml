@@ -57,22 +57,48 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
+      actual_repo: ${{ steps.actual-ref.outputs.actual_repo }}
+      actual_ref: ${{ steps.actual-ref.outputs.actual_ref }}
       docker_tag: ${{ steps.config.outputs.docker_tag }}
       ecr_url: ${{ steps.config.outputs.ecr_url }}
       iam_role_arn: ${{ steps.config.outputs.iam_role_arn }}
       ruby_version: ${{ steps.config.outputs.ruby_version }}
       slack_channel: ${{ steps.config.outputs.slack_channel }}
-      actual_repo: ${{ steps.config.outputs.actual_repo }}
-      actual_ref: ${{ steps.config.outputs.actual_ref }}
     steps:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
 
+      - id: actual-ref
+        run: |
+          if [ -z "${{ inputs.checkout-repo }}" ]; then
+            ACTUAL_REF="${{ inputs.checkout-ref || github.ref }}"
+            ACTUAL_REPO="${{ github.repository }}"
+          else
+            PROVIDED_REPO="${{ inputs.checkout-repo }}"
+
+            if [ -z "${{ inputs.checkout-ref }}" ]; then
+              if [[ "$PROVIDED_REPO" == "${{ github.repository }}" ]]; then
+                ACTUAL_REF="${{ github.ref }}"
+              else
+                ACTUAL_REF="main"
+              fi
+            else
+              ACTUAL_REF="${{ inputs.checkout-ref }}"
+            fi
+
+            ACTUAL_REPO="${PROVIDED_REPO}"
+          fi
+
+          {
+            echo "actual_repo=${ACTUAL_REPO}"
+            echo "actual_ref=${ACTUAL_REF}"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.checkout-repo || github.repository }}
-          ref: ${{ inputs.checkout-ref || github.ref }}
+          repository: ${{ steps.actual-ref.outputs.actual_repo }}
+          ref: ${{ steps.actual-ref.outputs.actual_ref }}
 
       - id: config
         run: |
@@ -95,13 +121,6 @@ jobs:
               ;;
           esac
 
-          if [ -z "${{ inputs.checkout-ref }}" ]; then
-            ACTUAL_REF="$(git rev-parse --abbrev-ref HEAD)"
-          else
-            ACTUAL_REF="${{ inputs.checkout-ref }}"
-          fi
-
-          ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
 
           {
             echo "docker_tag=$(git rev-parse --short "$ACTUAL_REF")"
@@ -109,8 +128,6 @@ jobs:
             echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role"
             echo "ruby_version=$(cat .ruby-version)"
             echo "slack_channel=${SLACK_CHANNEL}"
-            echo "actual_ref=${ACTUAL_REF}"
-            echo "actual_repo=${ACTUAL_REPO}"
           } >> "$GITHUB_OUTPUT"
 
   build:
