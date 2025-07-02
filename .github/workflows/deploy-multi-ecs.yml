@@ -57,6 +57,7 @@ jobs:
       test-flavour: none
       checkout-ref: ${{ matrix.app.ref || 'main' }}
       checkout-repo: ${{ matrix.app.repo }}
+      notify: false
     secrets:
       ssh-key: ${{ secrets.ssh-key }}
       slack-webhook: ${{ secrets.slack-webhook }}
@@ -84,7 +85,6 @@ jobs:
       scp-password: ${{ secrets.scp-password }}
 
   notify-completion:
-    if: always()
     needs:
       - deploy-all
       - e2e-test-tariff
