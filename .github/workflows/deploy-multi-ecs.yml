@@ -85,6 +85,7 @@ jobs:
       scp-password: ${{ secrets.scp-password }}
 
   notify-completion:
+    if: always()
     needs:
       - deploy-all
       - e2e-test-tariff
