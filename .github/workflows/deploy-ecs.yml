@@ -123,11 +123,11 @@ jobs:
 
 
           {
-            echo "docker_tag=$(git rev-parse --short "$ACTUAL_REF")"
             echo "ecr_url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/${{ inputs.app-name }}-production"
             echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role"
             echo "ruby_version=$(cat .ruby-version)"
             echo "slack_channel=${SLACK_CHANNEL}"
+            echo "docker_tag=$(git rev-parse --short HEAD)"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -146,7 +146,6 @@ jobs:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
-          ssh-key: ${{ secrets.ssh-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
         with:
           build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.22 ${{ inputs.build-args }}"
@@ -172,7 +171,6 @@ jobs:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
-          ssh-key: ${{ secrets.ssh-key }}
 
   tag:
     if: ${{ inputs.environment == 'production' }}
