@@ -37,9 +37,10 @@ jobs:
       fail-fast: false
     steps:
       - id: parse-service-names
-        run: |
-          echo "service-names=$(echo '${{ matrix.app.service-names }}' | jq -r 'unique | join(" ")')" >> "$GITHUB_OUTPUT"
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/start-services@main
+        run: echo "service-names=$(echo '${{ toJson(matrix.app.service-names) }}' | jq -r 'join(" ")')" >> "$GITHUB_OUTPUT"
+
+      - if: ${{ steps.parse-service-names.outputs.service-names != '' }}
+        uses: trade-tariff/trade-tariff-tools/.github/actions/start-services@main
         with:
           service-names: ${{ steps.parse-service-names.outputs.service-names }}
           environment: development
