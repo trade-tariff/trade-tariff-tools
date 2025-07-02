@@ -50,7 +50,7 @@ jobs:
       matrix:
         app: ${{ fromJson(inputs.apps) }}
       fail-fast: false
-    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@HMRC-1380-full-deployments
     with:
       app-name: ${{ matrix.app.name }}
       environment: ${{ inputs.environment }}
