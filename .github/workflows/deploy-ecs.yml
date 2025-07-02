@@ -71,23 +71,14 @@ jobs:
 
       - id: actual-ref
         run: |
-          if [ -z "${{ inputs.checkout-repo }}" ]; then
-            ACTUAL_REF="${{ inputs.checkout-ref || github.ref }}"
-            ACTUAL_REPO="${{ github.repository }}"
+          ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
+
+          if [[ -n "${{ inputs.checkout-ref }}" ]]; then
+            ACTUAL_REF="${{ inputs.checkout-ref }}"
+          elif [[ "$ACTUAL_REPO" == "${{ github.repository }}" ]]; then
+            ACTUAL_REF="${{ github.ref }}"
           else
-            PROVIDED_REPO="${{ inputs.checkout-repo }}"
-
-            if [ -z "${{ inputs.checkout-ref }}" ]; then
-              if [[ "$PROVIDED_REPO" == "${{ github.repository }}" ]]; then
-                ACTUAL_REF="${{ github.ref }}"
-              else
-                ACTUAL_REF="main"
-              fi
-            else
-              ACTUAL_REF="${{ inputs.checkout-ref }}"
-            fi
-
-            ACTUAL_REPO="${PROVIDED_REPO}"
+            ACTUAL_REF="main"
           fi
 
           {
