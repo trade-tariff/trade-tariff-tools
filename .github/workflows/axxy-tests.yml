@@ -21,7 +21,10 @@ on:
         type: string
         required: false
     secrets:
-      basic_password:
+      slack-webhook:
+        description: 'Slack webhook URL for notifications'
+        required: true
+      basic-password:
         description: 'The basic auth password'
         required: false
 
@@ -46,4 +49,14 @@ jobs:
         env:
           BASE_URL: ${{ inputs.base-url }}
           ADMIN_URL: ${{ inputs.admin-url }}
-          BASIC_PASSWORD: ${{ secrets.basic_password }}
+          BASIC_PASSWORD: ${{ secrets.basic-password }}
+
+      - uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: "non-production-alerts"
+          SLACK_USERNAME: "Accessibility Report"
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook }}
+          SLACK_ICON_EMOJI: ":playwright:"
+          SLACK_COLOR: success
+          SLACK_TITLE: New Accessibility report generated
+          SLACK_MESSAGE: https://trade-tariff.github.io/trade-tariff-frontend/accessibility-report.html
