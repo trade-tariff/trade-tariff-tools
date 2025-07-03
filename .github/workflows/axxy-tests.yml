@@ -3,23 +3,14 @@ name: axxy-tests
 on:
   workflow_call:
     inputs:
-      test-environment:
-        description: 'The e2e-test environment to run against'
-        type: string
-        required: true
-      ref:
-        description: 'The e2e-test repo reference to run with'
-        type: string
-        default: 'main'
-        required: false
       base-url:
         description: 'The base URL for the e2e tests'
         type: string
-        required: false
+        required: true
       admin-url:
         description: 'The admin URL for the e2e tests'
         type: string
-        required: false
+        required: true
     secrets:
       slack-webhook:
         description: 'Slack webhook URL for notifications'
@@ -35,7 +26,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: trade-tariff/trade-tariff-frontend
-          ref: ${{ inputs.ref || 'main' }}
 
       - uses: actions/setup-node@v4
         with:
