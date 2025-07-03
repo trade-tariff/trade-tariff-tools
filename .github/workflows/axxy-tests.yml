@@ -1,0 +1,49 @@
+name: axxy-tests
+
+on:
+  workflow_call:
+    inputs:
+      test-environment:
+        description: 'The e2e-test environment to run against'
+        type: string
+        required: true
+      ref:
+        description: 'The e2e-test repo reference to run with'
+        type: string
+        default: 'main'
+        required: false
+      base-url:
+        description: 'The base URL for the e2e tests'
+        type: string
+        required: false
+      admin-url:
+        description: 'The admin URL for the e2e tests'
+        type: string
+        required: false
+    secrets:
+      basic_password:
+        description: 'The basic auth password'
+        required: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: trade-tariff/trade-tariff-frontend
+          ref: ${{ inputs.ref || 'main' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          cache: 'yarn'
+
+      - run: yarn install
+
+      - run: yarn playwright install --with-deps chromium
+
+      - run: yarn run axxy
+        env:
+          BASE_URL: ${{ inputs.base-url }}
+          ADMIN_URL: ${{ inputs.admin-url }}
+          BASIC_PASSWORD: ${{ secrets.basic_password }}
