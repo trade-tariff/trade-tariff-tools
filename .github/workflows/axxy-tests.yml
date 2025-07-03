@@ -4,16 +4,25 @@ on:
   workflow_call:
     inputs:
       base-url:
-        description: 'The base URL for the e2e tests'
+        description: 'The base URL for the axxy tests'
         type: string
         required: true
       admin-url:
-        description: 'The admin URL for the e2e tests'
+        description: 'The admin URL for the axxy tests'
         type: string
         required: true
+      email:
+        description: 'Email address for the axxy tests gh pages commit'
+        type: string
+        required: false
+        default: 'trade-tariff-infrastructure-continuity<hmrc-trade-tariff-support-g@digital.hmrc.gov.uk>'
+
     secrets:
       slack-webhook:
         description: 'Slack webhook URL for notifications'
+        required: true
+      ssh-key:
+        description: 'SSH private key used for commits'
         required: true
       basic-password:
         description: 'The basic auth password'
@@ -24,8 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          repository: trade-tariff/trade-tariff-frontend
 
       - uses: actions/setup-node@v4
         with:
@@ -40,6 +47,20 @@ jobs:
           BASE_URL: ${{ inputs.base-url }}
           ADMIN_URL: ${{ inputs.admin-url }}
           BASIC_PASSWORD: ${{ secrets.basic-password }}
+
+      - run: cp node_modules/govuk-frontend/dist/govuk/assets/images/favicon.ico dist/favicon.ico
+
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
+        with:
+          ssh-key: ${{ secrets.ssh-key }}
+
+      - run: |
+          yarn run gh-pages \
+            --dist dist \
+            --user "${{ inputs.email }}" \
+            --silent \
+            --nojekyll \
+            --no-history
 
       - uses: rtCamp/action-slack-notify@v2
         env:
