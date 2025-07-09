@@ -20,6 +20,21 @@ on:
         description: 'The admin URL for the e2e tests'
         type: string
         required: false
+      skip-admin:
+        description: 'Skip the admin tests'
+        type: boolean
+        default: false
+        required: false
+      skip-api:
+        description: 'Skip the API tests'
+        type: boolean
+        default: false
+        required: false
+      skip-frontend:
+        description: 'Skip the frontend tests'
+        type: boolean
+        default: false
+        required: false
     secrets:
       basic_password:
         description: 'The basic auth password'
@@ -57,3 +72,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - run: yarn run test
+        env:
+          SKIP_ADMIN: ${{ inputs.skip-admin }}
+          SKIP_API: ${{ inputs.skip-api }}
+          SKIP_FRONTEND: ${{ inputs.skip-frontend }}
