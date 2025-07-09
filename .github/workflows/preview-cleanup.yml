@@ -37,9 +37,6 @@ jobs:
           role-to-assume: ${{ env.IAM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Lock Docker Compose to v2.36.0
-        uses: ./.github/actions/lock-docker-compose
-
       - run: npm install -g preevy
 
       - name: Clean up preview environments
