@@ -35,6 +35,16 @@ on:
         type: boolean
         default: false
         required: false
+      skip-passwordless:
+        description: 'Skip the passwordless verification tests'
+        type: boolean
+        default: false
+        required: false
+      region:
+        description: 'AWS region to use when assuming IAM role'
+        type: string
+        default: 'eu-west-2'
+        required: false
     secrets:
       basic_password:
         description: 'The basic auth password'
@@ -60,6 +70,17 @@ jobs:
 
       - run: |
           {
+            case "${{ inputs.test-environment }}" in
+              development)
+                ACCOUNT_ID="844815912454"
+                ;;
+              staging)
+                ACCOUNT_ID="451934005581"
+                ;;
+              *)
+                echo "No role associated with the environment: ${{ inputs.test-environment }}"
+                ;;
+            esac
             if [ -n "${{ inputs.admin-url }}" ]; then
               echo "ADMIN_URL=${{ inputs.admin-url }}"
             fi
@@ -69,10 +90,17 @@ jobs:
             echo "BASIC_PASSWORD=${{ secrets.basic_password }}"
             echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
             echo "CI=true"
+            echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
           } >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.region }}
 
       - run: yarn run test
         env:
           SKIP_ADMIN: ${{ inputs.skip-admin }}
           SKIP_API: ${{ inputs.skip-api }}
           SKIP_FRONTEND: ${{ inputs.skip-frontend }}
+          SKIP_PASSWORDLESS_VERIFICATION: ${{ inputs.skip-passwordless }}
