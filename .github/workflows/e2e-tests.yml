@@ -97,6 +97,7 @@ jobs:
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ inputs.region }}
+        if: ${{ inputs['test-environment'] == 'development' || inputs['test-environment'] == 'staging' }}
 
       - run: yarn run test
         env:
