@@ -78,7 +78,7 @@ jobs:
                 ACCOUNT_ID="451934005581"
                 ;;
               *)
-                echo "No role associated with the environment: ${{ inputs.test-environment }}"
+                ACCOUNT_ID=""
                 ;;
             esac
             if [ -n "${{ inputs.admin-url }}" ]; then
