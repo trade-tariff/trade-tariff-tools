@@ -38,7 +38,7 @@ on:
       skip-passwordless:
         description: 'Skip the passwordless verification tests'
         type: boolean
-        default: false
+        default: true
         required: false
       region:
         description: 'AWS region to use when assuming IAM role'
