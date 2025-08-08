@@ -87,34 +87,31 @@ jobs:
               continue
             }
 
-            # Extract branch name (after last hyphen group)
-            branch_name=$(echo "$env_id" | sed -E 's/^trade-tariff-[a-z]+-//')
+            # Extract repo type (admin/frontend) and branch name from env_id
+            # Format: trade-tariff-<repo>-<branch>
+            env_repo=$(echo "$env_id" | sed -E 's/^trade-tariff-(admin|frontend)-.*$/\1/')
+            branch_name=$(echo "$env_id" | sed -E 's/^trade-tariff-(admin|frontend)-//')
             branch_name="${branch_name,,}"  # Lowercase
 
             should_skip="false"
             pr_number=""
-            matching_repo=""
+            matching_repo="trade-tariff/trade-tariff-$env_repo"  # Only check the matching repo
 
-            for repo in "${REPOS[@]}"; do
-              echo "📦 Searching $repo for PRs..."
+            echo "🔍 Checking $matching_repo for branch: $branch_name"
+            for pr in $(gh pr list --repo "$matching_repo" --state open --json number,headRefName -q '.[] | "\(.number)::\(.headRefName)"' || echo ""); do
+              number="${pr%%::*}"
+              head_branch="${pr##*::}"
+              head_branch_lower="${head_branch,,}"
 
-              for pr in $(gh pr list --repo "trade-tariff/$repo" --state open --json number,headRefName -q '.[] | "\(.number)::\(.headRefName)"' || echo ""); do
-                number="${pr%%::*}"
-                head_branch="${pr##*::}"
-                head_branch_lower="${head_branch,,}"
-
-                echo "🔍 Comparing $head_branch_lower (PR #$number in $repo) to env: $branch_name"
-                if [[ "$head_branch_lower" == "$branch_name" ]]; then
-                  if gh pr view "$number" --repo "trade-tariff/$repo" --json labels -q '.labels[].name' | grep -q "^keep-preview$"; then
-                    echo "🛑 Skipping: $env_id (PR #$number in $repo is labeled keep-preview)"
-                    should_skip="true"
-                  else
-                    pr_number="$number"
-                    matching_repo="$repo"
-                  fi
-                  break 2  # stop searching
+              if [[ "$head_branch_lower" == "$branch_name" ]]; then
+                if gh pr view "$number" --repo "$matching_repo" --json labels -q '.labels[].name' | grep -q "^keep-preview$"; then
+                  echo "🛑 Skipping: $env_id (PR #$number in $matching_repo is labeled keep-preview)"
+                  should_skip="true"
+                else
+                  pr_number="$number"
                 fi
-              done
+                break
+              fi
             done
 
             if [[ "$should_skip" == "true" ]]; then
@@ -128,9 +125,9 @@ jobs:
               echo "🔥 Destroying: $env_id"
               if preevy down --id "$env_id" --force --wait --profile "$PROFILE_URL"; then
                 destroyed_envs=$(jq -n --argjson arr "$destroyed_envs" --arg id "$env_id" '$arr + [$id]')
-                if [[ -n "$pr_number" && -n "$matching_repo" ]]; then
+                if [[ -n "$pr_number" ]]; then
                   echo "🏷️ Removing 'needs-preview' label from PR #$pr_number in $matching_repo"
-                  gh pr edit "$pr_number" --repo "trade-tariff/$matching_repo" --remove-label "needs-preview" || echo "⚠️ Failed to remove label"
+                  gh pr edit "$pr_number" --repo "$matching_repo" --remove-label "needs-preview" || echo "⚠️ Failed to remove label"
                 fi
               else
                 echo "❌ Failed to destroy: $env_id"
@@ -162,4 +159,4 @@ jobs:
             *Cleanup completed*
             *Run Mode:* `${{ needs.cleanup.outputs.run_mode }}`
             *Destroyed Environments:*
-            ${{ join(fromJson(needs.cleanup.outputs.destroyed_envs), '• ') }}
+            ${{ join(fromJson(needs.cleanup.outputs.destroyed_envs), ', ') }}
