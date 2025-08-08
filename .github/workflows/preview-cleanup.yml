@@ -146,7 +146,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   notifications:
-    if: always()
+    if: needs.cleanup.outputs.destroyed_envs != '[]' && needs.cleanup.outputs.dry_run == 'false'
     needs: cleanup
     runs-on: ubuntu-latest
     steps:
@@ -159,8 +159,7 @@ jobs:
           SLACK_ICON_EMOJI: ':recycle:'
           SLACK_TITLE: 'Preview Cleanup Report'
           SLACK_MESSAGE: |
-            *Cleanup finished*
+            *Cleanup completed*
             *Run Mode:* `${{ needs.cleanup.outputs.run_mode }}`
-            *Dry Run:* `${{ needs.cleanup.outputs.dry_run }}`
-            *Cleaned Environments:*
-            ${{ join(fromJson(needs.cleanup.outputs.destroyed_envs || '["None"]'), '\n• ') }}
+            *Destroyed Environments:*
+            ${{ join(fromJson(needs.cleanup.outputs.destroyed_envs), '• ') }}
