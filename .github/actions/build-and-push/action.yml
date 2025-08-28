@@ -22,6 +22,27 @@ runs:
       with:
         role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
+
+    - name: Install the ECR credential helper
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y amazon-ecr-credential-helper
+      shell: bash
+
+    - name: Configure Docker to use ECR helper
+      run: |
+        mkdir -p ~/.docker
+        REGISTRY_HOST=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f1)
+        echo "Using registry host: $REGISTRY_HOST"
+        cat > ~/.docker/config.json <<EOF
+        {
+          "credHelpers": {
+            "$REGISTRY_HOST": "ecr-login"
+          }
+        }
+        EOF
+      shell: bash
+
     - id: extract-build-args
       run: |
         build_args=""
@@ -32,15 +53,13 @@ runs:
         echo "::notice::Build arguments extracted: $build_args"
         echo BUILD_ARGS="$build_args" >> "$GITHUB_OUTPUT"
       shell: bash
+
     - run: |
         # Extract repository name and registry id from ecr-url (assumes format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>)
         REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
         REGISTRY_ID=$(echo "${{ inputs.ecr-url }}" | cut -d'.' -f1)
         REF=${{ inputs.ref }}
         IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
-
-        aws ecr get-login-password --region ${{ inputs.region }} \
-          | docker login --username AWS --password-stdin "${{ inputs.ecr-url }}"
 
         if aws ecr describe-images \
           --repository "$REPO_NAME" \
