@@ -49,6 +49,9 @@ on:
       basic_password:
         description: 'The basic auth password'
         required: false
+      spimm_api_key:
+        description: 'Green Lanes SPIMM API key'
+        required: false
 
 jobs:
   test:
@@ -88,6 +91,7 @@ jobs:
               echo "BASE_URL=${{ inputs.base-url }}"
             fi
             echo "BASIC_PASSWORD=${{ secrets.basic_password }}"
+            echo "SPIMM_API_KEY=${{ secrets.spimm_api_key }}"
             echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
             echo "CI=true"
             echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
