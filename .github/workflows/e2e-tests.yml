@@ -109,3 +109,4 @@ jobs:
           SKIP_API: ${{ inputs.skip-api }}
           SKIP_FRONTEND: ${{ inputs.skip-frontend }}
           SKIP_PASSWORDLESS_VERIFICATION: ${{ inputs.skip-passwordless }}
+          DOTENV_CONFIG_QUIET: true
