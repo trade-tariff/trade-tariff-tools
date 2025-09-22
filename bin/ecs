@@ -220,18 +220,17 @@ start_backend_job_task() {
 wait_for_task_agent() {
     local cluster="$1"
     local task="$2"
-
     local wait_count=0
+
     while [[ $wait_count -lt $MAX_WAIT_TIME ]]; do
         local agent_status
         agent_status=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" --region "$REGION" \
             | jq -r '.tasks[0].containers[0].managedAgents[0].lastStatus // empty')
-
         if [[ "$agent_status" == "RUNNING" ]]; then
-            echo "Task status: AGENT $agent_status" >&2
+            printf "\r%-80s\n" "Task status: AGENT $agent_status" >&2
             return 0
         fi
-        echo "Task status: AGENT ${agent_status:-N/A}, waiting..." >&2
+        printf "\r%-80s" "Task status: AGENT ${agent_status:-N/A}, waiting..." >&2
         sleep 2
         ((wait_count++))
     done
@@ -242,26 +241,21 @@ wait_for_task_agent() {
 wait_for_task_ready() {
     local cluster="$1"
     local task="$2"
-
-    echo "Waiting for task to be ready for exec..." >&2
-
+    printf "Waiting for task to be ready for exec..." >&2
     local wait_count=0
     while [[ $wait_count -lt $MAX_WAIT_TIME ]]; do
         local task_status
         task_status=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" --region "$REGION" \
             | jq -r '.tasks[0].lastStatus')
-
         if [[ "$task_status" == "RUNNING" ]]; then
-            echo "Task status: $task_status, checking agent..." >&2
+            printf "\r%-80s\n" "Task status: $task_status, checking agent..." >&2
             wait_for_task_agent "$cluster" "$task"
             return 0
         fi
-
-        echo "Task status: $task_status, waiting..." >&2
+        printf "\r%-80s" "Task status: $task_status, waiting..." >&2
         sleep 2
         ((wait_count++))
     done
-
     error_exit "Task did not start within expected time ($MAX_WAIT_TIME seconds)"
 }
 
