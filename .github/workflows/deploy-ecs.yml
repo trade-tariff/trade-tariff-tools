@@ -46,12 +46,6 @@ on:
       basic-password:
         description: The basic auth password
         required: false
-      scp-username:
-        description: The SCP username for FPO tests
-        required: false
-      scp-password:
-        description: The SCP password for FPO tests
-        required: false
 
 jobs:
   configure:
@@ -198,9 +192,6 @@ jobs:
     needs: deploy
     with:
       test-environment: ${{ inputs.environment }}
-    secrets:
-      scp-username: ${{ secrets.scp-username }}
-      scp-password: ${{ secrets.scp-password }}
 
   notify:
     if: ${{ inputs.notify }}
