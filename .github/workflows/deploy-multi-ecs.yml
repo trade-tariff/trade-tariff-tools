@@ -22,10 +22,6 @@ on:
         required: true
       basic-password:
         required: false
-      scp-username:
-        required: false
-      scp-password:
-        required: false
 
 jobs:
   start-all:
@@ -62,8 +58,6 @@ jobs:
       ssh-key: ${{ secrets.ssh-key }}
       slack-webhook: ${{ secrets.slack-webhook }}
       basic-password: ${{ secrets.basic-password }}
-      scp-username: ${{ secrets.scp-username }}
-      scp-password: ${{ secrets.scp-password }}
 
   e2e-test-tariff:
     if: ${{ inputs.test-flavour == 'tariff' }}
@@ -80,9 +74,6 @@ jobs:
     needs: deploy-all
     with:
       test-environment: ${{ inputs.environment }}
-    secrets:
-      scp-username: ${{ secrets.scp-username }}
-      scp-password: ${{ secrets.scp-password }}
 
   notify-completion:
     if: always()

@@ -11,16 +11,14 @@ on:
         description: 'The e2e-test repo reference to run with'
         type: string
         default: 'main'
-    secrets:
-      scp-username:
-        description: 'The Government Gateway username'
-      scp-password:
-        description: 'The Government Gateway password'
+      region:
+        description: 'AWS region to use when assuming IAM role'
+        type: string
+        default: 'eu-west-2'
+        required: false
 
 jobs:
   test:
-    environment: development
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +34,30 @@ jobs:
 
       - run: yarn playwright install --with-deps chromium
 
+      - run: |
+          {
+            case "${{ inputs.test-environment }}" in
+              development)
+                ACCOUNT_ID="844815912454"
+                ;;
+              staging)
+                ACCOUNT_ID="451934005581"
+                ;;
+              *)
+                ACCOUNT_ID=""
+                ;;
+            esac
+            echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
+          } >> "$GITHUB_ENV"
+
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.region }}
+        if: ${{ inputs['test-environment'] == 'development' || inputs['test-environment'] == 'staging' }}
+
       - run: yarn run test
         env:
           PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
-          SCP_USERNAME: ${{ secrets.scp-username }}
-          SCP_PASSWORD: ${{ secrets.scp-password }}
           CI: true
