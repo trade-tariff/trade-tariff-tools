@@ -80,7 +80,7 @@ jobs:
             echo "actual_ref=${ACTUAL_REF}"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ steps.actual-ref.outputs.actual_repo }}
           ref: ${{ steps.actual-ref.outputs.actual_ref }}
@@ -122,7 +122,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -147,7 +147,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -167,7 +167,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -205,7 +205,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
