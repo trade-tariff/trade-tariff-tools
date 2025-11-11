@@ -29,7 +29,7 @@ jobs:
       GH_TOKEN: ${{ secrets.BOT_USER_PAT }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: touch .env # To prevent preevy from failing due to missing .env file
 
       - uses: aws-actions/configure-aws-credentials@v4
@@ -147,7 +147,7 @@ jobs:
     needs: cleanup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: rtCamp/action-slack-notify@v2
         env:

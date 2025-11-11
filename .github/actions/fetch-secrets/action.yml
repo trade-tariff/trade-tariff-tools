@@ -24,11 +24,29 @@ runs:
         role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
 
-    - name: Fetch and store secrets
+    - name: Fetch, store and mask secrets
       shell: bash
       run: |
-        aws secretsmanager get-secret-value \
+        SECRET_JSON=$(aws secretsmanager get-secret-value \
           --secret-id "${{ inputs.secret-name }}" \
           --query "SecretString" \
-          --output text \
-          | jq -r 'to_entries[] | "\(.key)=\"\(.value)\""' > "${{ inputs.env-file }}"
+          --output text)
+
+          if [ -z "$SECRET_JSON" ]; then
+            echo "Error: No secret data retrieved"
+            exit 1
+          fi
+
+          TEMP_FILE=$(mktemp)
+          echo "$SECRET_JSON" > "$TEMP_FILE"
+
+          jq -r '
+            to_entries[]
+            | select(.value | type == "string")
+            | select(.value | length > 8) 
+            | "::add-mask::" + .value
+          ' "$TEMP_FILE"
+
+           jq -r 'to_entries[] | "\(.key)=\"\(.value)\""' "$TEMP_FILE" > "${{ inputs.env-file }}"
+
+           rm -f "$TEMP_FILE"
