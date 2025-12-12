@@ -16,6 +16,13 @@ on:
         type: string
         default: 'eu-west-2'
         required: false
+    secrets:
+      non_admin_bypass_password:
+        description: 'Password for non-admin bypass'
+        required: false
+      admin_bypass_password:
+        description: 'Password for admin bypass'
+        required: false
 
 jobs:
   test:
@@ -59,5 +66,7 @@ jobs:
 
       - run: yarn run test
         env:
-          PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
+          ADMIN_BYPASS_PASSWORD: ${{ secrets.admin_bypass_password }}
           CI: true
+          NON_ADMIN_BYPASS_PASSWORD: ${{ secrets.non_admin_bypass_password }}
+          PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
