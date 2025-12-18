@@ -13,5 +13,5 @@ jobs:
     steps:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/start-services@main
         with:
-          service-names: backend-uk backend-xi worker-uk worker-xi backend-job admin frontend identity dev-hub tea
+          service-names: backend-uk backend-xi worker-uk worker-xi admin frontend identity dev-hub tea
           environment: development
