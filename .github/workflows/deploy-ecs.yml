@@ -70,7 +70,7 @@ jobs:
           if [[ -n "${{ inputs.checkout-ref }}" ]]; then
             ACTUAL_REF="${{ inputs.checkout-ref }}"
           elif [[ "$ACTUAL_REPO" == "${{ github.repository }}" ]]; then
-            ACTUAL_REF="${{ github.ref }}"
+            ACTUAL_REF="${{ github.event.pull_request.head.sha || github.sha }}"
           else
             ACTUAL_REF="main"
           fi
