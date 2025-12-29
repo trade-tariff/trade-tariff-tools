@@ -79,8 +79,8 @@ jobs:
     with:
       test-environment: ${{ inputs.environment }}
     secrets:
-      NON_ADMIN_BYPASS_PASSWORD: ${{ secrets.NON_ADMIN_BYPASS_PASSWORD }}
-      ADMIN_BYPASS_PASSWORD: ${{ secrets.ADMIN_BYPASS_PASSWORD }}
+      non_admin_bypass_password: "${{ secrets.NON_ADMIN_BYPASS_PASSWORD }}"
+      admin_bypass_password: "${{ secrets.ADMIN_BYPASS_PASSWORD }}"
 
   notify-completion:
     if: always()
