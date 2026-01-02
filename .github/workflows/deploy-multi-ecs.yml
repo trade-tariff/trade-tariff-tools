@@ -74,7 +74,7 @@ jobs:
 
   e2e-test-fpo:
     if: ${{ inputs.test-flavour == 'fpo' }}
-    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-fpo-tests.yml@main
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-fpo-tests.yml@add-logging
     needs: deploy-all
     with:
       test-environment: ${{ inputs.environment }}
