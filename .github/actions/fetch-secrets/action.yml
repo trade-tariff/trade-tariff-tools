@@ -43,7 +43,7 @@ runs:
           jq -r '
             to_entries[]
             | select(.value | type == "string")
-            | select(.value | length > 8) 
+            | select(.value | length > 8)
             | "::add-mask::" + .value
           ' "$TEMP_FILE"
 
