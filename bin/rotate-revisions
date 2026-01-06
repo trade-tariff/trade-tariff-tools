@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o noclobber
+
+USED_ARNS_FILE=$(mktemp)
+
+cleanup() {
+    rm -f "$USED_ARNS_FILE"
+}
+
+trap cleanup EXIT
+
+in_use_revisions() {
+    echo "Scanning for used Task Definitions..." >&2
+
+    local clusters
+    clusters=($(aws ecs list-clusters --query 'clusterArns[]' --output text))
+
+    for cluster in "${clusters[@]}"; do
+        echo "  Checking cluster: ${cluster##*/}" >&2
+
+        local services
+        services=$(aws ecs list-services --cluster "$cluster" --query 'serviceArns[]' --output text)
+
+        if [[ -n "$services" ]]; then
+             echo "$services" | xargs -n 10 aws ecs describe-services \
+                --cluster "$cluster" \
+                --services \
+                | jq -r '.services[].taskDefinition' >> "$USED_ARNS_FILE"
+        fi
+
+        local tasks
+        tasks=$(aws ecs list-tasks --cluster "$cluster" --desired-status RUNNING --query 'taskArns[]' --output text)
+
+        if [[ -n "$tasks" ]]; then
+            echo "$tasks" | xargs -n 10 aws ecs describe-tasks \
+                --cluster "$cluster" \
+                --tasks \
+                | jq -r '.tasks[].taskDefinitionArn' >> "$USED_ARNS_FILE"
+        fi
+    done
+
+    # Sort and unique the file in place
+    sort -u -o "$USED_ARNS_FILE" "$USED_ARNS_FILE"
+
+    local count
+    count=$(wc -l < "$USED_ARNS_FILE")
+
+    cat "$USED_ARNS_FILE"
+    echo "Found $count active task definitions." >&2
+}
+
+deregister_unused() {
+    local whitelist_file="$1"
+    local keep_latest="$2"
+
+    local families
+    families=($(aws ecs list-task-definition-families --status ACTIVE --query 'families[]' --output text))
+
+    for family in "${families[@]}"; do
+        echo "Processing family: $family"
+
+        local revisions
+        revisions=($(aws ecs list-task-definitions --family-prefix "$family" --status ACTIVE --sort DESC --query 'taskDefinitionArns[]' --output text))
+
+        if [ ${#revisions[@]} -eq 0 ]; then
+             echo "  [SKIP] No active revisions found."
+             continue
+        fi
+
+        local count=0
+        for arn in "${revisions[@]}"; do
+            set +e  # NOTE: count++ exits with status 1 when count is zero
+            ((count++))
+            set -e
+
+            # NOTE: ALWAYS keep revisions currently in use
+            # This is extremely fast and avoids regex overhead
+            if grep -qFxf "$whitelist_file" <<< "$arn"; then
+                echo "  [KEEP IN-USE] $arn"
+                continue
+            fi
+
+            # NOTE: ALWAYS keep the top N latest revisions
+            if [ "$count" -le "$keep_latest" ]; then
+                echo "  [KEEP LATEST] $arn"
+                continue
+            fi
+
+
+            # WARN: Deregister the rest
+            echo "  [DEREGISTERING] $arn"
+            aws ecs deregister-task-definition --task-definition "$arn" >/dev/null
+            sleep 0.5  # NOTE: AWS API Throttle protection
+        done
+    done
+}
+
+main() {
+    local keep="${1:-4}"
+
+    in_use_revisions
+
+    deregister_unused "$USED_ARNS_FILE" "$keep"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
