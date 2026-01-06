@@ -36,11 +36,15 @@ This repo is used as a wastebasket for general workflows and scripts that the ta
    brew install fzf
    ```
 
-3. **Configure AWS credentials (for `ecs` script):**
-   - Configure credentials: `aws configure`
-   - Or pull credentials from: https://d-9c677042e2.awsapps.com/start/
+3. **Install system dependencies (for Mac):**
+   ```bash
+   brew install awscli jq fzf session-manager-plugin
+   ```
 
-4. **Verify Session Manager Plugin installation:**
+4. **Configure AWS credentials (for `ecs` script):**
+   - Pull credentials from: https://d-9c677042e2.awsapps.com/start/
+
+5. **Verify Session Manager Plugin installation:**
    ```bash
    session-manager-plugin
    ```
@@ -120,3 +124,35 @@ python3 bin/ott_search_stat.py
 - "Other Results" - Other search results
 
 **Configuration:** The script currently points to `http://localhost:3000`. You may need to modify the `url` variable in the script (line 32) to point to your desired environment.
+
+### 4. `bin/cleanup-ecs-families`
+
+This script reports on and optionally deregisters unused Amazon ECS task definition families. It is designed to help keep your ECS task definitions clean by identifying and removing old, inactive families that are no longer associated with active services or recently run tasks.
+
+**Important Safeguards:**
+- The script maintains a `PRESERVE_FAMILIES` array (configured within the script) for task families that should *never* be deregistered, even if they appear unused (e.g., scheduled jobs like `backend-job`).
+- It also considers families of recently running or stopped tasks as 'in-use' for a short period.
+
+**Usage:**
+```bash
+# Report mode (default): Lists unused task definition families without making any changes.
+./bin/cleanup-ecs-families report
+
+# Deregister mode: Deregisters the identified unused task definition families.
+./bin/cleanup-ecs-families deregister [--family FAMILY_NAME] [--environment ENV_NAME]
+```
+
+**Options:**
+- `--family FAMILY_NAME`: Target a specific task definition family for reporting or deregistration.
+- `--environment ENV_NAME`: Specify the environment (e.g., `development`, `staging`, `production`). Defaults to `development`.
+
+### 5. `bin/rotate-revisions`
+
+Deregisters old, unused ECS task definition revisions, keeping a specified number of recent revisions and all currently in-use revisions.
+
+**Usage:**
+```bash
+./bin/rotate-revisions [number_to_keep]
+```
+
+The `number_to_keep` argument is optional and defaults to 4. All revisions currently in use by services or running tasks are always preserved, regardless of this number.

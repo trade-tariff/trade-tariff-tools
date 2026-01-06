@@ -1,0 +1,108 @@
+name: Cleanup Unused ECS Task Families
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Mode: report (dry-run) or deregister'
+        required: false
+        default: 'report'
+        type: choice
+        options:
+          - report
+          - deregister
+      environment:
+        description: 'Environment to target (leave empty for all)'
+        required: false
+        type: choice
+        options:
+          - all
+          - development
+          - staging
+          - production
+      family:
+        description: 'Specific family to target (optional)'
+        required: false
+  schedule:
+    # Run at 6 PM UTC (end of day) every day
+    - cron: '0 18 * * *'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cleanup-development:
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'development' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials for development
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::844815912454:role/GithubActions-ECS-Deployments-Role
+          aws-region: eu-west-2
+
+      - name: Cleanup unused task families in development
+        run: |
+          FAMILY_ARG=""
+          if [[ -n "${{ inputs.family }}" ]]; then
+            FAMILY_ARG="--family ${{ inputs.family }}"
+          fi
+
+          MODE="${{ inputs.mode || 'deregister' }}"
+
+          echo "::notice::Running cleanup in development environment (mode: $MODE)"
+          ./bin/cleanup-ecs-families "$MODE" --environment development "$FAMILY_ARG"
+
+  cleanup-staging:
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'staging' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials for staging
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::451934005581:role/GithubActions-ECS-Deployments-Role
+          aws-region: eu-west-2
+
+      - name: Cleanup unused task families in staging
+        run: |
+          FAMILY_ARG=""
+          if [[ -n "${{ inputs.family }}" ]]; then
+            FAMILY_ARG="--family ${{ inputs.family }}"
+          fi
+
+          MODE="${{ inputs.mode || 'deregister' }}"
+
+          echo "::notice::Running cleanup in staging environment (mode: $MODE)"
+          ./bin/cleanup-ecs-families "$MODE" --environment staging "$FAMILY_ARG"
+
+  cleanup-production:
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'production' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials for production
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::382373577178:role/GithubActions-ECS-Deployments-Role
+          aws-region: eu-west-2
+
+      - name: Cleanup unused task families in production
+        run: |
+          FAMILY_ARG=""
+          if [[ -n "${{ inputs.family }}" ]]; then
+            FAMILY_ARG="--family ${{ inputs.family }}"
+          fi
+
+          MODE="${{ inputs.mode || 'deregister' }}"
+
+          echo "$FAMILY_ARG"
+
+          echo "::notice::Running cleanup in production environment (mode: $MODE)"
+          # NOTE: Letting development and staging bed in until switching this on.
+          # ./bin/cleanup-ecs-families "$MODE" --environment production "$FAMILY_ARG"

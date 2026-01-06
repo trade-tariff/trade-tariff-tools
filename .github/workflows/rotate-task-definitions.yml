@@ -1,0 +1,78 @@
+name: Rotate ECS Task Definitions
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep-latest:
+        description: 'Number of latest revisions to keep per family'
+        required: false
+        default: '4'
+      environment:
+        description: 'Environment to target (leave empty for all)'
+        required: false
+        type: choice
+        options:
+          - all
+          - development
+          - staging
+          - production
+  schedule:
+    # Run at 5 PM UTC (end of day) every day
+    - cron: '0 17 * * *'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rotate-development:
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'development' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials for development
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::844815912454:role/GithubActions-ECS-Deployments-Role
+          aws-region: eu-west-2
+
+      - name: Rotate task definitions in development
+        run: |
+          echo "::notice::Rotating task definitions in development environment"
+          ./bin/rotate-revisions ${{ inputs.keep-latest || '4' }}
+
+  rotate-staging:
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'staging' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials for staging
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::451934005581:role/GithubActions-ECS-Deployments-Role
+          aws-region: eu-west-2
+
+      - name: Rotate task definitions in staging
+        run: |
+          echo "::notice::Rotating task definitions in staging environment"
+          ./bin/rotate-revisions ${{ inputs.keep-latest || '4' }}
+
+  rotate-production:
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'production' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials for production
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::382373577178:role/GithubActions-ECS-Deployments-Role
+          aws-region: eu-west-2
+
+      - name: Rotate task definitions in production
+        run: |
+          echo "::notice::Rotating task definitions in production environment"
+          # NOTE: Letting development and staging bed in until switching this on
+          # ./bin/rotate-revisions ${{ inputs.keep-latest || '20' }}

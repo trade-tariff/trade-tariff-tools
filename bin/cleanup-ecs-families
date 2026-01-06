@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o noclobber
+
+declare -A CLUSTERS
+declare -A CLUSTERS=(
+    ["development"]="trade-tariff-cluster-development"
+    ["staging"]="trade-tariff-cluster-staging"
+    ["production"]="trade-tariff-cluster-production"
+)
+
+MODE="report"
+TARGET_FAMILY=""
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        report|deregister) MODE="$1" ;;
+        --family) TARGET_FAMILY="$2"; shift ;;
+        --environment) ENVIRONMENT="$2"; shift ;;
+        --help)
+            echo "Usage: $0 [report|deregister] [--family FAMILY_NAME] [--cluster CLUSTER_NAME]"
+            echo ""
+            echo "Modes:"
+            echo "  report            - Lists unused Task Definition families without making changes (default)"
+            echo "  deregister        - Deregisters unused Task Definition families"
+            echo ""
+            echo "Options:"
+            echo "  --family FAMILY_NAME     - Target a specific Task Definition family for cleanup"
+            echo "  --environment ENV_NAME   - Specify the environment (development, staging, production). Default is development."
+            exit 0
+            ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+declare -a PRESERVE_FAMILIES=(
+    "backend-job"
+)
+declare ENVIRONMENT="${ENVIRONMENT:-development}"
+CLUSTER="${CLUSTERS[$ENVIRONMENT]}"
+
+echo "--- ECS Task Definition Cleanup Tool ---"
+echo "Mode: $MODE"
+echo "Cluster: $CLUSTER"
+if [[ -n "$TARGET_FAMILY" ]]; then
+    echo "Targeting specific family: $TARGET_FAMILY"
+fi
+echo "----------------------------------------"
+
+echo "🔍 Scanning for used families (from Services, recent Tasks, and preserve list)..."
+
+declare -a USED_FAMILIES
+
+for fam in "${PRESERVE_FAMILIES[@]}"; do
+    USED_FAMILIES+=("$fam")
+done
+
+SERVICE_ARNS=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns[]' --output json)
+if [[ "$SERVICE_ARNS" != "[]" ]]; then
+    while read -r task_def_arn; do
+        fam=$(echo "$task_def_arn" | cut -d '/' -f 2 | cut -d ':' -f 1)
+        USED_FAMILIES+=("$fam")
+    done < <(echo "$SERVICE_ARNS" | jq -r '.[]' | xargs -n 10 aws ecs describe-services --cluster "$CLUSTER" --services | jq -r '.services[].taskDefinition')
+fi
+
+TASK_ARNS=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status RUNNING --query 'taskArns[]' --output json)
+STOPPED_TASK_ARNS=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status STOPPED --query 'taskArns[]' --output json)
+ALL_TASK_ARNS=$(jq -s 'add' <(echo "$TASK_ARNS") <(echo "$STOPPED_TASK_ARNS"))
+
+if [[ "$ALL_TASK_ARNS" != "[]" && "$(echo "$ALL_TASK_ARNS" | jq 'length')" -gt 0 ]]; then
+    while read -r task_def_arn; do
+        fam=$(echo "$task_def_arn" | cut -d '/' -f 2 | cut -d ':' -f 1)
+        USED_FAMILIES+=("$fam")
+    done < <(echo "$ALL_TASK_ARNS" | jq -r '.[]' | xargs -n 100 aws ecs describe-tasks --cluster "$CLUSTER" --tasks | jq -r '.tasks[].taskDefinitionArn')
+fi
+
+USED_FAMILIES=($(echo "${USED_FAMILIES[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+
+echo "✅ Found ${#USED_FAMILIES[*]} families considered in use."
+
+echo "🔍 Fetching all ACTIVE Task Definition families..."
+ALL_FAMILIES=($(aws ecs list-task-definition-families --status ACTIVE --query 'families[]' --output text))
+
+CANDIDATES=()
+
+for fam in "${ALL_FAMILIES[@]}"; do
+    is_used=false
+    for used in "${USED_FAMILIES[@]}"; do
+        if [[ "$used" == "$fam" ]]; then
+            is_used=true
+            break
+        fi
+    done
+
+    if [[ "$is_used" == "true" ]]; then
+        continue # Skip used families
+    fi
+
+    if [[ -n "$TARGET_FAMILY" && "$fam" != "$TARGET_FAMILY" ]]; then
+        continue
+    fi
+
+    CANDIDATES+=("$fam")
+done
+
+echo "⚠️  Found ${#CANDIDATES[@]} unused families eligible for cleanup."
+echo "----------------------------------------"
+
+if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+    echo "No unused families found to process."
+    exit 0
+fi
+
+if [[ "$MODE" == "report" ]]; then
+    echo "REPORT: The following families appear unused and would be deregistered:"
+    for fam in "${CANDIDATES[@]}"; do
+        echo " - $fam"
+    done
+    echo ""
+    echo "To clean these up, run: $0 deregister [--family FAMILY_NAME] [--environment ENV_NAME]"
+
+elif [[ "$MODE" == "deregister" ]]; then
+    echo "DEREGISTERING: Starting cleanup of ${#CANDIDATES[@]} families..."
+
+    for fam in "${CANDIDATES[@]}"; do
+        revisions=($(aws ecs list-task-definitions --family-prefix "$fam" --status ACTIVE --query 'taskDefinitionArns[]' --output text))
+        count=0
+        for revision_arn in "${revisions[@]}"; do
+            echo "   - Deregistering: $revision_arn"
+            AWS_MAX_ATTEMPTS=10 aws ecs deregister-task-definition --task-definition "$revision_arn" > /dev/null
+            (( count+=1 ))
+
+            sleep 0.5 # NOTE: Throttle to avoid API rate limits
+        done
+        echo "   ✔ Deregistered $count revisions for $fam"
+    done
+    echo "✅ Cleanup complete."
+fi
