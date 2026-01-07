@@ -34,7 +34,7 @@ jobs:
       - name: Configure AWS credentials for development
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::844815912454:role/GithubActions-ECS-Deployments-Role
+          role-to-assume: arn:aws:iam::844815912454:role/GithubActions-ECS-Task-Cleanup-Role
           aws-region: eu-west-2
 
       - name: Rotate task definitions in development
@@ -51,7 +51,7 @@ jobs:
       - name: Configure AWS credentials for staging
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::451934005581:role/GithubActions-ECS-Deployments-Role
+          role-to-assume: arn:aws:iam::451934005581:role/GithubActions-ECS-Task-Cleanup-Role
           aws-region: eu-west-2
 
       - name: Rotate task definitions in staging
@@ -68,7 +68,7 @@ jobs:
       - name: Configure AWS credentials for production
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::382373577178:role/GithubActions-ECS-Deployments-Role
+          role-to-assume: arn:aws:iam::382373577178:role/GithubActions-ECS-Task-Cleanup-Role
           aws-region: eu-west-2
 
       - name: Rotate task definitions in production
