@@ -66,7 +66,7 @@ jobs:
 
       - run: yarn run test
         env:
-          admin_bypass_password: ${{ secrets.ADMIN_BYPASS_PASSWORD }}
-          non_admin_bypass_password: ${{ secrets.NON_ADMIN_BYPASS_PASSWORD }}
+          ADMIN_BYPASS_PASSWORD: ${{ secrets.admin_bypass_password }}
+          NON_ADMIN_BYPASS_PASSWORD: ${{ secrets.non_admin_bypass_password }}
           CI: true
           PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
