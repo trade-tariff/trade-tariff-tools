@@ -54,7 +54,8 @@ jobs:
           MODE="${{ inputs.mode || 'deregister' }}"
 
           echo "::notice::Running cleanup in development environment (mode: $MODE)"
-          ./bin/cleanup-ecs-families "$MODE" --environment development "$FAMILY_ARG"
+          # shellcheck disable=SC2086
+          ./bin/cleanup-ecs-families "$MODE" --environment development $FAMILY_ARG
 
   cleanup-staging:
     runs-on: ubuntu-latest
@@ -78,7 +79,8 @@ jobs:
           MODE="${{ inputs.mode || 'deregister' }}"
 
           echo "::notice::Running cleanup in staging environment (mode: $MODE)"
-          ./bin/cleanup-ecs-families "$MODE" --environment staging "$FAMILY_ARG"
+          # shellcheck disable=SC2086
+          ./bin/cleanup-ecs-families "$MODE" --environment staging $FAMILY_ARG
 
   cleanup-production:
     runs-on: ubuntu-latest
@@ -105,4 +107,4 @@ jobs:
 
           echo "::notice::Running cleanup in production environment (mode: $MODE)"
           # NOTE: Letting development and staging bed in until switching this on.
-          # ./bin/cleanup-ecs-families "$MODE" --environment production "$FAMILY_ARG"
+          # ./bin/cleanup-ecs-families "$MODE" --environment production $FAMILY_ARG
