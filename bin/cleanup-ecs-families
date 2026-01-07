@@ -82,6 +82,10 @@ fi
 USED_FAMILIES=($(echo "${USED_FAMILIES[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
 
 echo "✅ Found ${#USED_FAMILIES[*]} families considered in use."
+if [[ "$MODE" == "report" ]]; then
+    echo "   Preserved families: ${PRESERVE_FAMILIES[*]}"
+    echo "   All used families: ${USED_FAMILIES[*]}"
+fi
 
 echo "🔍 Fetching all ACTIVE Task Definition families..."
 ALL_FAMILIES=($(aws ecs list-task-definition-families --status ACTIVE --query 'families[]' --output text))
@@ -96,6 +100,16 @@ for fam in "${ALL_FAMILIES[@]}"; do
             break
         fi
     done
+
+    # Also check if family matches any preserve patterns (substring match)
+    if [[ "$is_used" == "false" ]]; then
+        for preserve in "${PRESERVE_FAMILIES[@]}"; do
+            if [[ "$fam" == *"$preserve"* ]]; then
+                is_used=true
+                break
+            fi
+        done
+    fi
 
     if [[ "$is_used" == "true" ]]; then
         continue # Skip used families
