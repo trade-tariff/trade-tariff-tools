@@ -187,7 +187,8 @@ jobs:
       basic_password: ${{ secrets.basic-password }}
 
   e2e-test-fpo:
-    if: ${{ inputs.test-flavour == 'fpo' }}
+    # TODO: FPO tests should not be run against production environment since we don't have control of a mailbox there
+    if: ${{ inputs.test-flavour == 'fpo' && inputs.environment != 'production' }}
     uses: trade-tariff/trade-tariff-tools/.github/workflows/e2e-fpo-tests.yml@main
     needs: deploy
     with:
