@@ -39,9 +39,66 @@ runs:
         role-to-assume: ${{ steps.config.outputs.role_to_assume }}
         aws-region: ${{ inputs.region }}
     - run: |
+        CLUSTER="trade-tariff-cluster-${{ inputs.environment }}"
+        REGION="${{ inputs.region }}"
+
+        SUCCEEDED=()
+        FAILED=()
+
         for SERVICE_NAME in ${{ inputs.service-names }}; do
-          echo "::notice::Stopping ECS service: $SERVICE_NAME"
-          aws ecs update-service --cluster "trade-tariff-cluster-${{ inputs.environment }}" --service "$SERVICE_NAME" --desired-count 0 --region "${{ inputs.region }}"
+          echo "::group::Stopping service: $SERVICE_NAME"
+
+          # Check if service exists first
+          if ! aws ecs describe-services \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE_NAME" \
+            --region "$REGION" \
+            --query "services[?status=='ACTIVE'].serviceName" \
+            --output text | grep -q "$SERVICE_NAME"; then
+            echo "::error::Service '$SERVICE_NAME' does not exist or is not active in cluster '$CLUSTER'"
+            FAILED+=("$SERVICE_NAME (not found)")
+            echo "::endgroup::"
+            continue
+          fi
+
+          # Stop the service
+          if aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE_NAME" \
+            --desired-count 0 \
+            --region "$REGION" \
+            --output text \
+            --query "service.{name:serviceName,desired:desiredCount,running:runningCount}" > /dev/null; then
+            echo "::notice::✓ Stopped $SERVICE_NAME (desired count: 0)"
+            SUCCEEDED+=("$SERVICE_NAME")
+          else
+            echo "::error::✗ Failed to stop $SERVICE_NAME"
+            FAILED+=("$SERVICE_NAME")
+          fi
+
+          echo "::endgroup::"
         done
-        echo "::notice::Successfully stopped ECS services: ${{ inputs.service-names }}"
+
+        # Print summary
+        echo ""
+        echo "=========================================="
+        echo "Summary:"
+        echo "=========================================="
+
+        if [ ${#SUCCEEDED[@]} -gt 0 ]; then
+          echo "::notice::✓ Successfully stopped ${#SUCCEEDED[@]} service(s):"
+          for svc in "${SUCCEEDED[@]}"; do
+            echo "::notice::  - $svc"
+          done
+        fi
+
+        if [ ${#FAILED[@]} -gt 0 ]; then
+          echo "::error::✗ Failed to stop ${#FAILED[@]} service(s):"
+          for svc in "${FAILED[@]}"; do
+            echo "::error::  - $svc"
+          done
+          exit 1
+        fi
+
+        echo "::notice::All services stopped successfully!"
       shell: bash
