@@ -74,5 +74,4 @@ jobs:
       - name: Rotate task definitions in production
         run: |
           echo "::notice::Rotating task definitions in production environment"
-          # NOTE: Letting development and staging bed in until switching this on
-          # ./bin/rotate-revisions ${{ inputs.keep-latest || '20' }}
+          ./bin/rotate-revisions ${{ inputs.keep-latest || '20' }}

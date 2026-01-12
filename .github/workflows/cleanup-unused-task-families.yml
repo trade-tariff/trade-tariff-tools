@@ -106,5 +106,5 @@ jobs:
           echo "$FAMILY_ARG"
 
           echo "::notice::Running cleanup in production environment (mode: $MODE)"
-          # NOTE: Letting development and staging bed in until switching this on.
-          # ./bin/cleanup-ecs-families "$MODE" --environment production $FAMILY_ARG
+          # shellcheck disable=SC2086
+          ./bin/cleanup-ecs-families "$MODE" --environment production $FAMILY_ARG
