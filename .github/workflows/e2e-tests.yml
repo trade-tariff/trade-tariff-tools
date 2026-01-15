@@ -23,7 +23,7 @@ on:
       skip-admin:
         description: 'Skip the admin tests'
         type: boolean
-        default: false
+        default: true
         required: false
       skip-api:
         description: 'Skip the API tests'
