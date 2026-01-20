@@ -198,6 +198,9 @@ jobs:
     needs: deploy
     with:
       test-environment: ${{ inputs.environment }}
+    secrets:
+      non_admin_bypass_password: ${{ secrets.non_admin_bypass_password }}
+      admin_bypass_password: ${{ secrets.admin_bypass_password }}
 
   notify:
     if: ${{ always() && inputs.notify }}
