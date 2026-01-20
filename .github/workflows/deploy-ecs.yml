@@ -46,6 +46,12 @@ on:
       basic-password:
         description: The basic auth password
         required: false
+      non_admin_bypass_password:
+        description: 'Password for non-admin bypass'
+        required: false
+      admin_bypass_password:
+        description: 'Password for admin bypass'
+        required: false
 
 jobs:
   configure:
