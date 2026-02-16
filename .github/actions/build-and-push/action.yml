@@ -73,6 +73,6 @@ runs:
         fi
 
         echo "$REF" > REVISION
-        docker build -t "$IMAGE_NAME" . ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
+        docker build --provenance=false -t "$IMAGE_NAME" . ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
         docker push "$IMAGE_NAME"
       shell: bash
