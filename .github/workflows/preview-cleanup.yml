@@ -58,8 +58,6 @@ jobs:
           echo "Run mode: $RUN_MODE"
           echo "Dry run: $DRY_RUN"
 
-          REPOS=("trade-tariff-frontend" "trade-tariff-admin")
-
           envs_json=$(preevy ls --json --profile "$PROFILE_URL") || {
             echo "⚠️ Failed to list environments"
             {
@@ -149,13 +147,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_CHANNEL: 'deployments'
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_ICON_EMOJI: ':recycle:'
-          SLACK_TITLE: 'Preview Cleanup Report'
-          SLACK_MESSAGE: |
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          channel: deployments
+          icon_emoji: ':recycle:'
+          title: Preview Cleanup Report
+          message: |
             *Cleanup completed*
             *Run Mode:* `${{ needs.cleanup.outputs.run_mode }}`
             *Destroyed Environments:*

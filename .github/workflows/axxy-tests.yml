@@ -62,12 +62,12 @@ jobs:
             --nojekyll \
             --no-history
 
-      - uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_CHANNEL: "non-production-alerts"
-          SLACK_USERNAME: "Accessibility Report"
-          SLACK_WEBHOOK: ${{ secrets.slack-webhook }}
-          SLACK_ICON_EMOJI: ":playwright:"
-          SLACK_COLOR: success
-          SLACK_TITLE: New Accessibility report generated
-          SLACK_MESSAGE: https://trade-tariff.github.io/trade-tariff-frontend/accessibility-report.html
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
+        with:
+          webhook: ${{ secrets.slack-webhook }}
+          channel: non-production-alerts
+          username: Accessibility Report
+          icon_emoji: ':playwright:'
+          color: success
+          title: New Accessibility report generated
+          message: https://trade-tariff.github.io/trade-tariff-frontend/accessibility-report.html
