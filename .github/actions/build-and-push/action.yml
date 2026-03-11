@@ -23,13 +23,36 @@ runs:
         role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
 
+    - name: Check if image already exists in ECR
+      id: check-image
+      run: |
+        REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
+        REGISTRY_ID=$(echo "${{ inputs.ecr-url }}" | cut -d'.' -f1)
+        REF=${{ inputs.ref }}
+        IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
+
+        if aws ecr describe-images \
+          --repository "$REPO_NAME" \
+          --image-ids imageTag="$REF" \
+          --region "${{ inputs.region }}" \
+          --registry-id "$REGISTRY_ID" > /dev/null 2>&1; then
+          echo "::notice::Image $IMAGE_NAME already exists in ECR. Skipping build and push."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "::notice::Image $IMAGE_NAME not found in ECR. Proceeding with build and push."
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+      shell: bash
+
     - name: Install the ECR credential helper
+      if: steps.check-image.outputs.exists == 'false'
       run: |
         sudo apt-get update
         sudo apt-get install -y amazon-ecr-credential-helper
       shell: bash
 
     - name: Configure Docker to use ECR helper
+      if: steps.check-image.outputs.exists == 'false'
       run: |
         mkdir -p ~/.docker
         REGISTRY_HOST=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f1)
@@ -43,7 +66,9 @@ runs:
         EOF
       shell: bash
 
-    - id: extract-build-args
+    - name: Extract build arguments
+      if: steps.check-image.outputs.exists == 'false'
+      id: extract-build-args
       run: |
         build_args=""
         for arg in ${{ inputs.build-args }}; do
@@ -54,23 +79,11 @@ runs:
         echo BUILD_ARGS="$build_args" >> "$GITHUB_OUTPUT"
       shell: bash
 
-    - run: |
-        # Extract repository name and registry id from ecr-url (assumes format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>)
-        REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
-        REGISTRY_ID=$(echo "${{ inputs.ecr-url }}" | cut -d'.' -f1)
+    - name: Build and push image
+      if: steps.check-image.outputs.exists == 'false'
+      run: |
         REF=${{ inputs.ref }}
         IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
-
-        if aws ecr describe-images \
-          --repository "$REPO_NAME" \
-          --image-ids imageTag="$REF" \
-          --region "${{ inputs.region }}" \
-          --registry-id "$REGISTRY_ID" > /dev/null 2>&1; then
-          echo "::notice::Image $IMAGE_NAME already exists in ECR. Skipping build and push."
-          exit 0
-        else
-          echo "::notice::Image $IMAGE_NAME not found in ECR. Proceeding with build and push."
-        fi
 
         echo "$REF" > REVISION
         docker build --provenance=false -t "$IMAGE_NAME" . ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
