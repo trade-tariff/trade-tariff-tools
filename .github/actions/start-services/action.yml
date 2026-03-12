@@ -16,7 +16,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - id: config
       run: |
         case "${{ inputs.environment }}" in
@@ -37,7 +37,7 @@ runs:
 
         echo "role_to_assume=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role" >> "$GITHUB_OUTPUT"
       shell: bash
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ steps.config.outputs.role_to_assume }}
         aws-region: ${{ inputs.region }}
