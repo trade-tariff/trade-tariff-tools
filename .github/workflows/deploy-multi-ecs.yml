@@ -103,6 +103,8 @@ jobs:
           fi
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
-          result: ${{ steps.result.outputs.result }}
-          slack_webhook: ${{ secrets.slack-webhook }}
-          slack_channel: deployments
+          webhook: ${{ secrets.slack-webhook }}
+          channel: deployments
+          color: ${{ steps.result.outputs.result }}
+          title: "${{ github.workflow }}"
+          message: "Deploy to ${{ inputs.environment }} ${{ steps.result.outputs.result }}"

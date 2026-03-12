@@ -234,6 +234,6 @@ jobs:
           webhook: ${{ secrets.slack-webhook }}
           channel: ${{ needs.configure.outputs.slack_channel }}
           color: ${{ steps.result.outputs.result }}
-          title: "Deployment finished with - ${{ steps.result.outputs.result }}"
-          message: "${{ steps.result.outputs.result }}"
+          title: "${{ github.workflow }}"
+          message: "Deploy to ${{ inputs.environment }} ${{ steps.result.outputs.result }}"
       - run: if [[ "${{ steps.result.outputs.result }}" != "success" ]]; then exit 1; fi
