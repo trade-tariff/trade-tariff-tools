@@ -3,8 +3,8 @@ description: Send a notification to a Slack channel
 
 inputs:
   webhook:
-    required: true
-    description: Slack webhook URL
+    required: false
+    description: Slack webhook URL. When omitted, the action logs and exits without posting.
   channel:
     required: false
     default: 'deployments'
@@ -42,6 +42,11 @@ runs:
         TITLE: ${{ inputs.title }}
         MESSAGE: ${{ inputs.message }}
       run: |
+        if [[ -z "$WEBHOOK" ]]; then
+          echo "::notice::Skipping Slack notification because no webhook was provided"
+          exit 0
+        fi
+
         case "$COLOR" in
           success) COLOR="good" ;;
           failure) COLOR="danger" ;;
