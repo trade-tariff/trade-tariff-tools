@@ -4,5 +4,8 @@
 # Used for release notes generation
 /repos
 
+# os files
+.DS_Store
+
 .claude
 .env

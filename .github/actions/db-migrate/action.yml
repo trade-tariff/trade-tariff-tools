@@ -1,0 +1,66 @@
+
+name: 'Run database migrations'
+description: 'Applies schema changes pre-deployment.'
+
+inputs:
+  role-to-assume:
+    description: 'The IAM role ARN to assume for AWS operations.'
+    required: true
+  region:
+    required: false
+    default: 'eu-west-2'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v6
+    - uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ steps.config.outputs.role_to_assume }}
+        aws-region: ${{ inputs.region }}
+    - name: Apply database migrations
+      shell: bash
+      run: |
+        CLUSTER="trade-tariff-cluster-${{ inputs.environment }}"
+        REGION="${{ inputs.region }}"
+        SG_NAME="trade-tariff-ecs-security-group-${{ inputs.environment }}"
+        CMD=$(cat <<EOF
+        {
+          "containerOverrides": [
+            {
+              "name": "backend-job",
+              "command": ["/bin/sh", "-c", "bundle exec rails db:migrate && bundle exec rails data:migrate"]
+            }
+          ]
+        }
+        EOF)
+
+        subnets=$(aws ec2 describe-subnets           \
+          --filters "Name=tag:Name,Values=*private*" \
+          --query 'Subnets[*].SubnetId'              \
+          --output text                              \
+          --region "$REGION"                         \
+        | tr '\t' '|')
+
+        security_group=$(aws ec2 describe-security-groups \
+          --filters ="Name=group-name,Values=${SG_NAME}"  \
+          --query 'SecurityGroups[0].GroupId'             \
+          --output text                                   \
+          --region "${REGION}")
+
+        task_definition=$(aws ecs list-task-definitions \
+          --status ACTIVE                               \
+          --sort DESC                                   \
+          --region "${REGION}"                          \
+        | jq -r '.taskDefinitionArns[]'                 \
+        | grep -E ".*/backend-job-[0-9]{12}:[0-9]+$"    \
+        | head -n 1)
+
+        aws ecs run-task                       \
+          --cluster "${CLUSTER}"               \
+          --count 1                            \
+          --launch-type FARGATE                \
+          --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg],assignPublicIp=DISABLED}" \
+          --region "${REGION}"                 \
+          --started-by db-migrate              \
+          --task-definition ${task_definition} \
+          --overrides "${CMD}"
