@@ -35,3 +35,12 @@ runs:
       shell: bash
       env:
         TF_VAR_docker_tag: ${{ inputs.ref }}
+    - name: Force unlock terraform state on cancellation
+      if: cancelled()
+      shell: bash
+      run: |
+        BUCKET=$(grep '^bucket' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
+        KEY=$(grep '^key' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
+        aws s3 cp "s3://${BUCKET}/${KEY}.tflock" /tmp/terraform.tflock || exit 0
+        LOCK_ID=$(jq -r '.ID' /tmp/terraform.tflock)
+        cd terraform && terraform force-unlock -force "${LOCK_ID}"
