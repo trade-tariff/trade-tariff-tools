@@ -12,80 +12,20 @@ runs:
   using: 'composite'
   steps:
     - uses: actions/checkout@v6
+
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ steps.config.outputs.role_to_assume }}
         aws-region: ${{ inputs.region }}
-    - name: Apply database migrations
+
+    - name: Apply database migration on UK schema
       shell: bash
       run: |
-        CLUSTER="trade-tariff-cluster-${{ inputs.environment }}"
-        REGION="${{ inputs.region }}"
-        SG_NAME="trade-tariff-ecs-security-group-${{ inputs.environment }}"
-        CMD=$(cat <<EOF
-        {
-          "containerOverrides": [
-            {
-              "name": "backend-job",
-              "command": ["/bin/sh", "-c", "bundle exec rails db:migrate && bundle exec rails data:migrate"]
-            }
-          ]
-        }
-        EOF)
+        echo "::notice::Running database migration in ${{ inputs.environment }}"
+        ./bin/db-migrate ${{ inputs.environment }} ${{ inputs.region }} "uk"
 
-        subnets=$(aws ec2 describe-subnets           \
-          --filters "Name=tag:Name,Values=*private*" \
-          --query 'Subnets[*].SubnetId'              \
-          --output text                              \
-          --region "$REGION"                         \
-        | tr '\t' '|')
-
-        security_group=$(aws ec2 describe-security-groups \
-          --filters ="Name=group-name,Values=${SG_NAME}"  \
-          --query 'SecurityGroups[0].GroupId'             \
-          --output text                                   \
-          --region "${REGION}")
-
-        task_definition=$(aws ecs list-task-definitions \
-          --status ACTIVE                               \
-          --sort DESC                                   \
-          --region "${REGION}"                          \
-        | jq -r '.taskDefinitionArns[]'                 \
-        | grep -E ".*/backend-job-[0-9]{12}:[0-9]+$"    \
-        | head -n 1)
-
-        task_id=$(aws ecs run-task               \
-          --cluster "${CLUSTER}"                 \
-          --count 1                              \
-          --launch-type FARGATE                  \
-          --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg],assignPublicIp=DISABLED}" \
-          --region "${REGION}"                   \
-          --started-by db-migrate                \
-          --task-definition "${task_definition}" \
-          --overrides "${CMD}")
-
-        aws logs get-log-events                                      \
-          --log-group-name "platform-logs-${{ inputs.environment }}" \
-          --log-stream-name "ecs/backend-job/${task_id}"             \
-          --query 'events[*].{message: message}'                     \
-          --no-cli-pager                                             \
-          --output text >> task_logs)
-
-        task_exit_code=$(aws ecs describe-tasks     \
-          --cluster "${CLUSTER}"                    \
-          --tasks "${task_id}"                      \
-          --query 'tasks[*].containers[0].exitCode' \
-          --output text)
-
-        # Read all task logs into individual log lines in GitHub Actions output
-        while IFS= read -r line; do
-          echo "$line";
-        done < "task_logs"
-
-        if [ $task_exit_code -ne 0 ]; then
-          echo "::error::Database migration failed; check log output."
-          exit $task_exit_code
-        else
-          echo "::notice::Database migration completed successfully."
-          exit 0
-        fi
+    - name: Apply database migration on XI schema
+      shell: bash
+      run: |
+        echo "::notice::Running database migration in ${{ inputs.environment }}"
+        ./bin/db-migrate ${{ inputs.environment }} ${{ inputs.region }} "xi"
