@@ -1,4 +1,3 @@
-
 name: 'Run database migrations'
 description: 'Applies schema changes pre-deployment.'
 
@@ -55,12 +54,38 @@ runs:
         | grep -E ".*/backend-job-[0-9]{12}:[0-9]+$"    \
         | head -n 1)
 
-        aws ecs run-task                       \
-          --cluster "${CLUSTER}"               \
-          --count 1                            \
-          --launch-type FARGATE                \
+        task_id=$(aws ecs run-task               \
+          --cluster "${CLUSTER}"                 \
+          --count 1                              \
+          --launch-type FARGATE                  \
           --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg],assignPublicIp=DISABLED}" \
-          --region "${REGION}"                 \
-          --started-by db-migrate              \
-          --task-definition ${task_definition} \
-          --overrides "${CMD}"
+          --region "${REGION}"                   \
+          --started-by db-migrate                \
+          --task-definition "${task_definition}" \
+          --overrides "${CMD}")
+
+        aws logs get-log-events                                      \
+          --log-group-name "platform-logs-${{ inputs.environment }}" \
+          --log-stream-name "ecs/backend-job/${task_id}"             \
+          --query 'events[*].{message: message}'                     \
+          --no-cli-pager                                             \
+          --output text >> task_logs)
+
+        task_exit_code=$(aws ecs describe-tasks     \
+          --cluster "${CLUSTER}"                    \
+          --tasks "${task_id}"                      \
+          --query 'tasks[*].containers[0].exitCode' \
+          --output text)
+
+        # Read all task logs into individual log lines in GitHub Actions output
+        while IFS= read -r line; do
+          echo "$line";
+        done < "task_logs"
+
+        if [ $task_exit_code -ne 0 ]; then
+          echo "::error::Database migration failed; check log output."
+          exit $task_exit_code
+        else
+          echo "::notice::Database migration completed successfully."
+          exit 0
+        fi

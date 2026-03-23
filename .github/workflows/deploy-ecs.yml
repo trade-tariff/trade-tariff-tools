@@ -35,7 +35,7 @@ on:
         description: Whether to run database migrations before deployment
         type: boolean
         default: false
-        required: true
+        required: false
       notify:
         description: Whether to send notifications to Slack
         type: boolean
@@ -163,13 +163,16 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
+        with:
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
 
   deploy:
     runs-on: ubuntu-latest
     needs:
       - configure
       - build
+      - migrate
     steps:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
@@ -228,6 +231,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - configure
+      - migrate
       - deploy
       - e2e-test-tariff
       - e2e-test-fpo
