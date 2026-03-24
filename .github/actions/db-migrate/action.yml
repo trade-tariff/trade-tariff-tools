@@ -8,6 +8,9 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
+  overrides:
+    description: 'Container overrides for running the task in JSON format.'
+    required: true
 runs:
   using: 'composite'
   steps:
@@ -18,14 +21,8 @@ runs:
         role-to-assume: ${{ steps.config.outputs.role_to_assume }}
         aws-region: ${{ inputs.region }}
 
-    - name: Apply database migration on UK schema
+    - name: Apply database migration
       shell: bash
       run: |
-        echo "::notice::Running database migration in ${{ inputs.environment }}"
-        ./bin/db-migrate ${{ inputs.environment }} ${{ inputs.region }} "uk"
-
-    - name: Apply database migration on XI schema
-      shell: bash
-      run: |
-        echo "::notice::Running database migration in ${{ inputs.environment }}"
-        ./bin/db-migrate ${{ inputs.environment }} ${{ inputs.region }} "xi"
+        echo "::notice::Running migration task for ${ENVIRONMENT}..."
+        ./bin/db-migrate ${{ inputs.environment }} ${{ inputs.overrides }}

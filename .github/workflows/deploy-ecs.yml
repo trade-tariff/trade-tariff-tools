@@ -36,6 +36,10 @@ on:
         type: boolean
         default: false
         required: false
+      overrides:
+        description: Migration job container overrides, in JSON format.
+        type: string
+        required: false
       notify:
         description: Whether to send notifications to Slack
         type: boolean
@@ -166,9 +170,11 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         with:
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+          overrides: ${{ inputs.overrides }}
 
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ always() }}
     needs:
       - configure
       - build

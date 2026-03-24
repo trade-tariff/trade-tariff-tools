@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 ENVIRONMENT=$1
-REGION=$2
-SERVICE=$3
+OVERRIDES=$2
 
 run_migration_task() {
   local service="$1"
@@ -10,45 +9,23 @@ run_migration_task() {
   CLUSTER="trade-tariff-cluster-${ENVIRONMENT}"
   SG_NAME="trade-tariff-ecs-security-group-${ENVIRONMENT}"
 
-  OVERRIDES=$(cat <<EOT
-{
-  "containerOverrides": [
-    {
-      "name": "backend-job",
-      "environment": [
-        {
-          "name": "SERVICE",
-          "value": "${service}"
-        }
-      ],
-      "command": [
-        "/bin/sh",
-        "-c",
-        "bundle exec rails db:migrate && bundle exec rails data:migrate"
-      ]
-    }
-  ]
-}
-EOT
-)
-
   subnets=$(aws ec2 describe-subnets           \
     --filters "Name=tag:Name,Values=*private*" \
     --query 'Subnets[*].SubnetId'              \
     --output text                              \
-    --region "${REGION}"                       \
+    --region "${AWS_REGION}"                   \
     | tr '\t' '|')
 
   security_group=$(aws ec2 describe-security-groups \
     --filters ="Name=group-name,Values=${SG_NAME}"  \
     --query 'SecurityGroups[0].GroupId'             \
     --output text                                   \
-    --region "${REGION}")
+    --region "${AWS_REGION}")
 
   task_definition=$(aws ecs list-task-definitions \
     --status ACTIVE                               \
     --sort DESC                                   \
-    --region "${REGION}"                          \
+    --region "${AWS_REGION}"                      \
   | jq -r '.taskDefinitionArns[]'                 \
   | grep -E ".*/backend-job-[0-9]{12}:[0-9]+$"    \
   | head -n 1)
@@ -58,7 +35,7 @@ EOT
     --count 1                              \
     --launch-type FARGATE                  \
     --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$security_group],assignPublicIp=DISABLED}" \
-    --region "${REGION}"                   \
+    --region "${AWS_REGION}"               \
     --started-by db-migrate                \
     --task-definition "${task_definition}" \
     --overrides "${OVERRIDES}")
@@ -83,12 +60,9 @@ EOT
   return "$task_exit_code"
 }
 
-echo "Running migration task for ${ENVIRONMENT} on schema ${SERVICE^^}..."
 
 if [ ! "$(run_migration_task "${ENVIRONMENT}")" ]; then
-  echo "::error::Database migration failed for ${SERVICE^^} schema in ${ENVIRONMENT}"
   exit 1
-else
-  echo "::notice::Databate migration applied successfully for ${SERVICE^^} schema"
-  exit 0
 fi
+
+exit 0
