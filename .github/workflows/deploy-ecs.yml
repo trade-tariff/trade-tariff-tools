@@ -31,6 +31,20 @@ on:
         type: string
         default: ''
         required: false
+      migrate:
+        description: Whether to run database migrations before deployment
+        type: boolean
+        default: false
+        required: false
+      migration-task:
+        description: Name of the task to use for migration
+        type: string
+        default: ''
+        required: false
+      migration-overrides:
+        description: Migration job container overrides, in JSON format.
+        type: string
+        required: false
       notify:
         description: Whether to send notifications to Slack
         type: boolean
@@ -157,6 +171,12 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
+        if: ${{ inputs.migrate }}
+        with:
+          migration-task: ${{ inputs.migration-task}}
+          migration-overrides: ${{ inputs.migration-overrides }}
+          role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:
           environment: ${{ inputs.environment }}
