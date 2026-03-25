@@ -2,13 +2,19 @@ name: 'Run database migrations'
 description: 'Applies schema changes pre-deployment.'
 
 inputs:
-  role-to-assume:
-    description: 'The IAM role ARN to assume for AWS operations.'
+  environment:
+    description: 'The name of the environment to perform the migration in'
     required: true
   region:
     required: false
     default: 'eu-west-2'
-  overrides:
+  role-to-assume:
+    description: 'The IAM role ARN to assume for AWS operations.'
+    required: true
+  migration-task:
+    description: 'The name of the task to use'
+    required: true
+  migration-overrides:
     description: 'Container overrides for running the task in JSON format.'
     required: true
 runs:
@@ -24,5 +30,11 @@ runs:
     - name: Apply database migration
       shell: bash
       run: |
-        echo "::notice::Running migration task for ${ENVIRONMENT}..."
-        ./bin/db-migrate ${{ inputs.environment }} ${{ inputs.overrides }}
+        echo "::notice::Running migration task for ${{ inputs.environment }}..."
+
+        migration=$(./bin/db-migrate ${{ inputs.environment }} ${{ inputs.migration-task }} ${{ inputs.migration-overrides }})
+
+        if [ ! "$(migration)" ]; then
+          echo "::error::Migration task failed for ${{ inputs.environment }}"
+          exit 1
+        fi

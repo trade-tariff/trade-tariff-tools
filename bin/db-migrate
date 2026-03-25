@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ENVIRONMENT=$1
-OVERRIDES=$2
+TASK=$2
+OVERRIDES=$3
 
 run_migration_task() {
   local service="$1"
@@ -27,7 +28,7 @@ run_migration_task() {
     --sort DESC                                   \
     --region "${AWS_REGION}"                      \
   | jq -r '.taskDefinitionArns[]'                 \
-  | grep -E ".*/backend-job-[0-9]{12}:[0-9]+$"    \
+  | grep -E ".*/${TASK}-[0-9]{12}:[0-9]+$"        \
   | head -n 1)
 
   task_id=$(aws ecs run-task               \
@@ -42,7 +43,7 @@ run_migration_task() {
 
   aws logs get-log-events                           \
     --log-group-name "platform-logs-${ENVIRONMENT}" \
-    --log-stream-name "ecs/backend-job/${task_id}"  \
+    --log-stream-name "ecs/${TASK}/${task_id}"      \
     --query 'events[*].{message: message}'          \
     --no-cli-pager                                  \
     --output text >> "task_logs"

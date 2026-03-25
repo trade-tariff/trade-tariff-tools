@@ -36,7 +36,12 @@ on:
         type: boolean
         default: false
         required: false
-      overrides:
+      migration-task:
+        description: Name of the task to use for migration
+        type: string
+        default: ''
+        required: false
+      migration-overrides:
         description: Migration job container overrides, in JSON format.
         type: string
         required: false
@@ -169,7 +174,8 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@hrmc-2210-run-db-migrations
         if: ${{ inputs.migrate }}
         with:
-          overrides: ${{ inputs.overrides }}
+          migration-task: ${{ inputs.migration-task}}
+          migration-overrides: ${{ inputs.migration-overrides }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:
