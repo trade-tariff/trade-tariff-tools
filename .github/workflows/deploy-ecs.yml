@@ -166,7 +166,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@hrmc-2210-run-db-migrations
         if: ${{ inputs.migrate }}
         with:
           overrides: ${{ inputs.overrides }}
