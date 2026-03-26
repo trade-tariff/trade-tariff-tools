@@ -174,7 +174,8 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate }}
         with:
-          migration-task: ${{ inputs.migration-task}}
+          environment: ${{ inputs.environment }}
+          migration-task: ${{ inputs.migration-task }}
           migration-overrides: ${{ inputs.migration-overrides }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
