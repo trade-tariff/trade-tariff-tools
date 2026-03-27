@@ -24,7 +24,7 @@ runs:
 
     - uses: aws-actions/configure-aws-credentials@v6
       with:
-        role-to-assume: ${{ steps.config.outputs.role_to_assume }}
+        role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
 
     - name: Apply database migration
@@ -32,7 +32,8 @@ runs:
       run: |
         echo "::notice::Running migration task for ${{ inputs.environment }}..."
 
-        migration=$(./bin/db-migrate ${{ inputs.environment }} ${{ inputs.migration-task }} ${{ inputs.migration-overrides }})
+        overrides=$(jq -r -c '.' <<<"${{ inputs.migration-overrides }}")
+        migration=$(./bin/db-migrate ${{ inputs.environment }} ${{ inputs.migration-task }} "${overrides}"
 
         if [ ! "$(migration)" ]; then
           echo "::error::Migration task failed for ${{ inputs.environment }}"
