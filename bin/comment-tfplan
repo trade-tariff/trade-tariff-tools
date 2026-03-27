@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+post_plan_comment() {
+  pr_comment_url="$1"
+  plan_output="$2"
+
+  message=$(jo body="$(printf "<details>\n<summary>**Terraform plan output:**</summary>\n\`\`\`diff\n%s</details>" "$plan_output")")
+
+  curl                                             \
+    --silent                                       \
+    --location                                     \
+    --request POST "$pr_comment_url"               \
+    -u "$GITHUB_USER":"$GITHUB_TOKEN"              \
+    --header 'Content-Type: application/json'      \
+    --header 'Accept: application/vnd.github+json' \
+    --header 'X-GitHub-Api-Version: 2026-03-10'    \
+    --data "$message"
+}
+
+execute_terraform_plan() {
+  terraform plan -out="/tmp/terraform/plan.cache"
+  plan_output=$(terraform show -no-color "/tmp/terraform/plan.cache")
+
+  pr_response=$(curl \
+    --silent         \
+    --location       \
+    --request GET    \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls?head=trade-tariff:${GITHUB_HEAD_REF}&state=open" \
+    -u "${GITHUB_USER}":"${GITHUB_TOKEN}")
+
+  if [ "$(echo "$pr_response" | jq length)" -eq 0 ]; then
+    echo "No PR found to update"
+    exit 0
+  else
+    pr_comment_url=$(echo "$pr_response" | jq -r ".[]._links.comments.href")
+    post_plan_comment "$pr_comment_url" "$plan_output"
+  fi
+}
+
+execute_terraform_plan
