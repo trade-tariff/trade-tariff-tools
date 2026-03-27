@@ -32,8 +32,8 @@ runs:
       run: |
         echo "::notice::Running migration task for ${{ inputs.environment }}..."
 
-        overrides=$(jq -r -c '.' <<<"${{ inputs.migration-overrides }}")
-        migration=$(./bin/db-migrate ${{ inputs.environment }} ${{ inputs.migration-task }} "${overrides}"
+        overrides=$(jq -r -c '.' <<<'${{ toJSON(inputs.migration-overrides) }}')
+        migration=$(./bin/db-migrate ${{ inputs.environment }} ${{ inputs.migration-task }} "${overrides}")
 
         if [ ! "$(migration)" ]; then
           echo "::error::Migration task failed for ${{ inputs.environment }}"
