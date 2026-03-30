@@ -1,0 +1,25 @@
+name: Pull Request
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pull-request.yml'
+      - 'scripts/trufflehog-pre-commit.sh'
+      - 'tests/trufflehog-pre-commit.bash'
+
+permissions:
+  contents: read
+
+jobs:
+  trufflehog-pre-commit:
+    name: Validate TruffleHog pre-commit script
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check bash syntax
+        run: bash -n scripts/trufflehog-pre-commit.sh tests/trufflehog-pre-commit.bash
+
+      - name: Run regression tests
+        run: ./tests/trufflehog-pre-commit.bash
