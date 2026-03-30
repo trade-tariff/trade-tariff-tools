@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: docker is required to run the TruffleHog pre-commit scan." >&2
+  exit 1
+fi
+
+scan_dir="${1:-$(pwd)}"
+image="${TRUFFLEHOG_IMAGE:-trufflesecurity/trufflehog:latest}"
+
+if [ ! -d "$scan_dir" ]; then
+  echo "Error: scan directory does not exist: $scan_dir" >&2
+  exit 1
+fi
+
+scan_dir="$(cd "$scan_dir" && pwd)"
+exclude_file="$(mktemp)"
+trap 'rm -f "$exclude_file"' EXIT
+
+cat > "$exclude_file" <<'PATTERNS'
+(^|/)\.git(/|$)
+(^|/)\.terraform(/|$)
+(^|/)\.terragrunt-cache(/|$)
+PATTERNS
+
+exec docker run --rm \
+  -v "$scan_dir:/workdir:ro" \
+  -v "$exclude_file:/trufflehog-exclude-paths.txt:ro" \
+  -w /workdir \
+  -i \
+  "$image" \
+  filesystem /workdir \
+  --exclude-paths=/trufflehog-exclude-paths.txt \
+  --results=verified,unknown \
+  --fail
