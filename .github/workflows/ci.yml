@@ -1,4 +1,4 @@
-name: Pull Request
+name: CI
 
 on:
   pull_request:
@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  trufflehog-pre-commit:
-    name: Validate TruffleHog pre-commit script
+  ci:
+    name: ci
     runs-on: ubuntu-latest
 
     steps:
