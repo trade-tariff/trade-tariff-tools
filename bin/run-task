@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o pipefail
+set -o noclobber
+
+readonly SCRIPT_NAME="$(basename "$0")"
+
+usage() {
+  echo "Usage: ${SCRIPT_NAME} [-e <environment>] [-t <task-name>] [-o <overrides>]" 1>&2;
+  exit 1;
+}
+
+help() {
+  cat <<EOF
+Usage: $SCRIPT_NAME [OPTIONS]
+
+This script allows you to run tasks in ECS with optional overrides.
+
+OPTIONS:
+  -h  Show this help message and exit
+  -e  Environment name (one of \`development\`, \`staging\`, \`production\`)
+  -t  Name of the task to use. Must be one of the available ECS tasks.
+  -o  Container overrides, in JSON format. See AWS docs for complete documentation.
+
+EXAMPLES:
+  $SCRIPT_NAME -e development -t backend-uk -o '{"containerOverrides":[{"name":"backend-uk","command":["/bin/sh", "-c", "echo \"hello world\""]}]}'
+EOF
+}
+
+while getopts ":e:t:o:h" opt; do
+  case "${opt}" in
+    e)
+      environment=${OPTARG}
+      ;;
+    t)
+      task=${OPTARG}
+      ;;
+    o)
+      overrides=${OPTARG}
+      ;;
+    h)
+      help
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG"
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument."
+      exit 1
+      ;;
+    \*)
+      help
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [ -z "${environment}" ] || [ -z "${task}" ] || [ -z "${overrides}" ]; then
+  usage
+  exit 1
+fi
+
+if [ -z "${AWS_REGION}" ]; then
+  echo "AWS credentials not set, exiting..."
+  exit 1
+fi
+
+run_task() {
+  CLUSTER="trade-tariff-cluster-${environment}"
+  SG_NAME="trade-tariff-ecs-security-group-${environment}"
+
+  subnets=$(aws ec2 describe-subnets           \
+    --filters "Name=tag:Name,Values=*private*" \
+    --query 'Subnets[*].SubnetId'              \
+    --output text                              \
+    --region "${AWS_REGION}"                   \
+    | tr '\t' ',')
+
+  security_group=$(aws ec2 describe-security-groups \
+    --filters "Name=group-name,Values=${SG_NAME}"   \
+    --query 'SecurityGroups[0].GroupId'             \
+    --output text                                   \
+    --region "${AWS_REGION}")
+
+  task_definition=$(aws ecs list-task-definitions \
+    --status ACTIVE                               \
+    --sort DESC                                   \
+    --region "${AWS_REGION}"                      \
+  | jq -r '.taskDefinitionArns[]'                 \
+  | grep -E ".*/${task}-[0-9]{12}:[0-9]+$"        \
+  | head -n 1)
+
+  task_arn=$(aws ecs run-task              \
+    --cluster "${CLUSTER}"                 \
+    --count 1                              \
+    --launch-type FARGATE                  \
+    --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$security_group],assignPublicIp=DISABLED}" \
+    --region "${AWS_REGION}"               \
+    --started-by db-migrate                \
+    --task-definition "${task_definition}" \
+    --output text                          \
+    --color off                            \
+    --query 'tasks[0].taskArn'             \
+    --overrides "${overrides}")
+
+  task_id=$(echo "${task_arn}" | awk -F'/' '{print $NF}')
+  echo "${task_id}"
+
+  aws logs tail "platform-logs-${environment}" \
+    --since 10s                                \
+    --format short                             \
+
+  task_exit_code=$(aws ecs describe-tasks     \
+    --cluster "${CLUSTER}"                    \
+    --tasks "${task_id}"                      \
+    --query 'tasks[*].containers[0].exitCode' \
+    --output text)
+
+  return $task_exit_code
+}
+
+run_task
