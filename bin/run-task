@@ -110,11 +110,27 @@ run_task() {
     --overrides "${overrides}")
 
   task_id=$(echo "${task_arn}" | awk -F'/' '{print $NF}')
-  echo "${task_id}"
+  echo "Started task with ID: ${task_id}"
 
-  aws logs tail "platform-logs-${environment}" \
-    --since 10s                                \
-    --format short                             \
+  # attempt to get the log stream by creationTime, it should be the newest
+  # (therefore the largest creationTime timestamp)
+  sleep 5
+  log_stream_name=$(aws logs describe-log-streams   \
+    --log-group-name "platform-logs-${environment}" \
+    --log-stream-name-prefix "ecs/${task}/"         \
+  | jq -r '.logStreams | max_by(.creationTime).logStreamName')
+  echo "Found log stream with name: ${log_stream_name}"
+
+  # wait until the task has stopped
+  aws ecs wait tasks-stopped \
+    --cluster "${CLUSTER}"   \
+    --tasks "${task_arn}"    \
+
+  aws logs get-log-events                           \
+    --log-group-name "platform-logs-${environment}" \
+    --log-stream-name "${log_stream_name}"          \
+    --query 'events[*].{message: message}'          \
+    --no-cli-pager                                  \
 
   task_exit_code=$(aws ecs describe-tasks     \
     --cluster "${CLUSTER}"                    \
