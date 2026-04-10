@@ -102,7 +102,7 @@ run_task() {
     --launch-type FARGATE                  \
     --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$security_group],assignPublicIp=DISABLED}" \
     --region "${AWS_REGION}"               \
-    --started-by db-migrate                \
+    --started-by "run-task"                \
     --task-definition "${task_definition}" \
     --output text                          \
     --color off                            \
