@@ -112,25 +112,28 @@ run_task() {
   task_id=$(echo "${task_arn}" | awk -F'/' '{print $NF}')
   echo "Started task with ID: ${task_id}"
 
-  # attempt to get the log stream by creationTime, it should be the newest
-  # (therefore the largest creationTime timestamp)
-  sleep 5
-  log_stream_name=$(aws logs describe-log-streams   \
-    --log-group-name "platform-logs-${environment}" \
-    --log-stream-name-prefix "ecs/${task}/"         \
-  | jq -r '.logStreams | max_by(.creationTime).logStreamName')
-  echo "Found log stream with name: ${log_stream_name}"
-
   # wait until the task has stopped
+  echo "Waiting for task to stop..."
   aws ecs wait tasks-stopped \
     --cluster "${CLUSTER}"   \
     --tasks "${task_arn}"    \
 
+  # attempt to get the log stream by creationTime, it should be the newest
+  # (therefore the largest creationTime timestamp). waiting until the task
+  # has stopped gives us buffer against slow CloudWatch log ingestion.
+  log_stream_name=$(aws logs describe-log-streams   \
+    --log-group-name "platform-logs-${environment}" \
+    --log-stream-name-prefix "ecs/${task}/"         \
+  | jq -r '.logStreams | max_by(.creationTime).logStreamName')
+  echo -e "Found log stream with name: ${log_stream_name}\n"
+
   aws logs get-log-events                           \
     --log-group-name "platform-logs-${environment}" \
     --log-stream-name "${log_stream_name}"          \
-    --query 'events[*].{message: message}'          \
+    --query 'events[*].message'                     \
     --no-cli-pager                                  \
+    --start-from-head                               \
+  | jq -r '.[]'
 
   task_exit_code=$(aws ecs describe-tasks     \
     --cluster "${CLUSTER}"                    \
@@ -138,6 +141,7 @@ run_task() {
     --query 'tasks[*].containers[0].exitCode' \
     --output text)
 
+  echo -e "\nTask exited with an exit code of ${task_exit_code}"
   return $task_exit_code
 }
 
