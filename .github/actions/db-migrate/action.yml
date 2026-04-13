@@ -31,14 +31,6 @@ runs:
       shell: bash
       run: |
         echo "::notice::Running migration task for ${{ inputs.environment }}..."
-
         overrides=$(jq -r -c '.' <<<'${{ toJSON(inputs.migration-overrides) }}')
-        migration_status=$(${{ github.action_path }}/../../../bin/run-task -e ${{ inputs.environment }} -t ${{ inputs.migration-task }} -o "${overrides}")
 
-        if [ $((migration_status)) -ne 0 ]; then
-          echo "::error::Migration task failed for ${{ inputs.environment }}"
-        else
-          echo "::notice::Migration task run successfully for ${{ inputs.environment }}"
-        fi
-
-        exit "$migration_status"
+        ${{ github.action_path }}/../../../bin/run-task -e ${{ inputs.environment }} -t ${{ inputs.migration-task }} -o "${overrides}"
