@@ -15,6 +15,12 @@ on:
         description: "The flavour of tests to run. Options: 'tariff', 'fpo', 'none'"
         type: string
         default: tariff
+      migrate:
+        description: Whether to run database migrations before deployment
+        type: boolean
+        default: false
+        required: false
+
     secrets:
       ssh-key:
         required: true
@@ -53,11 +59,12 @@ jobs:
     uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
     with:
       app-name: ${{ matrix.app.name }}
-      environment: ${{ inputs.environment }}
-      test-flavour: none
       checkout-ref: ${{ matrix.app.ref }}
       checkout-repo: ${{ matrix.app.repo }}
+      environment: ${{ inputs.environment }}
+      migrate: ${{ inputs.migrate }}
       notify: false
+      test-flavour: none
     secrets:
       ssh-key: ${{ secrets.ssh-key }}
       slack-webhook: ${{ secrets.slack-webhook }}

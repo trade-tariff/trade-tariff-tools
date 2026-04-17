@@ -36,20 +36,12 @@ on:
         type: boolean
         default: false
         required: false
-      migration-task:
-        description: Name of the task to use for migration
-        type: string
-        default: ''
-        required: false
-      migration-overrides:
-        description: Migration job container overrides, in JSON format.
-        type: string
-        required: false
       notify:
         description: Whether to send notifications to Slack
         type: boolean
         default: true
         required: false
+
     secrets:
       ssh-key:
         description: The SSH key to use for accessing github repos (implicitly with terraform init)
@@ -172,11 +164,9 @@ jobs:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
-        if: ${{ inputs.migrate }}
+        if: ${{ inputs.migrate &&  needs.configure.outputs.actual_repo == 'trade-tariff/trade-tariff-backend' }}
         with:
           environment: ${{ inputs.environment }}
-          migration-task: ${{ inputs.migration-task }}
-          migration-overrides: ${{ inputs.migration-overrides }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:
