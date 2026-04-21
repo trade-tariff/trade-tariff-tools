@@ -167,6 +167,7 @@ jobs:
         if: ${{ inputs.migrate &&  needs.configure.outputs.actual_repo == 'trade-tariff/trade-tariff-backend' }}
         with:
           environment: ${{ inputs.environment }}
+          ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:

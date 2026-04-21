@@ -13,6 +13,9 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
+  ref:
+    required: true
+    description: 'The git ref to deploy.'
   role-to-assume:
     description: 'The IAM role ARN to assume for AWS operations.'
     required: true
@@ -38,7 +41,7 @@ runs:
     - name: Deploy backend-job
       shell: bash
       env:
-        TF_VAR_docker_tag: $GITHUB_SHA
+        TF_VAR_docker_tag: ${{ inputs.ref }}
       run: |
         cd terraform && terraform apply \
           -var-file=config_${{ inputs.environment }}.tfvars \
