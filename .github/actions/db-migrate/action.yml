@@ -1,6 +1,11 @@
 name: 'Run database migrations'
 description: 'Applies schema changes pre-deployment.'
 
+env:
+  TF_INPUT: 0
+  TF_IN_AUTOMATION: 1
+  TERRAFORM_VERSION: 1.12
+
 inputs:
   environment:
     description: 'The name of the environment to perform the migration in'
@@ -8,15 +13,13 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
+  ref:
+    required: true
+    description: 'The git ref to deploy.'
   role-to-assume:
     description: 'The IAM role ARN to assume for AWS operations.'
     required: true
-  migration-task:
-    description: 'The name of the task to use'
-    required: true
-  migration-overrides:
-    description: 'Container overrides for running the task in JSON format.'
-    required: true
+
 runs:
   using: 'composite'
   steps:
@@ -27,10 +30,51 @@ runs:
         role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
 
-    - name: Apply database migration
+    - uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+    - name: Initialise Terraform
+      shell: bash
+      run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
+
+    - name: Deploy backend-job
+      shell: bash
+      env:
+        TF_VAR_docker_tag: ${{ inputs.ref }}
+      run: |
+        cd terraform && terraform apply \
+          -var-file=config_${{ inputs.environment }}.tfvars \
+          -auto-approve \
+          -lock-timeout=10m \
+          -target=module.backend-job
+
+    - name: Apply database migration for UK schema
       shell: bash
       run: |
-        echo "::notice::Running migration task for ${{ inputs.environment }}..."
-        overrides=$(jq -r -c '.' <<<'${{ toJSON(inputs.migration-overrides) }}')
+        echo "::notice::Running migration task for UK schema in ${{ inputs.environment }}..."
 
-        ${{ github.action_path }}/../../../bin/run-task -e ${{ inputs.environment }} -t ${{ inputs.migration-task }} -o "${overrides}"
+        ${{ github.action_path }}/../../../bin/run-task \
+          -e ${{ inputs.environment }} \
+          -t "backend-job" \
+          -o '{"containerOverrides":[{"name":"backend-job","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+
+    - name: Apply database migration for XI schema
+      shell: bash
+      run: |
+        echo "::notice::Running migration task for XI schema in ${{ inputs.environment }}..."
+
+        ${{ github.action_path }}/../../../bin/run-task \
+          -e ${{ inputs.environment }} \
+          -t "backend-job" \
+          -o '{"containerOverrides":[{"name":"backend-job","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+
+    - name: Force unlock terraform state on cancellation
+      if: cancelled()
+      shell: bash
+      run: |
+        BUCKET=$(grep '^bucket' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
+        KEY=$(grep '^key' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
+        aws s3 cp "s3://${BUCKET}/${KEY}.tflock" /tmp/terraform.tflock || exit 0
+        LOCK_ID=$(jq -r '.ID' /tmp/terraform.tflock)
+        cd terraform && terraform force-unlock -force "${LOCK_ID}"
