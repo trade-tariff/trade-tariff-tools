@@ -4,7 +4,7 @@ description: 'Setup terraform docs'
 inputs:
   terraform_docs_version:
     required: false
-    default: '0.20.0'
+    default: '0.22.0'
 
 runs:
   using: 'composite'
