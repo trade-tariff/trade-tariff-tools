@@ -1,0 +1,27 @@
+name: 'Terraform Plan Comment'
+description: 'Posts Terraform plan with destroy detection to PR comments'
+
+inputs:
+  plan-json-path:
+    description: 'Path to terraform plan JSON file'
+    required: true
+  github-token:
+    description: 'GitHub API token'
+    required: true
+  environment:
+    description: 'Environment name (development/staging/production)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Post Terraform Plan Comment
+      run: |
+        chmod +x "${{ github.action_path }}/comment-tfplan"
+        "${{ github.action_path }}/comment-tfplan" "${{ inputs.plan-json-path }}"
+      shell: bash
+      env:
+        TF_ENV: ${{ inputs.environment }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_EVENT_PATH: ${{ github.event_path }}
