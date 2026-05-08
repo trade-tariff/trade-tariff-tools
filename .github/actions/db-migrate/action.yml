@@ -24,6 +24,7 @@ runs:
   using: 'composite'
   steps:
     - name: Configure output variables
+      shell: bash
       id: configure
       run: |
         REPO=$(echo ${{ github.repository }} | sed 's/trade-tariff\/trade-tariff-//')
