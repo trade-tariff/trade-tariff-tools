@@ -24,6 +24,7 @@ runs:
   using: 'composite'
   steps:
     - name: Configure output variables
+      shell: bash
       id: configure
       run: |
         REPO=$(echo ${{ github.repository }} | sed 's/trade-tariff\/trade-tariff-//')
@@ -69,7 +70,7 @@ runs:
         ${{ github.action_path }}/../../../bin/run-task \
           -e ${{ inputs.environment }} \
           -t ${{ steps.configure.outputs.task }} \
-          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","command":["/bin/sh","-c","bundle exec rails db:migrate"]}]}'
 
     # The backend service needs to run database migrations twice, once for each
     # search path - so this custom behaviour runs instead
