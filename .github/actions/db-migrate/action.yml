@@ -23,6 +23,15 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Configure output variables
+      id: configure
+      run: |
+        REPO=$(echo ${{ github.repository }} | sed 's/trade-tariff\/trade-tariff-//')
+        {
+          echo "repo_name=${REPO}"
+          echo "task=${REPO}-job"
+        } >> "$GITHUB_OUTPUT"
+
     - uses: actions/checkout@v6
 
     - uses: aws-actions/configure-aws-credentials@v6
@@ -38,7 +47,7 @@ runs:
       shell: bash
       run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
 
-    - name: Deploy backend-job
+    - name: Update job task
       shell: bash
       env:
         TF_VAR_docker_tag: ${{ inputs.ref }}
@@ -47,27 +56,38 @@ runs:
           -var-file=config_${{ inputs.environment }}.tfvars \
           -auto-approve \
           -lock-timeout=10m \
-          -target=module.backend-job
+          -target=module.${{ steps.configure.outputs.task }}
 
-    - name: Apply database migration for UK schema
+    # For the admin and dev-hub services, there is only one search path to
+    # apply migrations to, so this runs one task
+    - name: Apply database migration
+      if: ${{ steps.configure.outputs.repo != 'backend' }}
+      shell: bash
+      run: |
+        echo "::notice::Running migration task in ${{ inputs.environment }}..."
+
+        ${{ github.action_path }}/../../../bin/run-task \
+          -e ${{ inputs.environment }} \
+          -t ${{ steps.configure.outputs.task }} \
+          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+
+    # The backend service needs to run database migrations twice, once for each
+    # search path - so this custom behaviour runs instead
+    - name: Apply database migrations for backend service
+      if: ${{ steps.configure.outputs.repo == 'backend' }}
       shell: bash
       run: |
         echo "::notice::Running migration task for UK schema in ${{ inputs.environment }}..."
-
         ${{ github.action_path }}/../../../bin/run-task \
           -e ${{ inputs.environment }} \
-          -t "backend-job" \
-          -o '{"containerOverrides":[{"name":"backend-job","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+          -t ${{ steps.configure.outputs.task }} \
+          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
 
-    - name: Apply database migration for XI schema
-      shell: bash
-      run: |
         echo "::notice::Running migration task for XI schema in ${{ inputs.environment }}..."
-
         ${{ github.action_path }}/../../../bin/run-task \
           -e ${{ inputs.environment }} \
-          -t "backend-job" \
-          -o '{"containerOverrides":[{"name":"backend-job","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+          -t ${{ steps.configure.outputs.task }} \
+          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
 
     - name: Force unlock terraform state on cancellation
       if: cancelled()
