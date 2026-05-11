@@ -1,6 +1,11 @@
 name: 'Terraform Plan Comment'
 description: 'Posts Terraform plan with destroy detection to PR comments'
 
+env:
+  TF_INPUT: 0
+  TF_IN_AUTOMATION: 1
+  TERRAFORM_VERSION: 1.12
+
 inputs:
   plan-json-path:
     description: 'Path to terraform plan JSON file'
