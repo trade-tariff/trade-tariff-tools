@@ -9,3 +9,6 @@
 
 .claude
 .env
+
+.nix
+.envrc
