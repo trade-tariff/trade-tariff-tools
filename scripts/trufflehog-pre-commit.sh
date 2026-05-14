@@ -14,7 +14,7 @@ if [ ! -d "$scan_dir" ]; then
   exit 1
 fi
 
-scan_dir="$(cd "$scan_dir" && pwd)"
+scan_dir="$(cd "$scan_dir" && pwd -P)"
 exclude_file="$(mktemp)"
 trap 'rm -f "$exclude_file"' EXIT
 
@@ -29,7 +29,7 @@ append_gitignored_paths() {
     return 0
   fi
 
-  git_root="$(cd "$git_root" && pwd)"
+  git_root="$(cd "$git_root" && pwd -P)"
 
   case "$scan_dir/" in
     "$git_root/"*)

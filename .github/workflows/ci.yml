@@ -3,9 +3,11 @@ name: CI
 on:
   pull_request:
     paths:
-      - '.github/workflows/pull-request.yml'
+      - '.github/workflows/ci.yml'
+      - 'bin/cleanup-ecs-families'
+      - 'bin/rotate-revisions'
       - 'scripts/trufflehog-pre-commit.sh'
-      - 'tests/trufflehog-pre-commit.bash'
+      - 'tests/**'
 
 permissions:
   contents: read
@@ -17,8 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
       - name: Check bash syntax
-        run: bash -n scripts/trufflehog-pre-commit.sh tests/trufflehog-pre-commit.bash
+        run: bash -n scripts/trufflehog-pre-commit.sh bin/cleanup-ecs-families bin/rotate-revisions tests/test_helper.bash
 
       - name: Run regression tests
-        run: ./tests/trufflehog-pre-commit.bash
+        run: bats tests
