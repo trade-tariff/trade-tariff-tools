@@ -41,6 +41,34 @@ done
 declare -a PRESERVE_FAMILIES=(
     "backend-job"
 )
+declare -a PRESERVE_FAMILY_SUFFIXES=(
+    "-job"
+)
+
+family_is_preserved() {
+    local family="$1"
+
+    for preserve in "${PRESERVE_FAMILIES[@]}"; do
+        if [[ "$family" == "$preserve" ]]; then
+            return 0
+        fi
+    done
+
+    for suffix in "${PRESERVE_FAMILY_SUFFIXES[@]}"; do
+        if [[ "$family" == *"$suffix" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+task_definition_family() {
+    local task_definition_arn="$1"
+    local family_revision="${task_definition_arn##*/}"
+    echo "${family_revision%:*}"
+}
+
 declare ENVIRONMENT="${ENVIRONMENT:-development}"
 CLUSTER="${CLUSTERS[$ENVIRONMENT]}"
 
@@ -84,6 +112,7 @@ USED_FAMILIES=($(echo "${USED_FAMILIES[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' 
 echo "✅ Found ${#USED_FAMILIES[*]} families considered in use."
 if [[ "$MODE" == "report" ]]; then
     echo "   Preserved families: ${PRESERVE_FAMILIES[*]}"
+    echo "   Preserved family suffixes: *${PRESERVE_FAMILY_SUFFIXES[*]}"
     echo "   All used families: ${USED_FAMILIES[*]}"
 fi
 
@@ -101,14 +130,10 @@ for fam in "${ALL_FAMILIES[@]}"; do
         fi
     done
 
-    # Also check if family matches any preserve patterns (substring match)
     if [[ "$is_used" == "false" ]]; then
-        for preserve in "${PRESERVE_FAMILIES[@]}"; do
-            if [[ "$fam" == *"$preserve"* ]]; then
-                is_used=true
-                break
-            fi
-        done
+        if family_is_preserved "$fam"; then
+            is_used=true
+        fi
     fi
 
     if [[ "$is_used" == "true" ]]; then
@@ -145,6 +170,10 @@ elif [[ "$MODE" == "deregister" ]]; then
         revisions=($(aws ecs list-task-definitions --family-prefix "$fam" --status ACTIVE --query 'taskDefinitionArns[]' --output text))
         count=0
         for revision_arn in "${revisions[@]}"; do
+            if [[ "$(task_definition_family "$revision_arn")" != "$fam" ]]; then
+                continue
+            fi
+
             echo "   - Deregistering: $revision_arn"
             AWS_MAX_ATTEMPTS=10 aws ecs deregister-task-definition --task-definition "$revision_arn" > /dev/null
             (( count+=1 ))
