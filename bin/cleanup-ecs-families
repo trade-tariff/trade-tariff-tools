@@ -38,21 +38,12 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-declare -a PRESERVE_FAMILIES=(
-    "backend-job"
-)
 declare -a PRESERVE_FAMILY_SUFFIXES=(
     "-job"
 )
 
 family_is_preserved() {
     local family="$1"
-
-    for preserve in "${PRESERVE_FAMILIES[@]}"; do
-        if [[ "$family" == "$preserve" ]]; then
-            return 0
-        fi
-    done
 
     for suffix in "${PRESERVE_FAMILY_SUFFIXES[@]}"; do
         if [[ "$family" == *"$suffix" ]]; then
@@ -84,10 +75,6 @@ echo "🔍 Scanning for used families (from Services, recent Tasks, and preserve
 
 declare -a USED_FAMILIES
 
-for fam in "${PRESERVE_FAMILIES[@]}"; do
-    USED_FAMILIES+=("$fam")
-done
-
 SERVICE_ARNS=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns[]' --output json)
 if [[ "$SERVICE_ARNS" != "[]" ]]; then
     while read -r task_def_arn; do
@@ -111,7 +98,6 @@ USED_FAMILIES=($(echo "${USED_FAMILIES[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' 
 
 echo "✅ Found ${#USED_FAMILIES[*]} families considered in use."
 if [[ "$MODE" == "report" ]]; then
-    echo "   Preserved families: ${PRESERVE_FAMILIES[*]}"
     echo "   Preserved family suffixes: *${PRESERVE_FAMILY_SUFFIXES[*]}"
     echo "   All used families: ${USED_FAMILIES[*]}"
 fi

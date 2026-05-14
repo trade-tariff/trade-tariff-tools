@@ -130,8 +130,7 @@ python3 bin/ott_search_stat.py
 This script reports on and optionally deregisters unused Amazon ECS task definition families. It is designed to help keep your ECS task definitions clean by identifying and removing old, inactive families that are no longer associated with active services or recently run tasks.
 
 **Important Safeguards:**
-- The script maintains a `PRESERVE_FAMILIES` array (configured within the script) for task families that should *never* be deregistered, even if they appear unused (e.g., scheduled jobs like `backend-job`).
-- Task definition families ending in `-job` are also preserved from family cleanup, because scheduled job families are not necessarily attached to ECS services.
+- Task definition families ending in `-job` are preserved from family cleanup, because scheduled job families are not necessarily attached to ECS services.
 - It also considers families of recently running or stopped tasks as 'in-use' for a short period.
 
 **Usage:**
