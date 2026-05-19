@@ -119,9 +119,15 @@ jobs:
           esac
 
 
+          if [ "${{ inputs.app-name }}" = "tariff-identity" ]; then
+            DEPLOY_ROLE_NAME="GithubActions-Identity-ECS-Deployments-Role"
+          else
+            DEPLOY_ROLE_NAME="GithubActions-ECS-Deployments-Role"
+          fi
+
           {
             echo "ecr_url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/${{ inputs.app-name }}-production"
-            echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role"
+            echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOY_ROLE_NAME}"
             echo "ruby_version=$(cat .ruby-version)"
             echo "slack_channel=${SLACK_CHANNEL}"
             echo "docker_tag=$(git rev-parse --short HEAD)"
