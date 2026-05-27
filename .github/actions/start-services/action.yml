@@ -35,7 +35,15 @@ runs:
             ;;
         esac
 
-        echo "role_to_assume=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Deployments-Role" >> "$GITHUB_OUTPUT"
+        ROLE_NAME="GithubActions-ECS-Deployments-Role"
+        for SERVICE_NAME in ${{ inputs.service-names }}; do
+          if [ "$SERVICE_NAME" = "identity" ]; then
+            ROLE_NAME="GithubActions-Identity-ECS-Deployments-Role"
+            break
+          fi
+        done
+
+        echo "role_to_assume=arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}" >> "$GITHUB_OUTPUT"
       shell: bash
     - uses: aws-actions/configure-aws-credentials@v6
       with:
