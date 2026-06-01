@@ -1,0 +1,84 @@
+name: Check PR line count
+description: >-
+  Fail when a pull request changes more lines than the configured threshold.
+  Supports pull_request and push events (push looks up the open PR for the branch).
+
+inputs:
+  threshold:
+    description: Maximum allowed lines changed (additions + deletions).
+    required: true
+  exclude-paths:
+    description: >-
+      Newline-separated path globs to exclude from the count (git pathspec syntax).
+      Lines starting with # are ignored.
+    required: false
+    default: ''
+  base-sha:
+    description: Override the base commit SHA (optional).
+    required: false
+    default: ''
+  head-sha:
+    description: Override the head commit SHA (optional).
+    required: false
+    default: ''
+  github-token:
+    description: Token used to resolve the open PR on push events.
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        THRESHOLD: ${{ inputs.threshold }}
+        EXCLUDE_PATHS: ${{ inputs.exclude-paths }}
+        INPUT_BASE_SHA: ${{ inputs.base-sha }}
+        INPUT_HEAD_SHA: ${{ inputs.head-sha }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+
+        base_sha="$INPUT_BASE_SHA"
+        head_sha="$INPUT_HEAD_SHA"
+
+        if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+          case "${{ github.event_name }}" in
+            pull_request)
+              base_sha="${{ github.event.pull_request.base.sha }}"
+              head_sha="${{ github.event.pull_request.head.sha }}"
+              ;;
+            push)
+              response="$(
+                curl -fsSL \
+                  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ github.ref_name }}&state=open"
+              )"
+              if [[ "$(jq 'length' <<< "$response")" -eq 0 ]]; then
+                echo "::notice::No open pull request for ${{ github.ref_name }}; skipping line check."
+                exit 0
+              fi
+              base_sha="$(jq -r '.[0].base.sha' <<< "$response")"
+              head_sha="$(jq -r '.[0].head.sha' <<< "$response")"
+              ;;
+            *)
+              echo "::error::Unsupported event: ${{ github.event_name }}. Use pull_request or push." >&2
+              exit 1
+              ;;
+          esac
+        fi
+
+        if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+          echo "::error::Could not determine base-sha and head-sha." >&2
+          exit 1
+        fi
+
+        exclude_file="$(mktemp)"
+        printf '%s\n' "$EXCLUDE_PATHS" > "$exclude_file"
+
+        "${{ github.action_path }}/check-pr-lines.sh" \
+          --threshold "$THRESHOLD" \
+          --base "$base_sha" \
+          --head "$head_sha" \
+          --exclude-paths-file "$exclude_file"
