@@ -6,6 +6,7 @@ on:
       - '.github/workflows/ci.yml'
       - 'bin/cleanup-ecs-families'
       - 'bin/rotate-revisions'
+      - '.github/actions/check-pr-lines/**'
       - 'scripts/trufflehog-pre-commit.sh'
       - 'tests/**'
 
@@ -25,7 +26,7 @@ jobs:
           sudo apt-get install -y bats
 
       - name: Check bash syntax
-        run: bash -n scripts/trufflehog-pre-commit.sh bin/cleanup-ecs-families bin/rotate-revisions tests/test_helper.bash
+        run: bash -n scripts/trufflehog-pre-commit.sh .github/actions/check-pr-lines/check-pr-lines.sh bin/cleanup-ecs-families bin/rotate-revisions tests/test_helper.bash
 
       - name: Run regression tests
         run: bats tests
