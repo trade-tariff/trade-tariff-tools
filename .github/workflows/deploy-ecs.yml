@@ -151,7 +151,7 @@ jobs:
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
         with:
-          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.22 ${{ inputs.build-args }}"
+          build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.23 ${{ inputs.build-args }}"
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
@@ -172,6 +172,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate }}
         with:
+          app-name: ${{ inputs.app-name }}
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}

@@ -52,6 +52,8 @@ jobs:
           environment: development
 
   deploy-all:
+    needs: start-all
+    if: ${{ always() && (needs.start-all.result == 'success' || needs.start-all.result == 'skipped') }}
     strategy:
       matrix:
         app: ${{ fromJson(inputs.apps) }}

@@ -7,6 +7,9 @@ env:
   TERRAFORM_VERSION: 1.12
 
 inputs:
+  app-name:
+    description: 'ECR app name (e.g. tariff-dev-hub, tariff-identity)'
+    required: true
   environment:
     description: 'The name of the environment to perform the migration in'
     required: true
@@ -27,13 +30,33 @@ runs:
       shell: bash
       id: configure
       run: |
-        REPO=$(echo ${{ github.repository }} | sed 's/trade-tariff\/trade-tariff-//')
+        case "${{ inputs.app-name }}" in
+          tariff-dev-hub)
+            REPO=dev-hub
+            TASK=dev-hub-job
+            ;;
+          tariff-identity)
+            REPO=identity
+            TASK=identity-job
+            ;;
+          tariff-backend)
+            REPO=backend
+            TASK=backend-job
+            ;;
+          tariff-admin)
+            REPO=admin
+            TASK=admin-job
+            ;;
+          *)
+            echo "::error::Unknown app-name for db-migrate: ${{ inputs.app-name }}"
+            exit 1
+            ;;
+        esac
+
         {
           echo "repo_name=${REPO}"
-          echo "task=${REPO}-job"
+          echo "task=${TASK}"
         } >> "$GITHUB_OUTPUT"
-
-    - uses: actions/checkout@v6
 
     - uses: aws-actions/configure-aws-credentials@v6
       with:
@@ -62,7 +85,7 @@ runs:
     # For the admin and dev-hub services, there is only one search path to
     # apply migrations to, so this runs one task
     - name: Apply database migration
-      if: ${{ steps.configure.outputs.repo != 'backend' }}
+      if: ${{ steps.configure.outputs.repo_name != 'backend' }}
       shell: bash
       run: |
         echo "::notice::Running migration task in ${{ inputs.environment }}..."
@@ -75,7 +98,7 @@ runs:
     # The backend service needs to run database migrations twice, once for each
     # search path - so this custom behaviour runs instead
     - name: Apply database migrations for backend service
-      if: ${{ steps.configure.outputs.repo == 'backend' }}
+      if: ${{ steps.configure.outputs.repo_name == 'backend' }}
       shell: bash
       run: |
         echo "::notice::Running migration task for UK schema in ${{ inputs.environment }}..."
