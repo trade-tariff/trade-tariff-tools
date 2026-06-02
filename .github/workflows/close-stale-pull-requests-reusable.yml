@@ -7,7 +7,7 @@ on:
         description: Close pull requests with no activity for at least this many days
         required: false
         type: number
-        default: 90
+        default: 14
       keep_label:
         description: Label that exempts a pull request from automatic closure
         required: false
