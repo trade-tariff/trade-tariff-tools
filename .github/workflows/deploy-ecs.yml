@@ -169,7 +169,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@BAU-validate-full-deployment-tools-branch
         if: ${{ inputs.migrate }}
         with:
           environment: ${{ inputs.environment }}

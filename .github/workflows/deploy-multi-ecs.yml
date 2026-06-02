@@ -56,7 +56,7 @@ jobs:
       matrix:
         app: ${{ fromJson(inputs.apps) }}
       fail-fast: false
-    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@BAU-validate-full-deployment-tools-branch
     with:
       app-name: ${{ matrix.app.name }}
       checkout-ref: ${{ matrix.app.ref }}
