@@ -62,7 +62,7 @@ jobs:
       checkout-ref: ${{ matrix.app.ref }}
       checkout-repo: ${{ matrix.app.repo }}
       environment: ${{ inputs.environment }}
-      migrate: ${{ inputs.migrate && matrix.app.migrate != false }}
+      migrate: ${{ inputs.migrate && toJson(matrix.app.migrate) != 'false' }}
       notify: false
       test-flavour: none
     secrets:
