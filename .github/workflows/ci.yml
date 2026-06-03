@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/ci.yml'
+      - '.github/workflows/close-stale-pull-requests-reusable.yml'
       - 'bin/cleanup-ecs-families'
       - 'bin/rotate-revisions'
       - '.github/actions/check-pr-lines/**'

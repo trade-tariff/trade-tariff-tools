@@ -48,7 +48,8 @@ jobs:
           echo "Keep label: ${KEEP_LABEL}"
           echo "Dry run: ${DRY_RUN}"
 
-          mapfile -t prs < <(gh pr list --repo "${REPO}" --state open --json number,updatedAt,labels --limit 500)
+          prs_json=$(gh pr list --repo "${REPO}" --state open --json number,updatedAt,labels --limit 500)
+          mapfile -t prs < <(jq -c '.[]' <<<"${prs_json}")
 
           if [[ ${#prs[@]} -eq 0 ]]; then
             echo "No open pull requests."
