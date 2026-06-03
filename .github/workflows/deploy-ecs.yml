@@ -172,6 +172,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@BAU-validate-full-deployment-tools-branch
         if: ${{ inputs.migrate }}
         with:
+          app-name: ${{ inputs.app-name }}
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
