@@ -1,0 +1,73 @@
+name: Auto-merge low-risk PRs
+
+# Reusable workflow only — triggers live in each consumer repo (e.g. trade-tariff-backend).
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: PR label that enables auto-merge.
+        type: string
+        required: false
+        default: low-risk
+      merge-method:
+        description: 'merge, squash, or rebase.'
+        type: string
+        required: false
+        default: merge
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event_name != 'pull_request' ||
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve pull request number
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          case "${{ github.event_name }}" in
+            pull_request|pull_request_review)
+              echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              ;;
+            workflow_run)
+              if [[ "${{ github.event.workflow_run.event }}" != "pull_request" ]]; then
+                echo "number=" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              if [[ "${{ github.event.workflow_run.conclusion }}" != "success" ]]; then
+                echo "number=" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              branch="${{ github.event.workflow_run.head_branch }}"
+              number="$(gh pr list \
+                --repo "${{ github.repository }}" \
+                --head "$branch" \
+                --state open \
+                --json number \
+                -q '.[0].number' || true)"
+              if [[ -z "$number" || "$number" == "null" ]]; then
+                echo "number=" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "number=$number" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "number=" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Auto-merge when requirements are met
+        if: steps.pr.outputs.number != ''
+        uses: trade-tariff/trade-tariff-tools/.github/actions/auto-merge-low-risk@main
+        with:
+          pr-number: ${{ steps.pr.outputs.number }}
+          label: ${{ inputs.label }}
+          merge-method: ${{ inputs.merge-method }}

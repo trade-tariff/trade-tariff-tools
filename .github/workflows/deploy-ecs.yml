@@ -92,7 +92,7 @@ jobs:
             echo "actual_ref=${ACTUAL_REF}"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           repository: ${{ steps.actual-ref.outputs.actual_repo }}
           ref: ${{ steps.actual-ref.outputs.actual_ref }}
@@ -140,7 +140,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -165,13 +165,14 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate }}
         with:
+          app-name: ${{ inputs.app-name }}
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
@@ -191,7 +192,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -232,7 +233,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}

@@ -7,6 +7,9 @@ env:
   TERRAFORM_VERSION: 1.12
 
 inputs:
+  app-name:
+    description: 'The app being deployed, for example tariff-backend or tariff-dev-hub.'
+    required: true
   environment:
     description: 'The name of the environment to perform the migration in'
     required: true
@@ -27,13 +30,12 @@ runs:
       shell: bash
       id: configure
       run: |
-        REPO=$(echo ${{ github.repository }} | sed 's/trade-tariff\/trade-tariff-//')
+        REPO="${{ inputs.app-name }}"
+        REPO="${REPO#tariff-}"
         {
-          echo "repo_name=${REPO}"
+          echo "repo=${REPO}"
           echo "task=${REPO}-job"
         } >> "$GITHUB_OUTPUT"
-
-    - uses: actions/checkout@v6
 
     - uses: aws-actions/configure-aws-credentials@v6
       with:
@@ -49,15 +51,28 @@ runs:
       run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
 
     - name: Update job task
+      id: update-job-task
       shell: bash
       env:
         TF_VAR_docker_tag: ${{ inputs.ref }}
       run: |
-        cd terraform && terraform apply \
+        cd terraform
+
+        terraform apply \
           -var-file=config_${{ inputs.environment }}.tfvars \
           -auto-approve \
           -lock-timeout=10m \
           -target=module.${{ steps.configure.outputs.task }}
+
+        task_definition_arn=$(terraform state show "module.${{ steps.configure.outputs.task }}.aws_ecs_task_definition.this" \
+          | awk -F'= ' '/^[[:space:]]*arn[[:space:]]+=/ { gsub(/"/, "", $2); print $2; exit }')
+
+        if [ -z "${task_definition_arn}" ]; then
+          echo "::error::Could not determine updated task definition ARN"
+          exit 1
+        fi
+
+        echo "task-definition-arn=${task_definition_arn}" >> "$GITHUB_OUTPUT"
 
     # For the admin and dev-hub services, there is only one search path to
     # apply migrations to, so this runs one task
@@ -70,6 +85,7 @@ runs:
         ${{ github.action_path }}/../../../bin/run-task \
           -e ${{ inputs.environment }} \
           -t ${{ steps.configure.outputs.task }} \
+          -d ${{ steps.update-job-task.outputs.task-definition-arn }} \
           -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","command":["/bin/sh","-c","bundle exec rails db:migrate"]}]}'
 
     # The backend service needs to run database migrations twice, once for each
@@ -82,12 +98,14 @@ runs:
         ${{ github.action_path }}/../../../bin/run-task \
           -e ${{ inputs.environment }} \
           -t ${{ steps.configure.outputs.task }} \
+          -d ${{ steps.update-job-task.outputs.task-definition-arn }} \
           -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
 
         echo "::notice::Running migration task for XI schema in ${{ inputs.environment }}..."
         ${{ github.action_path }}/../../../bin/run-task \
           -e ${{ inputs.environment }} \
           -t ${{ steps.configure.outputs.task }} \
+          -d ${{ steps.update-job-task.outputs.task-definition-arn }} \
           -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
 
     - name: Force unlock terraform state on cancellation
