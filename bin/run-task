@@ -7,8 +7,13 @@ set -o noclobber
 
 readonly SCRIPT_NAME="$(basename "$0")"
 
+environment=""
+task=""
+task_definition=""
+overrides=""
+
 usage() {
-  echo "Usage: ${SCRIPT_NAME} [-e <environment>] [-t <task-name>] [-o <overrides>]" 1>&2;
+  echo "Usage: ${SCRIPT_NAME} [-e <environment>] [-t <task-name>] [-d <task-definition-arn>] [-o <overrides>]" 1>&2;
   exit 1;
 }
 
@@ -22,6 +27,7 @@ OPTIONS:
   -h  Show this help message and exit
   -e  Environment name (one of \`development\`, \`staging\`, \`production\`)
   -t  Name of the task to use. Must be one of the available ECS tasks.
+  -d  Task definition ARN to run. Defaults to the latest active definition for the task.
   -o  Container overrides, in JSON format. See AWS docs for complete documentation.
 
 EXAMPLES:
@@ -29,13 +35,16 @@ EXAMPLES:
 EOF
 }
 
-while getopts ":e:t:o:h" opt; do
+while getopts ":e:t:d:o:h" opt; do
   case "${opt}" in
     e)
       environment=${OPTARG}
       ;;
     t)
       task=${OPTARG}
+      ;;
+    d)
+      task_definition=${OPTARG}
       ;;
     o)
       overrides=${OPTARG}
@@ -88,13 +97,20 @@ run_task() {
     --output text                                   \
     --region "${AWS_REGION}")
 
-  task_definition=$(aws ecs list-task-definitions \
-    --status ACTIVE                               \
-    --sort DESC                                   \
-    --region "${AWS_REGION}"                      \
-  | jq -r '.taskDefinitionArns[]'                 \
-  | grep -E ".*/${task}-[0-9]{12}:[0-9]+$"        \
-  | head -n 1)
+  if [ -z "${task_definition}" ]; then
+    task_definition=$(aws ecs list-task-definitions \
+      --status ACTIVE                               \
+      --sort DESC                                   \
+      --region "${AWS_REGION}"                      \
+    | jq -r '.taskDefinitionArns[]'                 \
+    | grep -E ".*/${task}-[0-9]{12}:[0-9]+$"        \
+    | head -n 1)
+  fi
+
+  if [ -z "${task_definition}" ]; then
+    echo "Could not find an active task definition for ${task}"
+    exit 1
+  fi
 
   task_arn=$(aws ecs run-task              \
     --cluster "${CLUSTER}"                 \
