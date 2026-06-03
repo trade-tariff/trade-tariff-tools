@@ -1,0 +1,88 @@
+name: Close stale pull requests (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      stale_days:
+        description: Close pull requests with no activity for at least this many days
+        required: false
+        type: number
+        default: 14
+      keep_label:
+        description: Label that exempts a pull request from automatic closure
+        required: false
+        type: string
+        default: keep
+      dry_run:
+        description: List pull requests that would be closed without closing them
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  close-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close stale pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STALE_DAYS: ${{ inputs.stale_days }}
+          KEEP_LABEL: ${{ inputs.keep_label }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          stale_seconds=$((STALE_DAYS * 86400))
+          now=$(date -u +%s)
+          closed=0
+          skipped_keep=0
+          skipped_fresh=0
+
+          echo "Repository: ${REPO}"
+          echo "Stale threshold: ${STALE_DAYS} days"
+          echo "Keep label: ${KEEP_LABEL}"
+          echo "Dry run: ${DRY_RUN}"
+
+          mapfile -t prs < <(gh pr list --repo "${REPO}" --state open --json number,updatedAt,labels --limit 500)
+
+          if [[ ${#prs[@]} -eq 0 ]]; then
+            echo "No open pull requests."
+            exit 0
+          fi
+
+          for pr_json in "${prs[@]}"; do
+            number=$(jq -r '.number' <<<"${pr_json}")
+            updated_at=$(jq -r '.updatedAt' <<<"${pr_json}")
+
+            if jq -e --arg label "${KEEP_LABEL}" '.labels[].name == $label' <<<"${pr_json}" >/dev/null; then
+              echo "Skipping PR #${number} (label: ${KEEP_LABEL})"
+              skipped_keep=$((skipped_keep + 1))
+              continue
+            fi
+
+            updated_epoch=$(date -u -d "${updated_at}" +%s)
+            age=$((now - updated_epoch))
+
+            if (( age < stale_seconds )); then
+              skipped_fresh=$((skipped_fresh + 1))
+              continue
+            fi
+
+            age_days=$((age / 86400))
+            comment=$'Closing as stale: no activity for '"${age_days}"$' days (threshold: '"${STALE_DAYS}"$' days). Add the `'"${KEEP_LABEL}"$'` label to exempt a pull request from automatic closure.'
+
+            if [[ "${DRY_RUN}" == "true" ]]; then
+              echo "[DRY RUN] Would close PR #${number} (last updated ${updated_at})"
+            else
+              gh pr close "${number}" --repo "${REPO}" --comment "${comment}"
+              echo "Closed PR #${number}"
+              closed=$((closed + 1))
+            fi
+          done
+
+          echo "Summary: closed=${closed}, skipped_keep=${skipped_keep}, skipped_fresh=${skipped_fresh}"
