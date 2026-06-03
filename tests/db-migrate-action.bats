@@ -45,9 +45,9 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
-@test "deploy-multi-ecs lets individual apps opt out of global migrations" {
+@test "deploy-multi-ecs only migrates apps that explicitly opt in" {
   workflow="$repo_root/.github/workflows/deploy-multi-ecs.yml"
 
-  run grep -F "migrate: \${{ inputs.migrate && toJson(matrix.app.migrate) != 'false' }}" "$workflow"
+  run grep -F "migrate: \${{ inputs.migrate && toJson(matrix.app.migrate) == 'true' }}" "$workflow"
   [ "$status" -eq 0 ]
 }
