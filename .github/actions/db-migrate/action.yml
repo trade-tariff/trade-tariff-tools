@@ -7,6 +7,9 @@ env:
   TERRAFORM_VERSION: 1.12
 
 inputs:
+  app-name:
+    description: 'The app being deployed, for example tariff-backend or tariff-dev-hub.'
+    required: true
   environment:
     description: 'The name of the environment to perform the migration in'
     required: true
@@ -27,13 +30,12 @@ runs:
       shell: bash
       id: configure
       run: |
-        REPO=$(echo ${{ github.repository }} | sed 's/trade-tariff\/trade-tariff-//')
+        REPO="${{ inputs.app-name }}"
+        REPO="${REPO#tariff-}"
         {
-          echo "repo_name=${REPO}"
+          echo "repo=${REPO}"
           echo "task=${REPO}-job"
         } >> "$GITHUB_OUTPUT"
-
-    - uses: actions/checkout@v6
 
     - uses: aws-actions/configure-aws-credentials@v6
       with:
