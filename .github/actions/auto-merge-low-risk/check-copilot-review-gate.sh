@@ -7,7 +7,9 @@ usage() {
 Usage: check-copilot-review-gate.sh --repo <owner/name> --pr <number>
 
 Exits 0 when Copilot has submitted at least one PR review and every Copilot
-inline review thread is resolved. Exits 1 with a message on stderr otherwise.
+inline review thread is resolved.
+Exits 2 when Copilot has not reviewed yet.
+Exits 1 when Copilot review threads are still unresolved.
 EOF
 }
 
@@ -77,8 +79,8 @@ copilot_review_count="$(gh pr view "$pr" \
   -q "$COPILOT_REVIEW_JQ")"
 
 if [[ "${copilot_review_count:-0}" -lt 1 ]]; then
-  echo "PR #$pr has not been reviewed by Copilot yet. Request a review from Copilot before auto-merge." >&2
-  exit 1
+  echo "PR #$pr has not been reviewed by Copilot yet." >&2
+  exit 2
 fi
 
 threads_file="$(mktemp)"

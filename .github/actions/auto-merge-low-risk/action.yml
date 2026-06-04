@@ -1,7 +1,8 @@
 name: Auto-merge low-risk PR
 description: >-
-  Enable GitHub auto-merge when a PR has the configured label, Copilot has
-  reviewed it, and all Copilot review threads are resolved.
+  Enable or disable GitHub auto-merge for low-risk PRs. Requests Copilot review
+  when needed, then enables auto-merge once Copilot has reviewed and all Copilot
+  threads are resolved.
 
 inputs:
   pr-number:
@@ -15,6 +16,18 @@ inputs:
     description: 'merge, squash, or rebase.'
     required: false
     default: merge
+  pull-request-event-action:
+    description: >-
+      github.event.action from the caller workflow (e.g. labeled, unlabeled).
+      Used to disable auto-merge when the label is removed.
+    required: false
+    default: ''
+  pull-request-event-label:
+    description: >-
+      github.event.label.name from the caller workflow when action is labeled
+      or unlabeled.
+    required: false
+    default: ''
   github-token:
     description: Token used to call the GitHub API.
     required: false
@@ -29,8 +42,45 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         AUTO_MERGE_LABEL: ${{ inputs.label }}
         AUTO_MERGE_METHOD: ${{ inputs.merge-method }}
+        PR_EVENT_ACTION: ${{ inputs.pull-request-event-action }}
+        PR_EVENT_LABEL: ${{ inputs.pull-request-event-label }}
       run: |
         set -euo pipefail
+
+        repo="${{ github.repository }}"
+
+        disable_auto_merge() {
+          if gh pr view "$PR_NUMBER" \
+            --repo "$repo" \
+            --json autoMergeRequest \
+            -q '.autoMergeRequest != null'; then
+            echo "Disabling auto-merge for PR #$PR_NUMBER"
+            gh pr merge "$PR_NUMBER" --repo "$repo" --disable-auto
+          else
+            echo "Auto-merge is not enabled for PR #$PR_NUMBER; nothing to disable."
+          fi
+        }
+
+        request_copilot_review() {
+          pending="$(gh pr view "$PR_NUMBER" \
+            --repo "$repo" \
+            --json reviewRequests \
+            -q '[.reviewRequests[]? | select(.login | test("copilot"; "i"))] | length')"
+
+          if [[ "${pending:-0}" -gt 0 ]]; then
+            echo "Copilot review already requested on PR #$PR_NUMBER."
+            return 0
+          fi
+
+          echo "Requesting Copilot code review for PR #$PR_NUMBER"
+          gh pr edit "$PR_NUMBER" --repo "$repo" --add-reviewer copilot
+        }
+
+        # Label removed — turn off auto-merge.
+        if [[ "$PR_EVENT_ACTION" == "unlabeled" && "$PR_EVENT_LABEL" == "$AUTO_MERGE_LABEL" ]]; then
+          disable_auto_merge
+          exit 0
+        fi
 
         gate_script="${{ github.action_path }}/check-copilot-review-gate.sh"
         if [[ ! -f "$gate_script" ]]; then
@@ -48,7 +98,7 @@ runs:
         esac
 
         labels="$(gh pr view "$PR_NUMBER" \
-          --repo "${{ github.repository }}" \
+          --repo "$repo" \
           --json labels \
           -q '.labels[].name')"
 
@@ -57,15 +107,24 @@ runs:
           exit 0
         fi
 
-        if ! "$gate_script" \
-          --repo "${{ github.repository }}" \
-          --pr "$PR_NUMBER"; then
+        set +e
+        "$gate_script" --repo "$repo" --pr "$PR_NUMBER"
+        gate_status=$?
+        set -e
+
+        if [[ "$gate_status" -eq 2 ]]; then
+          request_copilot_review
+          echo "Waiting for Copilot to review PR #$PR_NUMBER; auto-merge will be retried on the next workflow run."
+          exit 0
+        fi
+
+        if [[ "$gate_status" -ne 0 ]]; then
           echo "Copilot review requirements not met for PR #$PR_NUMBER; skipping auto-merge."
           exit 0
         fi
 
         if gh pr view "$PR_NUMBER" \
-          --repo "${{ github.repository }}" \
+          --repo "$repo" \
           --json autoMergeRequest \
           -q '.autoMergeRequest != null'; then
           echo "Auto-merge already enabled for PR #$PR_NUMBER."
@@ -74,6 +133,6 @@ runs:
 
         echo "Enabling auto-merge (${AUTO_MERGE_METHOD}) for PR #$PR_NUMBER"
         gh pr merge "$PR_NUMBER" \
-          --repo "${{ github.repository }}" \
+          --repo "$repo" \
           "--${AUTO_MERGE_METHOD}" \
           --auto
