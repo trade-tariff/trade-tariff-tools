@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'development' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Configure AWS credentials for development
         uses: aws-actions/configure-aws-credentials@v6.1.1
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'staging' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Configure AWS credentials for staging
         uses: aws-actions/configure-aws-credentials@v6.1.1
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'production' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Configure AWS credentials for production
         uses: aws-actions/configure-aws-credentials@v6.1.1
