@@ -67,3 +67,27 @@ teardown() {
 
   rm -f "$exclude_file"
 }
+
+@test "counts changes from the merge base when the base branch has moved" {
+  git -C "$repo" switch -qc pr-branch "$base_sha"
+  printf 'branch change\n' > "$repo/feature.txt"
+  git -C "$repo" add feature.txt
+  git -C "$repo" commit -qm "branch change"
+  pr_head_sha="$(git -C "$repo" rev-parse HEAD)"
+
+  git -C "$repo" switch -qc base-branch "$base_sha"
+  printf 'unrelated base change\n' > "$repo/unrelated.txt"
+  git -C "$repo" add unrelated.txt
+  git -C "$repo" commit -qm "unrelated base change"
+  moved_base_sha="$(git -C "$repo" rev-parse HEAD)"
+
+  cd "$repo" || return 1
+
+  run bash "$script" \
+    --threshold 1 \
+    --base "$moved_base_sha" \
+    --head "$pr_head_sha"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PR changes 1 lines"* ]]
+}
