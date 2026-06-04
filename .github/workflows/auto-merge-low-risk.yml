@@ -71,3 +71,5 @@ jobs:
           pr-number: ${{ steps.pr.outputs.number }}
           label: ${{ inputs.label }}
           merge-method: ${{ inputs.merge-method }}
+          pull-request-event-action: ${{ github.event.action }}
+          pull-request-event-label: ${{ github.event.label.name }}
