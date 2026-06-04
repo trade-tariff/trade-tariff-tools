@@ -9,7 +9,9 @@ on:
       - 'bin/cleanup-ecs-families'
       - 'bin/run-task'
       - 'bin/rotate-revisions'
+      - '.github/actions/auto-merge-low-risk/**'
       - '.github/actions/check-pr-lines/**'
+      - '.github/workflows/auto-merge-low-risk.yml'
       - 'scripts/trufflehog-pre-commit.sh'
       - 'tests/**'
 
@@ -29,7 +31,7 @@ jobs:
           sudo apt-get install -y bats
 
       - name: Check bash syntax
-        run: bash -n scripts/trufflehog-pre-commit.sh .github/actions/check-pr-lines/check-pr-lines.sh bin/cleanup-ecs-families bin/run-task bin/rotate-revisions tests/test_helper.bash
+        run: bash -n scripts/trufflehog-pre-commit.sh .github/actions/check-pr-lines/check-pr-lines.sh .github/actions/auto-merge-low-risk/check-copilot-review-gate.sh bin/cleanup-ecs-families bin/run-task bin/rotate-revisions tests/test_helper.bash
 
       - name: Run regression tests
         run: bats tests
