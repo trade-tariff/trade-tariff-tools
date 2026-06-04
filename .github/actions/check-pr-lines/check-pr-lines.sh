@@ -56,6 +56,8 @@ if ! [[ "$threshold" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+merge_base="$(git merge-base "$base_sha" "$head_sha")"
+
 exclude_specs=()
 if [[ -n "$exclude_paths_file" && -f "$exclude_paths_file" ]]; then
   while IFS= read -r pattern || [[ -n "$pattern" ]]; do
@@ -67,9 +69,9 @@ if [[ -n "$exclude_paths_file" && -f "$exclude_paths_file" ]]; then
 fi
 
 if ((${#exclude_specs[@]} > 0)); then
-  numstat="$(git diff --numstat "$base_sha" "$head_sha" -- . "${exclude_specs[@]}")"
+  numstat="$(git diff --numstat "$merge_base" "$head_sha" -- . "${exclude_specs[@]}")"
 else
-  numstat="$(git diff --numstat "$base_sha" "$head_sha" -- .)"
+  numstat="$(git diff --numstat "$merge_base" "$head_sha" -- .)"
 fi
 
 total=0
