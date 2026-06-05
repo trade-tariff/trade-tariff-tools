@@ -15,6 +15,11 @@ on:
         required: false
         default: merge
 
+    secrets:
+      github-token:
+        description: Token used to call the GitHub API.
+        required: true
+
 permissions:
   contents: write
   pull-requests: write
@@ -66,10 +71,11 @@ jobs:
 
       - name: Auto-merge when requirements are met
         if: steps.pr.outputs.number != ''
-        uses: trade-tariff/trade-tariff-tools/.github/actions/auto-merge-low-risk@main
+        uses: trade-tariff/trade-tariff-tools/.github/actions/auto-merge-low-risk@HMRC-2247-2
         with:
           pr-number: ${{ steps.pr.outputs.number }}
           label: ${{ inputs.label }}
           merge-method: ${{ inputs.merge-method }}
+          github-token: ${{ secrets.github-token }}
           pull-request-event-action: ${{ github.event.action }}
           pull-request-event-label: ${{ github.event.label.name }}

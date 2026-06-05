@@ -8,6 +8,9 @@ inputs:
   pr-number:
     description: Pull request number in the caller repository.
     required: true
+  github-token:
+    description: Token used to call the GitHub API.
+    required: true
   label:
     description: PR label that enables auto-merge.
     required: false
@@ -28,10 +31,6 @@ inputs:
       or unlabeled.
     required: false
     default: ''
-  github-token:
-    description: Token used to call the GitHub API.
-    required: false
-    default: ${{ github.token }}
 
 runs:
   using: composite
@@ -122,6 +121,10 @@ runs:
           echo "Copilot review requirements not met for PR #$PR_NUMBER; skipping auto-merge."
           exit 0
         fi
+        
+        gh pr review "$PR_NUMBER" \
+          --repo "$repo" \
+          --approve
 
         if gh pr view "$PR_NUMBER" \
           --repo "$repo" \
