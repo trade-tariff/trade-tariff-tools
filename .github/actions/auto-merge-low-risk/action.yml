@@ -49,12 +49,19 @@ runs:
         repo="${{ github.repository }}"
 
         disable_auto_merge() {
-          if gh pr view "$PR_NUMBER" \
-            --repo "$repo" \
-            --json autoMergeRequest \
-            -q '.autoMergeRequest != null'; then
+          auto_merge_enabled=$(
+            gh pr view "$PR_NUMBER" \
+              --repo "$repo" \
+              --json autoMergeRequest \
+              -q '.autoMergeRequest != null'
+          )
+        
+          if [[ "$auto_merge_enabled" == "true" ]]; then
             echo "Disabling auto-merge for PR #$PR_NUMBER"
-            gh pr merge "$PR_NUMBER" --repo "$repo" --disable-auto
+            gh pr merge "$PR_NUMBER" \
+              --repo "$repo" \
+              "--${AUTO_MERGE_METHOD}" \
+              --disable-auto
           else
             echo "Auto-merge is not enabled for PR #$PR_NUMBER; nothing to disable."
           fi
@@ -126,10 +133,14 @@ runs:
           --repo "$repo" \
           --approve
 
-        if gh pr view "$PR_NUMBER" \
-          --repo "$repo" \
-          --json autoMergeRequest \
-          -q '.autoMergeRequest != null'; then
+        auto_merge_enabled=$(
+          gh pr view "$PR_NUMBER" \
+            --repo "$repo" \
+            --json autoMergeRequest \
+            -q '.autoMergeRequest != null'
+        )
+          
+        if [[ "$auto_merge_enabled" == "true" ]]; then
           echo "Auto-merge already enabled for PR #$PR_NUMBER."
           exit 0
         fi
