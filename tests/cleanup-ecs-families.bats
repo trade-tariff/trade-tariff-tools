@@ -73,6 +73,17 @@ teardown() {
   assert_not_contains "$output" " - admin-job"
 }
 
+@test "report preserves account-suffixed job task families" {
+  run env TEST_FAMILIES="admin-job-123456789012 dev-hub-job-123456789012 backend-job-123456789012 identity-job-123456789012 stale-worker" "$repo_root/bin/cleanup-ecs-families" report
+
+  [ "$status" -eq 0 ]
+  assert_not_contains "$output" " - admin-job-123456789012"
+  assert_not_contains "$output" " - dev-hub-job-123456789012"
+  assert_not_contains "$output" " - backend-job-123456789012"
+  assert_not_contains "$output" " - identity-job-123456789012"
+  assert_contains "$output" " - stale-worker"
+}
+
 @test "deregister ignores prefix results from other families" {
   capture_dir="$tmpdir/capture"
   mkdir -p "$capture_dir"
