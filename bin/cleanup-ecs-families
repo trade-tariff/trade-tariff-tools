@@ -46,7 +46,7 @@ family_is_preserved() {
     local family="$1"
 
     for suffix in "${PRESERVE_FAMILY_SUFFIXES[@]}"; do
-        if [[ "$family" == *"$suffix" ]]; then
+        if [[ "$family" == *"$suffix" || "$family" == *"$suffix"-* ]]; then
             return 0
         fi
     done
