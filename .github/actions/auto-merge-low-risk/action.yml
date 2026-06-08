@@ -54,7 +54,10 @@ runs:
             --json autoMergeRequest \
             -q '.autoMergeRequest != null'; then
             echo "Disabling auto-merge for PR #$PR_NUMBER"
-            gh pr merge "$PR_NUMBER" --repo "$repo" --disable-auto
+            gh pr merge "$PR_NUMBER" \
+              --repo "$repo" \
+              "--${AUTO_MERGE_METHOD}" \
+              --disable-auto
           else
             echo "Auto-merge is not enabled for PR #$PR_NUMBER; nothing to disable."
           fi

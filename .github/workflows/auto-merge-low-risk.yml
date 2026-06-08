@@ -71,7 +71,7 @@ jobs:
 
       - name: Auto-merge when requirements are met
         if: steps.pr.outputs.number != ''
-        uses: trade-tariff/trade-tariff-tools/.github/actions/auto-merge-low-risk@main
+        uses: trade-tariff/trade-tariff-tools/.github/actions/auto-merge-low-risk@HMRC-2247-2
         with:
           pr-number: ${{ steps.pr.outputs.number }}
           label: ${{ inputs.label }}
