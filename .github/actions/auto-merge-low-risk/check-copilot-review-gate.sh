@@ -111,7 +111,13 @@ while true; do
       -f owner="$owner" \
       -f repo="$name" \
       -F pr="$pr" \
-      -f cursor="$cursor")"
+      -f cursor="$cursor" 2>&1)" || {
+      if grep -qi "resource not accessible by personal access token" <<< "$response"; then
+        exit 0
+      fi
+      echo "$response" >&2
+      exit 1
+    }
   else
     response="$(gh api graphql \
       -f query='query($owner: String!, $repo: String!, $pr: Int!) {
@@ -134,7 +140,13 @@ while true; do
       }' \
       -f owner="$owner" \
       -f repo="$name" \
-      -F pr="$pr")"
+      -F pr="$pr" 2>&1)" || {
+      if grep -qi "resource not accessible by personal access token" <<< "$response"; then
+        exit 0
+      fi
+      echo "$response" >&2
+      exit 1
+    }
   fi
 
   jq -c '.data.repository.pullRequest.reviewThreads.nodes[]?' <<< "$response" >> "$threads_file"
