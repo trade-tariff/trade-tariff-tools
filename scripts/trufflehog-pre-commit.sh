@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-set -euo pipefail
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o noclobber
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: docker is required to run the TruffleHog pre-commit scan." >&2
@@ -75,7 +80,7 @@ append_gitignored_paths() {
   done < <(git -C "$git_root" ls-files --others --ignored --exclude-standard --directory)
 }
 
-cat > "$exclude_file" <<'PATTERNS'
+cat >| "$exclude_file" <<'PATTERNS'
 (^|/)\.git(/|$)
 (^|/)\.terraform(/|$)
 (^|/)\.terragrunt-cache(/|$)

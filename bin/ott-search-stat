@@ -7,5 +7,4 @@ set -o pipefail
 set -o noclobber
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-echo "Warning: bin/rotate-revisions is deprecated; use bin/rotate-task-definitions." >&2
-exec "$script_dir/rotate-task-definitions" "$@"
+exec python3 "$script_dir/../scripts/ott-search-stat.py" "$@"

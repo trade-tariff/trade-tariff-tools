@@ -74,7 +74,7 @@ teardown() {
   capture="$tmpdir/capture-prefix"
   mkdir -p "$capture"
 
-  run env TEST_CAPTURE_DIR="$capture" TEST_FAMILIES="admin" "$repo_root/bin/rotate-revisions" 0
+  run env TEST_CAPTURE_DIR="$capture" TEST_FAMILIES="admin" "$repo_root/bin/rotate-task-definitions" 0
 
   [ "$status" -eq 0 ]
   deregistered="$(cat "$capture/deregistered.txt")"
@@ -86,7 +86,7 @@ teardown() {
   capture="$tmpdir/capture-job"
   mkdir -p "$capture"
 
-  run env TEST_CAPTURE_DIR="$capture" TEST_FAMILIES="admin-job" "$repo_root/bin/rotate-revisions" 0
+  run env TEST_CAPTURE_DIR="$capture" TEST_FAMILIES="admin-job" "$repo_root/bin/rotate-task-definitions" 0
 
   [ "$status" -eq 0 ]
   deregistered="$(cat "$capture/deregistered.txt")"
