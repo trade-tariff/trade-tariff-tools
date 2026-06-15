@@ -18,39 +18,17 @@ runs:
   steps:
     - uses: actions/checkout@v6
     - id: config
-      run: |
-        case "${{ inputs.environment }}" in
-          development)
-            ACCOUNT_ID="844815912454"
-            ;;
-          staging)
-            ACCOUNT_ID="451934005581"
-            ;;
-          production)
-            ACCOUNT_ID="382373577178"
-            ;;
-          *)
-            echo "Invalid environment: ${{ inputs.environment }}"
-            exit 1
-            ;;
-        esac
-
-        ROLE_NAME="GithubActions-ECS-Deployments-Role"
-        for SERVICE_NAME in ${{ inputs.service-names }}; do
-          if [ "$SERVICE_NAME" = "identity" ]; then
-            ROLE_NAME="GithubActions-Identity-ECS-Deployments-Role"
-            break
-          fi
-        done
-
-        echo "role_to_assume=arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}" >> "$GITHUB_OUTPUT"
-      shell: bash
+      uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
+      with:
+        environment: ${{ inputs.environment }}
+        region: ${{ inputs.region }}
+        service-names: ${{ inputs.service-names }}
     - uses: aws-actions/configure-aws-credentials@v6
       with:
-        role-to-assume: ${{ steps.config.outputs.role_to_assume }}
+        role-to-assume: ${{ steps.config.outputs.deploy-role-arn }}
         aws-region: ${{ inputs.region }}
     - run: |
-        CLUSTER="trade-tariff-cluster-${{ inputs.environment }}"
+        CLUSTER="${{ steps.config.outputs.cluster }}"
         REGION="${{ inputs.region }}"
         DESIRED_COUNT="${{ inputs.desired_count }}"
 

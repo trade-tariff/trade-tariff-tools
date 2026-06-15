@@ -97,39 +97,19 @@ jobs:
           repository: ${{ steps.actual-ref.outputs.actual_repo }}
           ref: ${{ steps.actual-ref.outputs.actual_ref }}
 
+      - id: environment-config
+        uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
+        with:
+          app-name: ${{ inputs.app-name }}
+          environment: ${{ inputs.environment }}
+
       - id: config
         run: |
-          case "${{ inputs.environment }}" in
-            development)
-              ACCOUNT_ID="844815912454"
-              SLACK_CHANNEL=deployments
-              ;;
-            staging)
-              ACCOUNT_ID="451934005581"
-              SLACK_CHANNEL=deployments
-              ;;
-            production)
-              ACCOUNT_ID="382373577178"
-              SLACK_CHANNEL=production-deployments
-              ;;
-            *)
-              echo "Invalid environment: ${{ inputs.environment }}"
-              exit 1
-              ;;
-          esac
-
-
-          if [ "${{ inputs.app-name }}" = "tariff-identity" ]; then
-            DEPLOY_ROLE_NAME="GithubActions-Identity-ECS-Deployments-Role"
-          else
-            DEPLOY_ROLE_NAME="GithubActions-ECS-Deployments-Role"
-          fi
-
           {
-            echo "ecr_url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/${{ inputs.app-name }}-production"
-            echo "iam_role_arn=arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOY_ROLE_NAME}"
+            echo "ecr_url=${{ steps.environment-config.outputs.ecr-url }}"
+            echo "iam_role_arn=${{ steps.environment-config.outputs.deploy-role-arn }}"
             echo "ruby_version=$(cat .ruby-version)"
-            echo "slack_channel=${SLACK_CHANNEL}"
+            echo "slack_channel=${{ steps.environment-config.outputs.slack-channel }}"
             echo "docker_tag=$(git rev-parse --short HEAD)"
           } >> "$GITHUB_OUTPUT"
 
