@@ -6,6 +6,10 @@ set -o nounset
 set -o pipefail
 set -o noclobber
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# shellcheck source=../scripts/ecs-task-definition-inventory.sh
+source "$repo_root/scripts/ecs-task-definition-inventory.sh"
+
 USED_ARNS_FILE=$(mktemp)
 
 cleanup() {
@@ -13,12 +17,6 @@ cleanup() {
 }
 
 trap cleanup EXIT
-
-task_definition_family() {
-    local task_definition_arn="$1"
-    local family_revision="${task_definition_arn##*/}"
-    echo "${family_revision%:*}"
-}
 
 in_use_revisions() {
     echo "Scanning for used Task Definitions..." >&2
@@ -65,13 +63,13 @@ deregister_unused() {
     local keep_latest="$2"
 
     local families
-    families=($(aws ecs list-task-definition-families --status ACTIVE --query 'families[]' --output text))
+    families=($(list_active_task_definition_families))
 
     for family in "${families[@]}"; do
         echo "Processing family: $family"
 
         local revisions
-        revisions=($(aws ecs list-task-definitions --family-prefix "$family" --status ACTIVE --sort DESC --query 'taskDefinitionArns[]' --output text))
+        revisions=($(list_exact_active_task_definition_revisions "$family"))
 
         if [ ${#revisions[@]} -eq 0 ]; then
              echo "  [SKIP] No active revisions found."
@@ -80,10 +78,6 @@ deregister_unused() {
 
         local count=0
         for arn in "${revisions[@]}"; do
-            if [[ "$(task_definition_family "$arn")" != "$family" ]]; then
-                continue
-            fi
-
             set +e  # NOTE: count++ exits with status 1 when count is zero
             ((count++))
             set -e
