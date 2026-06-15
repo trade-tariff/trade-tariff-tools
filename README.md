@@ -106,7 +106,7 @@ Interactive script to execute commands in AWS ECS tasks. Uses `fzf` for interact
 brew install session-manager-plugin
 ```
 
-### 3. `bin/ott_search_stat.py`
+### 3. `bin/ott-search-stat`
 
 Performs OTT (Online Trade Tariff) searches and outputs results to an Excel file.
 
@@ -115,7 +115,7 @@ Performs OTT (Online Trade Tariff) searches and outputs results to an Excel file
 
 **Usage:**
 ```bash
-python3 bin/ott_search_stat.py
+./bin/ott-search-stat
 ```
 
 **Output:** Creates `search_results.xlsx` with three sheets:
@@ -146,13 +146,13 @@ This script reports on and optionally deregisters unused Amazon ECS task definit
 - `--family FAMILY_NAME`: Target a specific task definition family for reporting or deregistration.
 - `--environment ENV_NAME`: Specify the environment (e.g., `development`, `staging`, `production`). Defaults to `development`.
 
-### 5. `bin/rotate-revisions`
+### 5. `bin/rotate-task-definitions`
 
 Deregisters old, unused ECS task definition revisions, keeping a specified number of recent revisions and all currently in-use revisions.
 
 **Usage:**
 ```bash
-./bin/rotate-revisions [number_to_keep]
+./bin/rotate-task-definitions [number_to_keep]
 ```
 
 The `number_to_keep` argument is optional and defaults to 4. All revisions currently in use by services or running tasks are always preserved, regardless of this number.

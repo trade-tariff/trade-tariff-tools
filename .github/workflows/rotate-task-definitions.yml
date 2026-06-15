@@ -45,7 +45,7 @@ jobs:
       - name: Rotate task definitions in development
         run: |
           echo "::notice::Rotating task definitions in development environment"
-          ./bin/rotate-revisions ${{ inputs.keep-latest || '4' }}
+          ./bin/rotate-task-definitions ${{ inputs.keep-latest || '4' }}
 
   rotate-staging:
     runs-on: ubuntu-latest
@@ -67,7 +67,7 @@ jobs:
       - name: Rotate task definitions in staging
         run: |
           echo "::notice::Rotating task definitions in staging environment"
-          ./bin/rotate-revisions ${{ inputs.keep-latest || '4' }}
+          ./bin/rotate-task-definitions ${{ inputs.keep-latest || '4' }}
 
   rotate-production:
     runs-on: ubuntu-latest
@@ -89,4 +89,4 @@ jobs:
       - name: Rotate task definitions in production
         run: |
           echo "::notice::Rotating task definitions in production environment"
-          ./bin/rotate-revisions ${{ inputs.keep-latest || '20' }}
+          ./bin/rotate-task-definitions ${{ inputs.keep-latest || '20' }}

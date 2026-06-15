@@ -3,7 +3,7 @@
 load test_helper
 
 setup() {
-  source "$repo_root/scripts/ecs-task-definition-inventory.sh"
+  source "$repo_root/scripts/lib/ecs-task-definitions.sh"
 }
 
 @test "task_definition_family returns the exact family from an ARN" {
