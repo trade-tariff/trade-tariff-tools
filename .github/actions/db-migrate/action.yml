@@ -26,17 +26,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Configure output variables
-      shell: bash
-      id: configure
-      run: |
-        REPO="${{ inputs.app-name }}"
-        REPO="${REPO#tariff-}"
-        {
-          echo "repo=${REPO}"
-          echo "task=${REPO}-job"
-        } >> "$GITHUB_OUTPUT"
-
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.role-to-assume }}
@@ -50,63 +39,13 @@ runs:
       shell: bash
       run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
 
-    - name: Update job task
-      id: update-job-task
-      shell: bash
-      env:
-        TF_VAR_docker_tag: ${{ inputs.ref }}
-      run: |
-        cd terraform
-
-        terraform apply \
-          -var-file=config_${{ inputs.environment }}.tfvars \
-          -auto-approve \
-          -lock-timeout=10m \
-          -target=module.${{ steps.configure.outputs.task }}
-
-        task_definition_arn=$(terraform state show "module.${{ steps.configure.outputs.task }}.aws_ecs_task_definition.this" \
-          | awk -F'= ' '/^[[:space:]]*arn[[:space:]]+=/ { gsub(/"/, "", $2); print $2; exit }')
-
-        if [ -z "${task_definition_arn}" ]; then
-          echo "::error::Could not determine updated task definition ARN"
-          exit 1
-        fi
-
-        echo "task-definition-arn=${task_definition_arn}" >> "$GITHUB_OUTPUT"
-
-    # For the admin and dev-hub services, there is only one search path to
-    # apply migrations to, so this runs one task
-    - name: Apply database migration
-      if: ${{ steps.configure.outputs.repo != 'backend' }}
+    - name: Apply database migrations
       shell: bash
       run: |
-        echo "::notice::Running migration task in ${{ inputs.environment }}..."
-
-        ${{ github.action_path }}/../../../bin/run-task \
-          -e ${{ inputs.environment }} \
-          -t ${{ steps.configure.outputs.task }} \
-          -d ${{ steps.update-job-task.outputs.task-definition-arn }} \
-          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","command":["/bin/sh","-c","bundle exec rails db:migrate"]}]}'
-
-    # The backend service needs to run database migrations twice, once for each
-    # search path - so this custom behaviour runs instead
-    - name: Apply database migrations for backend service
-      if: ${{ steps.configure.outputs.repo == 'backend' }}
-      shell: bash
-      run: |
-        echo "::notice::Running migration task for UK schema in ${{ inputs.environment }}..."
-        ${{ github.action_path }}/../../../bin/run-task \
-          -e ${{ inputs.environment }} \
-          -t ${{ steps.configure.outputs.task }} \
-          -d ${{ steps.update-job-task.outputs.task-definition-arn }} \
-          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
-
-        echo "::notice::Running migration task for XI schema in ${{ inputs.environment }}..."
-        ${{ github.action_path }}/../../../bin/run-task \
-          -e ${{ inputs.environment }} \
-          -t ${{ steps.configure.outputs.task }} \
-          -d ${{ steps.update-job-task.outputs.task-definition-arn }} \
-          -o '{"containerOverrides":[{"name":"${{ steps.configure.outputs.task }}","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+        ${{ github.action_path }}/../../../bin/db-migrate \
+          --app-name ${{ inputs.app-name }} \
+          --environment ${{ inputs.environment }} \
+          --ref ${{ inputs.ref }}
 
     - name: Force unlock terraform state on cancellation
       if: cancelled()

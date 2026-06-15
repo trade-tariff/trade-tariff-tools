@@ -2,32 +2,39 @@
 
 load test_helper
 
-@test "db-migrate passes the updated task definition ARN to every migration task" {
+@test "db-migrate action delegates migration orchestration to bin/db-migrate" {
   action="$repo_root/.github/actions/db-migrate/action.yml"
 
-  run grep -F "id: update-job-task" "$action"
+  run grep -F "../../../bin/db-migrate" "$action"
   [ "$status" -eq 0 ]
 
-  run grep -F "task-definition-arn=" "$action"
+  run grep -F -- "--app-name \${{ inputs.app-name }}" "$action"
   [ "$status" -eq 0 ]
 
-  count=$(grep -F -c -- '-d ${{ steps.update-job-task.outputs.task-definition-arn }}' "$action" || true)
-  [ "$count" -eq 3 ]
+  run grep -F -- "--environment \${{ inputs.environment }}" "$action"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- "--ref \${{ inputs.ref }}" "$action"
+  [ "$status" -eq 0 ]
 }
 
-@test "db-migrate derives the job task from the deployed app name" {
+@test "db-migrate command derives the job task from the deployed app name" {
+  script="$repo_root/bin/db-migrate"
+
+  run grep -F 'repo="${app_name#tariff-}"' "$script"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'task="${repo}-job"' "$script"
+  [ "$status" -eq 0 ]
+}
+
+@test "db-migrate action passes the deployed app name to the command" {
   action="$repo_root/.github/actions/db-migrate/action.yml"
 
   run grep -F "app-name:" "$action"
   [ "$status" -eq 0 ]
 
-  run grep -F 'REPO="${{ inputs.app-name }}"' "$action"
-  [ "$status" -eq 0 ]
-
-  run grep -F 'REPO="${REPO#tariff-}"' "$action"
-  [ "$status" -eq 0 ]
-
-  run grep -F 'echo "repo=${REPO}"' "$action"
+  run grep -F -- "--app-name \${{ inputs.app-name }}" "$action"
   [ "$status" -eq 0 ]
 }
 
