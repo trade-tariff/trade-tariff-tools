@@ -1,0 +1,98 @@
+name: 'Configure Tariff environment'
+description: 'Derives shared AWS, ECS, and notification settings for a Tariff environment.'
+
+inputs:
+  environment:
+    description: 'The environment to configure: development, staging, or production.'
+    required: true
+  app-name:
+    description: 'Optional deployed app name, for example tariff-backend or tariff-identity.'
+    required: false
+    default: ''
+  service-names:
+    description: 'Optional space-separated ECS service names for service control workflows.'
+    required: false
+    default: ''
+  region:
+    description: 'AWS region.'
+    required: false
+    default: 'eu-west-2'
+
+outputs:
+  account-id:
+    description: 'AWS account ID for the environment.'
+    value: ${{ steps.configure.outputs.account-id }}
+  cleanup-role-arn:
+    description: 'IAM role ARN for ECS cleanup operations.'
+    value: ${{ steps.configure.outputs.cleanup-role-arn }}
+  cluster:
+    description: 'ECS cluster name for the environment.'
+    value: ${{ steps.configure.outputs.cluster }}
+  deploy-role-arn:
+    description: 'IAM role ARN for ECS deployment operations.'
+    value: ${{ steps.configure.outputs.deploy-role-arn }}
+  ecr-url:
+    description: 'Production ECR URL for the supplied app name.'
+    value: ${{ steps.configure.outputs.ecr-url }}
+  log-group:
+    description: 'CloudWatch platform log group.'
+    value: ${{ steps.configure.outputs.log-group }}
+  security-group-name:
+    description: 'ECS security group name.'
+    value: ${{ steps.configure.outputs.security-group-name }}
+  slack-channel:
+    description: 'Slack deployment notification channel.'
+    value: ${{ steps.configure.outputs.slack-channel }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: configure
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        APP_NAME: ${{ inputs.app-name }}
+        SERVICE_NAMES: ${{ inputs.service-names }}
+        REGION: ${{ inputs.region }}
+      run: |
+        case "$ENVIRONMENT" in
+          development)
+            ACCOUNT_ID="844815912454"
+            SLACK_CHANNEL="deployments"
+            ;;
+          staging)
+            ACCOUNT_ID="451934005581"
+            SLACK_CHANNEL="deployments"
+            ;;
+          production)
+            ACCOUNT_ID="382373577178"
+            SLACK_CHANNEL="production-deployments"
+            ;;
+          *)
+            echo "Invalid environment: $ENVIRONMENT"
+            exit 1
+            ;;
+        esac
+
+        DEPLOY_ROLE_NAME="GithubActions-ECS-Deployments-Role"
+        if [ "$APP_NAME" = "tariff-identity" ]; then
+          DEPLOY_ROLE_NAME="GithubActions-Identity-ECS-Deployments-Role"
+        fi
+
+        for SERVICE_NAME in $SERVICE_NAMES; do
+          if [ "$SERVICE_NAME" = "identity" ]; then
+            DEPLOY_ROLE_NAME="GithubActions-Identity-ECS-Deployments-Role"
+            break
+          fi
+        done
+
+        {
+          echo "account-id=${ACCOUNT_ID}"
+          echo "cleanup-role-arn=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-ECS-Task-Cleanup-Role"
+          echo "cluster=trade-tariff-cluster-${ENVIRONMENT}"
+          echo "deploy-role-arn=arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOY_ROLE_NAME}"
+          echo "ecr-url=382373577178.dkr.ecr.${REGION}.amazonaws.com/${APP_NAME}-production"
+          echo "log-group=platform-logs-${ENVIRONMENT}"
+          echo "security-group-name=trade-tariff-ecs-security-group-${ENVIRONMENT}"
+          echo "slack-channel=${SLACK_CHANNEL}"
+        } >> "$GITHUB_OUTPUT"
