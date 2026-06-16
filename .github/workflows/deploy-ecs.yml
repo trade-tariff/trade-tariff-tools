@@ -253,12 +253,13 @@ jobs:
             exit 0
           fi
 
+
           PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
           PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
           PR_URL=$(echo "$PR_DATA" | jq -r '.html_url')
           RISK_LABEL=$(echo "$PR_DATA" | jq -r '[.labels[].name | select(test("risk"))] | .[0] // empty')
 
-          MESSAGE="${FALLBACK}\n*<${PR_URL}|#${PR_NUMBER} — ${PR_TITLE}>*"
+          MESSAGE="${FALLBACK}"$'\n'"*<${PR_URL}|#${PR_NUMBER} — ${PR_TITLE}>*"
 
           if [[ -n "$RISK_LABEL" ]]; then
             case "$RISK_LABEL" in
@@ -267,10 +268,14 @@ jobs:
               high-risk)   RISK_EMOJI=":red_circle:" ;;
               *)           RISK_EMOJI=":white_circle:" ;;
             esac
-            MESSAGE="${MESSAGE}\nRisk: ${RISK_EMOJI} ${RISK_LABEL}"
+            MESSAGE="${MESSAGE}"$'\n'"Risk: ${RISK_EMOJI} ${RISK_LABEL}"
           fi
 
-          echo "message=${MESSAGE}" >> "$GITHUB_OUTPUT"
+          {
+            echo 'message<<NOTIFY_EOF'
+            echo "$MESSAGE"
+            echo 'NOTIFY_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
