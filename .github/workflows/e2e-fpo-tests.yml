@@ -28,7 +28,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           repository: trade-tariff/trade-tariff-fpo-dev-hub-e2e
           ref: ${{ inputs.ref }}
@@ -58,7 +58,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
 
-      - uses: aws-actions/configure-aws-credentials@v6.1.3
+      - uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ inputs.region }}

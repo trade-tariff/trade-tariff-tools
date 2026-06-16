@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o noclobber
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+run_task="${DB_MIGRATE_RUN_TASK:-$script_dir/run-task}"
+
+app_name=""
+environment=""
+ref=""
+
+usage() {
+  cat <<EOF
+Usage: db-migrate --app-name APP --environment ENV --ref REF
+
+Runs the ECS database migration task for a deployed Tariff app.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --app-name)
+      app_name="$2"
+      shift 2
+      ;;
+    --environment)
+      environment="$2"
+      shift 2
+      ;;
+    --ref)
+      ref="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$app_name" || -z "$environment" || -z "$ref" ]]; then
+  usage >&2
+  exit 1
+fi
+
+repo="${app_name#tariff-}"
+task="${repo}-job"
+
+cd terraform
+
+TF_VAR_docker_tag="$ref" terraform apply \
+  -var-file="config_${environment}.tfvars" \
+  -auto-approve \
+  -lock-timeout=10m \
+  -target="module.${task}"
+
+task_definition_arn=$(terraform state show "module.${task}.aws_ecs_task_definition.this" \
+  | awk -F'= ' '/^[[:space:]]*arn[[:space:]]+=/ { gsub(/"/, "", $2); print $2; exit }')
+
+if [[ -z "$task_definition_arn" ]]; then
+  echo "Could not determine updated task definition ARN" >&2
+  exit 1
+fi
+
+cd ..
+
+if [[ "$repo" != "backend" ]]; then
+  echo "::notice::Running migration task in $environment..."
+  "$run_task" \
+    -e "$environment" \
+    -t "$task" \
+    -d "$task_definition_arn" \
+    -o '{"containerOverrides":[{"name":"'"$task"'","command":["/bin/sh","-c","bundle exec rails db:migrate"]}]}'
+  exit 0
+fi
+
+echo "::notice::Running migration task for UK schema in $environment..."
+"$run_task" \
+  -e "$environment" \
+  -t "$task" \
+  -d "$task_definition_arn" \
+  -o '{"containerOverrides":[{"name":"'"$task"'","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+
+echo "::notice::Running migration task for XI schema in $environment..."
+"$run_task" \
+  -e "$environment" \
+  -t "$task" \
+  -d "$task_definition_arn" \
+  -o '{"containerOverrides":[{"name":"'"$task"'","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'

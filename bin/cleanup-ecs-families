@@ -6,6 +6,10 @@ set -o nounset
 set -o pipefail
 set -o noclobber
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# shellcheck source=../scripts/lib/ecs-task-definitions.sh
+source "$repo_root/scripts/lib/ecs-task-definitions.sh"
+
 declare -A CLUSTERS
 declare -A CLUSTERS=(
     ["development"]="trade-tariff-cluster-development"
@@ -37,28 +41,6 @@ while [[ "$#" -gt 0 ]]; do
     esac
     shift
 done
-
-declare -a PRESERVE_FAMILY_SUFFIXES=(
-    "-job"
-)
-
-family_is_preserved() {
-    local family="$1"
-
-    for suffix in "${PRESERVE_FAMILY_SUFFIXES[@]}"; do
-        if [[ "$family" == *"$suffix" || "$family" == *"$suffix"-* ]]; then
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-task_definition_family() {
-    local task_definition_arn="$1"
-    local family_revision="${task_definition_arn##*/}"
-    echo "${family_revision%:*}"
-}
 
 declare ENVIRONMENT="${ENVIRONMENT:-development}"
 CLUSTER="${CLUSTERS[$ENVIRONMENT]}"
@@ -103,7 +85,7 @@ if [[ "$MODE" == "report" ]]; then
 fi
 
 echo "🔍 Fetching all ACTIVE Task Definition families..."
-ALL_FAMILIES=($(aws ecs list-task-definition-families --status ACTIVE --query 'families[]' --output text))
+ALL_FAMILIES=($(list_active_task_definition_families))
 
 CANDIDATES=()
 
@@ -153,13 +135,9 @@ elif [[ "$MODE" == "deregister" ]]; then
     echo "DEREGISTERING: Starting cleanup of ${#CANDIDATES[@]} families..."
 
     for fam in "${CANDIDATES[@]}"; do
-        revisions=($(aws ecs list-task-definitions --family-prefix "$fam" --status ACTIVE --query 'taskDefinitionArns[]' --output text))
+        revisions=($(list_exact_active_task_definition_revisions "$fam"))
         count=0
         for revision_arn in "${revisions[@]}"; do
-            if [[ "$(task_definition_family "$revision_arn")" != "$fam" ]]; then
-                continue
-            fi
-
             echo "   - Deregistering: $revision_arn"
             AWS_MAX_ATTEMPTS=10 aws ecs deregister-task-definition --task-definition "$revision_arn" > /dev/null
             (( count+=1 ))

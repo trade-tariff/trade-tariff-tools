@@ -7,7 +7,7 @@ import requests
 # This script is used to send a OTT search request and feed to result into a excel sheet.
 # List of search text are added in queries.txt file
 #
-# You can call it with python3 bin/ott_search_stat.py
+# You can call it with bin/ott-search-stat
 #
 # results will be populate into  search_results.xlsx with three different sheets,
 # results will be populate into  search_results.xlsx with three different sheets,

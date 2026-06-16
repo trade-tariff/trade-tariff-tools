@@ -36,12 +36,17 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'development' }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
+
+      - id: config
+        uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
+        with:
+          environment: development
 
       - name: Configure AWS credentials for development
-        uses: aws-actions/configure-aws-credentials@v6.1.3
+        uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
-          role-to-assume: arn:aws:iam::844815912454:role/GithubActions-ECS-Task-Cleanup-Role
+          role-to-assume: ${{ steps.config.outputs.cleanup-role-arn }}
           aws-region: eu-west-2
 
       - name: Cleanup unused task families in development
@@ -61,12 +66,17 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'staging' }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
+
+      - id: config
+        uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
+        with:
+          environment: staging
 
       - name: Configure AWS credentials for staging
-        uses: aws-actions/configure-aws-credentials@v6.1.3
+        uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
-          role-to-assume: arn:aws:iam::451934005581:role/GithubActions-ECS-Task-Cleanup-Role
+          role-to-assume: ${{ steps.config.outputs.cleanup-role-arn }}
           aws-region: eu-west-2
 
       - name: Cleanup unused task families in staging
@@ -86,12 +96,17 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.environment || inputs.environment == 'all' || inputs.environment == 'production' }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
+
+      - id: config
+        uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
+        with:
+          environment: production
 
       - name: Configure AWS credentials for production
-        uses: aws-actions/configure-aws-credentials@v6.1.3
+        uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
-          role-to-assume: arn:aws:iam::382373577178:role/GithubActions-ECS-Task-Cleanup-Role
+          role-to-assume: ${{ steps.config.outputs.cleanup-role-arn }}
           aws-region: eu-west-2
 
       - name: Cleanup unused task families in production
