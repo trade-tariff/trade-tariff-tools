@@ -22,14 +22,26 @@ STUB
   chmod +x "$stub_bin/gh"
 }
 
+extract_pr_info_script() {
+  ruby -ryaml -e '
+    workflow = YAML.load_file(ARGV.fetch(0))
+    steps = workflow.fetch("jobs").fetch("notify").fetch("steps")
+    step = steps.find { |s| s["id"] == "pr-info" }
+    puts step.fetch("run")
+  ' "$repo_root/.github/workflows/deploy-ecs.yml"
+}
+
 run_script() {
+  script="$tmpdir/pr-info.sh"
+  extract_pr_info_script > "$script"
+
   run env \
     SHA="abc1234" \
     REPO="trade-tariff/example" \
     ENVIRONMENT="production" \
     RESULT="success" \
     GITHUB_OUTPUT="$GITHUB_OUTPUT" \
-    bash "$repo_root/scripts/notify-pr-info.sh"
+    bash "$script"
 }
 
 @test "outputs a plain fallback message when the API returns no PR" {
@@ -94,13 +106,6 @@ run_script() {
   output_content="$(cat "$GITHUB_OUTPUT")"
   assert_contains "$output_content" ":red_circle:"
   assert_contains "$output_content" "high-risk"
-}
-
-@test "deploy-ecs calls the notify-pr-info script in the pr-info step" {
-  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
-
-  run grep -F "bash scripts/notify-pr-info.sh" "$workflow"
-  [ "$status" -eq 0 ]
 }
 
 @test "deploy-ecs pr-info step has continue-on-error set" {
