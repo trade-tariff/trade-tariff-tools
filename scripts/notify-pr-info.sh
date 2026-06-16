@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-set -euo pipefail
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o noclobber
 
 # Looks up the PR associated with a deployed commit and writes a composed
 # Slack message to GITHUB_OUTPUT. Falls back to a plain message if the API
