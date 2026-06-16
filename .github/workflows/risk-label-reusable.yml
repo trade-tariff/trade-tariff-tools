@@ -51,6 +51,29 @@ jobs:
               issue_number: prNumber,
             });
 
+            // Dependabot PRs are dependency bumps with no API changes — always low-risk.
+            if (context.payload.pull_request.user.login === 'dependabot[bot]') {
+              for (const label of currentLabels) {
+                if (RISK_LABELS.includes(label.name) && label.name !== LABEL_LOW) {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo:  context.repo.repo,
+                    issue_number: prNumber,
+                    name: label.name,
+                  });
+                }
+              }
+              if (!currentLabels.find(l => l.name === LABEL_LOW)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  issue_number: prNumber,
+                  labels: [LABEL_LOW],
+                });
+              }
+              return;
+            }
+
             const existingRiskLabel = currentLabels.find(l => RISK_LABELS.includes(l.name));
 
             // Extract everything before **Reason for rating:** so that emoji in
