@@ -1,0 +1,14 @@
+name: Apply risk label
+description: >-
+  Checks PR descriptions for risk labels and automatically applies the correct
+  pull request label.
+
+runs:
+  using: composite
+  steps:
+    - name: Detect risk level and apply label
+      uses: actions/github-script@v9
+      with:
+        script: |
+          const script = require("${{ github.action_path }}/risk-label.js");
+          await script({github, context, core});

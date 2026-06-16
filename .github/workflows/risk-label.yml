@@ -1,0 +1,16 @@
+name: Apply risk label
+
+on:
+ workflow_call:
+
+jobs:
+  risk-label:
+    name: Apply risk label
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/apply-risk-label@bau-split-risk-label-script
