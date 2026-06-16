@@ -59,6 +59,11 @@ on:
         description: 'Password for admin bypass'
         required: false
 
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+
 jobs:
   configure:
     runs-on: ubuntu-latest
@@ -228,11 +233,22 @@ jobs:
           else
             echo "result=${{ needs.deploy.result }}" >> "$GITHUB_OUTPUT"
           fi
+
+      - id: pr-info
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.configure.outputs.actual_ref }}
+          REPO: ${{ needs.configure.outputs.actual_repo }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          RESULT: ${{ steps.result.outputs.result }}
+        run: bash scripts/notify-pr-info.sh
+
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
           webhook: ${{ secrets.slack-webhook }}
           channel: ${{ needs.configure.outputs.slack_channel }}
           color: ${{ steps.result.outputs.result }}
           title: "${{ github.workflow }}"
-          message: "Deploy to ${{ inputs.environment }} ${{ steps.result.outputs.result }}"
+          message: "${{ steps.pr-info.outputs.message || format('Deploy to {0} {1}', inputs.environment, steps.result.outputs.result) }}"
       - run: if [[ "${{ steps.result.outputs.result }}" != "success" ]]; then exit 1; fi
