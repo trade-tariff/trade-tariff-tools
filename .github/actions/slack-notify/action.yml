@@ -53,6 +53,8 @@ runs:
           cancelled) COLOR="#808080" ;;
         esac
 
+        MESSAGE="${MESSAGE//\\n/$'\n'}"
+
         FOOTER="${GITHUB_REPOSITORY} | <${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}|View workflow run>"
 
         PAYLOAD=$(jq -n \
