@@ -91,3 +91,33 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"PR changes 1 lines"* ]]
 }
+
+@test "counts stacked pull request changes from the merge base of the base ref" {
+  git -C "$repo" switch -qc parent-pr "$base_sha"
+  printf 'parent change\n' > "$repo/parent.txt"
+  git -C "$repo" add parent.txt
+  git -C "$repo" commit -qm "parent change"
+  parent_original_sha="$(git -C "$repo" rev-parse HEAD)"
+
+  git -C "$repo" switch -qc child-pr "$parent_original_sha"
+  printf 'child change\n' > "$repo/child.txt"
+  git -C "$repo" add child.txt
+  git -C "$repo" commit -qm "child change"
+  child_head_sha="$(git -C "$repo" rev-parse HEAD)"
+
+  git -C "$repo" switch parent-pr
+  printf 'parent follow-up\n' > "$repo/parent-follow-up.txt"
+  git -C "$repo" add parent-follow-up.txt
+  git -C "$repo" commit -qm "parent follow-up"
+
+  cd "$repo" || return 1
+
+  run bash "$script" \
+    --threshold 1 \
+    --base "$base_sha" \
+    --base-ref parent-pr \
+    --head "$child_head_sha"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PR changes 1 lines"* ]]
+}

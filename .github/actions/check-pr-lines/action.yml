@@ -41,12 +41,14 @@ runs:
 
         base_sha="$INPUT_BASE_SHA"
         head_sha="$INPUT_HEAD_SHA"
+        base_ref=""
 
         if [[ -z "$base_sha" || -z "$head_sha" ]]; then
           case "${{ github.event_name }}" in
             pull_request)
               base_sha="${{ github.event.pull_request.base.sha }}"
               head_sha="${{ github.event.pull_request.head.sha }}"
+              base_ref="${{ github.event.pull_request.base.ref }}"
               ;;
             push)
               response="$(
@@ -60,6 +62,7 @@ runs:
                 exit 0
               fi
               base_sha="$(jq -r '.[0].base.sha' <<< "$response")"
+              base_ref="$(jq -r '.[0].base.ref' <<< "$response")"
               head_sha="$(jq -r '.[0].head.sha' <<< "$response")"
               ;;
             *)
@@ -80,5 +83,6 @@ runs:
         "${{ github.action_path }}/check-pr-lines.sh" \
           --threshold "$THRESHOLD" \
           --base "$base_sha" \
+          --base-ref "$base_ref" \
           --head "$head_sha" \
           --exclude-paths-file "$exclude_file"
