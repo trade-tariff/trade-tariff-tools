@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: check-pr-lines.sh --threshold <n> --base <sha> --head <sha> [--exclude-paths-file <file>]
+Usage: check-pr-lines.sh --threshold <n> --base <sha> --head <sha> [--base-ref <ref>] [--exclude-paths-file <file>]
 
 Counts additions and deletions between two commits (after optional path exclusions)
 and exits 1 when the total exceeds the threshold.
@@ -13,6 +13,7 @@ EOF
 threshold=""
 base_sha=""
 head_sha=""
+base_ref=""
 exclude_paths_file=""
 
 while [[ $# -gt 0 ]]; do
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --head)
       head_sha="$2"
+      shift 2
+      ;;
+    --base-ref)
+      base_ref="$2"
       shift 2
       ;;
     --exclude-paths-file)
@@ -56,7 +61,14 @@ if ! [[ "$threshold" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-merge_base="$(git merge-base "$base_sha" "$head_sha")"
+merge_base_input="$base_sha"
+if [[ -n "$base_ref" ]] && git rev-parse --verify --quiet "$base_ref" >/dev/null; then
+  merge_base_input="$base_ref"
+elif [[ -n "$base_ref" ]] && git rev-parse --verify --quiet "origin/$base_ref" >/dev/null; then
+  merge_base_input="origin/$base_ref"
+fi
+
+merge_base="$(git merge-base "$merge_base_input" "$head_sha")"
 
 exclude_specs=()
 if [[ -n "$exclude_paths_file" && -f "$exclude_paths_file" ]]; then
