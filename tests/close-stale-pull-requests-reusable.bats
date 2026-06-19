@@ -41,7 +41,8 @@ if [[ "$1" == "api" && "$2" == "repos/trade-tariff/example/branches" ]]; then
 fi
 
 if [[ "$1" == "api" && "$2" == "repos/trade-tariff/example/commits/sha-fresh" ]]; then
-  printf '%s\n' '{"commit":{"committer":{"date":"2026-06-03T12:00:00Z"}}}'
+  fresh_date="$(date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ')"
+  printf '{"commit":{"committer":{"date":"%s"}}}\n' "$fresh_date"
   exit 0
 fi
 
