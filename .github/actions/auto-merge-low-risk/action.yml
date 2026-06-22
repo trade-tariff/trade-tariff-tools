@@ -79,7 +79,9 @@ runs:
           fi
 
           echo "Requesting Copilot code review for PR #$PR_NUMBER"
-          gh pr edit "$PR_NUMBER" --repo "$repo" --add-reviewer copilot
+          if ! gh pr edit "$PR_NUMBER" --repo "$repo" --add-reviewer copilot; then
+            echo "::warning::Unable to request Copilot code review for PR #$PR_NUMBER; auto-merge will retry after a review is available."
+          fi
         }
 
         # Label removed — turn off auto-merge.
