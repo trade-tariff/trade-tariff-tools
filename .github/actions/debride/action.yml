@@ -1,0 +1,43 @@
+name: Debride
+description: Run Debride and fail when normalized findings are not in the repo baseline.
+
+inputs:
+  baseline-path:
+    description: Path to the normalized Debride baseline file.
+    required: false
+    default: config/debride.whitelist
+  paths:
+    description: Newline-separated paths to scan. Defaults to existing app and lib paths.
+    required: false
+    default: ''
+  rails:
+    description: Run Debride with --rails.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        BASELINE_PATH: ${{ inputs.baseline-path }}
+        PATHS: ${{ inputs.paths }}
+        RAILS: ${{ inputs.rails }}
+      run: |
+        set -euo pipefail
+
+        args=(--baseline "$BASELINE_PATH")
+
+        if [[ "$RAILS" != "true" ]]; then
+          args+=(--no-rails)
+        fi
+
+        if [[ -n "$PATHS" ]]; then
+          args+=(--)
+          while IFS= read -r path || [[ -n "$path" ]]; do
+            [[ -z "$path" || "$path" == \#* ]] && continue
+            args+=("$path")
+          done <<< "$PATHS"
+        fi
+
+        "${{ github.action_path }}/debride-check" "${args[@]}"

@@ -1,0 +1,7 @@
+- id: debride
+  name: debride
+  description: Run Debride and fail when normalized findings are not in the repo baseline.
+  entry: .github/actions/debride/debride-check
+  language: script
+  pass_filenames: false
+  stages: [pre-push]
