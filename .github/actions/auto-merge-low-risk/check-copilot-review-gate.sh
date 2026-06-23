@@ -113,6 +113,7 @@ while true; do
       -F pr="$pr" \
       -f cursor="$cursor" 2>&1)" || {
       if grep -qi "resource not accessible by personal access token" <<< "$response"; then
+        echo "::warning::Insufficient token permissions to check Copilot review threads. Skipping detailed review gate check. This allows workflow to continue." >&2
         exit 0
       fi
       echo "$response" >&2
@@ -142,6 +143,7 @@ while true; do
       -f repo="$name" \
       -F pr="$pr" 2>&1)" || {
       if grep -qi "resource not accessible by personal access token" <<< "$response"; then
+        echo "::warning::Insufficient token permissions to check Copilot review threads. Skipping detailed review gate check. This allows workflow to continue." >&2
         exit 0
       fi
       echo "$response" >&2
