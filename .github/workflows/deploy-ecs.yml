@@ -86,7 +86,7 @@ jobs:
           if [[ -n "${{ inputs.checkout-ref }}" ]]; then
             ACTUAL_REF="${{ inputs.checkout-ref }}"
           elif [[ "$ACTUAL_REPO" == "${{ github.repository }}" ]]; then
-            ACTUAL_REF="${{ github.event.pull_request.head.sha || github.sha }}"
+            ACTUAL_REF="${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
           else
             ACTUAL_REF="main"
           fi
@@ -221,6 +221,20 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
+      - id: workflow-source
+        env:
+          JOB_CONTEXT: ${{ toJson(job) }}
+        run: |
+          {
+            echo "repository=$(echo "$JOB_CONTEXT" | jq -r '.workflow_repository')"
+            echo "sha=$(echo "$JOB_CONTEXT" | jq -r '.workflow_sha')"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6.0.3
+        with:
+          repository: ${{ steps.workflow-source.outputs.repository }}
+          ref: ${{ steps.workflow-source.outputs.sha }}
+          path: .trade-tariff-tools
+          ssh-key: ${{ secrets.ssh-key }}
       - id: result
         run: |
           TEST_FLAVOUR="${{ inputs.test-flavour }}"
@@ -237,45 +251,14 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          DEPLOY_SHA: ${{ needs.configure.outputs.docker_tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
           SHA: ${{ needs.configure.outputs.actual_ref }}
-          REPO: ${{ needs.configure.outputs.actual_repo }}
+          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.merge_commit_sha || github.event.pull_request.head.sha || github.sha }}
           ENVIRONMENT: ${{ inputs.environment }}
           RESULT: ${{ steps.result.outputs.result }}
-        run: |
-          FALLBACK="Deploy to ${ENVIRONMENT} ${RESULT}"
-
-          PR_DATA=$(gh api "repos/${REPO}/commits/${SHA}/pulls" \
-            -H "Accept: application/vnd.github+json" \
-            --jq '.[0] // empty' 2>/dev/null || true)
-
-          if [[ -z "$PR_DATA" ]]; then
-            echo "message=${FALLBACK}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-
-          PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
-          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
-          PR_URL=$(echo "$PR_DATA" | jq -r '.html_url')
-          RISK_LABEL=$(echo "$PR_DATA" | jq -r '[.labels[].name | select(test("risk"))] | .[0] // empty')
-
-          MESSAGE="${FALLBACK}"$'\n'"*<${PR_URL}|#${PR_NUMBER} — ${PR_TITLE}>*"
-
-          if [[ -n "$RISK_LABEL" ]]; then
-            case "$RISK_LABEL" in
-              low-risk)    RISK_EMOJI=":large_green_circle:" ;;
-              medium-risk) RISK_EMOJI=":large_yellow_circle:" ;;
-              high-risk)   RISK_EMOJI=":red_circle:" ;;
-              *)           RISK_EMOJI=":white_circle:" ;;
-            esac
-            MESSAGE="${MESSAGE}"$'\n'"Risk: ${RISK_EMOJI} ${RISK_LABEL}"
-          fi
-
-          {
-            echo 'message<<NOTIFY_EOF'
-            echo "$MESSAGE"
-            echo 'NOTIFY_EOF'
-          } >> "$GITHUB_OUTPUT"
+        run: .trade-tariff-tools/scripts/deploy-pr-info.sh
 
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
