@@ -69,7 +69,7 @@ deregister_unused() {
         echo "Processing family: $family"
 
         local revisions
-        revisions=($(list_exact_active_task_definition_revisions "$family"))
+        mapfile -t revisions < <(list_exact_active_task_definition_revisions "$family" | sort -t ':' -k 7,7nr)
 
         if [ ${#revisions[@]} -eq 0 ]; then
              echo "  [SKIP] No active revisions found."
