@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: debride-check [--baseline PATH] [--no-rails] [--update-baseline] [-- PATH...]
+
+Runs Debride, normalizes findings to ClassOrModule#method, and compares them
+with a checked-in baseline. By default it scans the existing app and lib paths.
+EOF
+}
+
+baseline_file="config/debride.whitelist"
+rails=1
+update_baseline=0
+paths=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --baseline)
+      baseline_file="$2"
+      shift 2
+      ;;
+    --no-rails)
+      rails=0
+      shift
+      ;;
+    --update-baseline)
+      update_baseline=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      paths=("$@")
+      break
+      ;;
+    *)
+      paths+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if ((${#paths[@]} == 0)); then
+  for path in app lib; do
+    [[ -e "$path" ]] && paths+=("$path")
+  done
+fi
+
+if ((${#paths[@]} == 0)); then
+  echo "::error::No Debride scan paths were provided and neither app nor lib exists." >&2
+  exit 2
+fi
+
+normalize_findings() {
+  ruby -e '
+    current_class = nil
+
+    ARGF.each_line do |line|
+      chomped = line.chomp
+      stripped = chomped.strip
+
+      if chomped == stripped && stripped != "" && stripped != "These methods MIGHT not be called:" && !stripped.start_with?("Total suspect LOC:")
+        current_class = stripped
+      elsif current_class && line =~ /\A\s{2}([A-Za-z_][A-Za-z0-9_!?=]*)\s+/
+        puts "#{current_class}##{Regexp.last_match(1)}"
+      end
+    end
+  ' | sort -u
+}
+
+if [[ -n "${DEBRIDE_OUTPUT_FILE:-}" ]]; then
+  raw_output="$(cat "$DEBRIDE_OUTPUT_FILE")"
+else
+  command=(bundle exec debride)
+  if ((rails)); then
+    command+=(--rails)
+  fi
+  command+=("${paths[@]}")
+
+  raw_output="$("${command[@]}")"
+fi
+
+findings_tmp="$(mktemp)"
+baseline_tmp="$(mktemp)"
+trap 'rm -f "$findings_tmp" "$baseline_tmp"' EXIT
+
+printf '%s\n' "$raw_output" | normalize_findings > "$findings_tmp"
+
+if ((update_baseline)); then
+  mkdir -p "$(dirname "$baseline_file")"
+  {
+    printf '%s\n' "# Debride cannot see framework convention calls reliably."
+    printf '%s\n' "# This normalized baseline is compared by trade-tariff-tools/debride."
+    printf '\n'
+    cat "$findings_tmp"
+  } > "$baseline_file"
+  echo "Updated Debride baseline at $baseline_file"
+  exit 0
+fi
+
+if [[ ! -f "$baseline_file" ]]; then
+  echo "::error::Missing Debride baseline: $baseline_file" >&2
+  echo "Run with --update-baseline to create it." >&2
+  exit 2
+fi
+
+grep -vE '^\s*(#|$)' "$baseline_file" | sort -u > "$baseline_tmp" || true
+
+unexpected="$(comm -13 "$baseline_tmp" "$findings_tmp")"
+
+if [[ -n "$unexpected" ]]; then
+  echo "Debride reported methods not in $baseline_file:"
+  printf '%s\n' "$unexpected"
+  exit 1
+fi
+
+echo "Debride findings match $baseline_file"
