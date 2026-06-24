@@ -6,6 +6,7 @@ on:
       - '.github/workflows/ci.yml'
       - '.github/workflows/close-stale-pull-requests-reusable.yml'
       - '.github/workflows/deploy-ecs.yml'
+      - '.github/workflows/deploy-multi-ecs.yml'
       - '.github/actions/db-migrate/**'
       - 'bin/cleanup-ecs-families'
       - 'bin/run-task'

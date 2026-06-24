@@ -58,3 +58,13 @@ load test_helper
   run grep -F "migrate: \${{ inputs.migrate && toJson(matrix.app.migrate) == 'true' }}" "$workflow"
   [ "$status" -eq 0 ]
 }
+
+@test "deploy-multi-ecs passes the WAF bypass token to tariff e2e tests" {
+  workflow="$repo_root/.github/workflows/deploy-multi-ecs.yml"
+
+  run grep -F "waf_bypass_token:" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "waf_bypass_token: \${{ secrets.waf_bypass_token }}" "$workflow"
+  [ "$status" -eq 0 ]
+}
