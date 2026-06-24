@@ -58,6 +58,9 @@ on:
       admin_bypass_password:
         description: 'Password for admin bypass'
         required: false
+      waf_bypass_token:
+        description: 'Secret token sent in X-WAF-Bypass header to bypass WAF bot control'
+        required: false
 
 permissions:
   contents: read
@@ -194,6 +197,7 @@ jobs:
       test-environment: ${{ inputs.environment }}
     secrets:
       basic_password: ${{ secrets.basic-password }}
+      waf_bypass_token: ${{ secrets.waf_bypass_token }}
 
   e2e-test-fpo:
     if: ${{ inputs.test-flavour == 'fpo' }}
