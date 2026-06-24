@@ -52,6 +52,9 @@ on:
       spimm_api_key:
         description: 'Green Lanes SPIMM API key'
         required: false
+      waf_bypass_token:
+        description: 'Secret token sent in X-WAF-Bypass header to bypass WAF bot control'
+        required: false
 
 jobs:
   test:
@@ -92,6 +95,8 @@ jobs:
             fi
             echo "BASIC_PASSWORD=${{ secrets.basic_password }}"
             echo "SPIMM_API_KEY=${{ secrets.spimm_api_key }}"
+            echo "WAF_BYPASS_TOKEN=${{ secrets.waf_bypass_token }}"
+
             echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
             echo "CI=true"
             echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
