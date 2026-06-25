@@ -99,7 +99,7 @@ jobs:
             echo "actual_ref=${ACTUAL_REF}"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: ${{ steps.actual-ref.outputs.actual_repo }}
           ref: ${{ steps.actual-ref.outputs.actual_ref }}
@@ -127,7 +127,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -152,7 +152,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -179,7 +179,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -221,7 +221,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
         with:
           ssh-key: ${{ secrets.ssh-key }}
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
@@ -233,7 +233,7 @@ jobs:
             echo "repository=$(echo "$JOB_CONTEXT" | jq -r '.workflow_repository')"
             echo "sha=$(echo "$JOB_CONTEXT" | jq -r '.workflow_sha')"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: ${{ steps.workflow-source.outputs.repository }}
           ref: ${{ steps.workflow-source.outputs.sha }}
