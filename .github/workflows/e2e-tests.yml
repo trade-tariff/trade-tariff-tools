@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           repository: trade-tariff/trade-tariff-e2e-tests
           ref: ${{ inputs.ref }}
