@@ -69,7 +69,7 @@ COPILOT_REVIEW_JQ='[
       .author.login == "copilot"
       or .author.login == "copilot-pull-request-reviewer"
       or .author.login == "github-copilot[bot]"
-      or (.author.login | test("copilot"; "i"))
+      or ((.author.login // "") | test("copilot"; "i"))
     )
 ] | length'
 
@@ -169,7 +169,7 @@ unresolved="$(jq -s '
     . == "copilot"
     or . == "copilot-pull-request-reviewer"
     or . == "github-copilot[bot]"
-    or test("copilot"; "i");
+    or ((. // "") | test("copilot"; "i"));
   [
     .[]
     | select(.isResolved == false)
