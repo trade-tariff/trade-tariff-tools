@@ -31,6 +31,13 @@ inputs:
       or unlabeled.
     required: false
     default: ''
+  copilot-review-required:
+    description: >-
+      When false, skip the Copilot review gate and merge immediately once all
+      other checks pass. Set to false for repos that do not have Copilot code
+      review enabled.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -71,7 +78,7 @@ runs:
           pending="$(gh pr view "$PR_NUMBER" \
             --repo "$repo" \
             --json reviewRequests \
-            -q '[.reviewRequests[]? | select(.login | test("copilot"; "i"))] | length')"
+            -q '[.reviewRequests[]? | select((.login // "") | test("copilot"; "i"))] | length')"
 
           if [[ "${pending:-0}" -gt 0 ]]; then
             echo "Copilot review already requested on PR #$PR_NUMBER."
@@ -115,20 +122,24 @@ runs:
           exit 0
         fi
 
-        set +e
-        "$gate_script" --repo "$repo" --pr "$PR_NUMBER"
-        gate_status=$?
-        set -e
+        if [[ "${{ inputs.copilot-review-required }}" == "true" ]]; then
+          set +e
+          "$gate_script" --repo "$repo" --pr "$PR_NUMBER"
+          gate_status=$?
+          set -e
 
-        if [[ "$gate_status" -eq 2 ]]; then
-          request_copilot_review
-          echo "Waiting for Copilot to review PR #$PR_NUMBER; auto-merge will be retried on the next workflow run."
-          exit 0
-        fi
+          if [[ "$gate_status" -eq 2 ]]; then
+            request_copilot_review
+            echo "Waiting for Copilot to review PR #$PR_NUMBER; auto-merge will be retried on the next workflow run."
+            exit 0
+          fi
 
-        if [[ "$gate_status" -ne 0 ]]; then
-          echo "Copilot review requirements not met for PR #$PR_NUMBER; skipping auto-merge."
-          exit 0
+          if [[ "$gate_status" -ne 0 ]]; then
+            echo "Copilot review requirements not met for PR #$PR_NUMBER; skipping auto-merge."
+            exit 0
+          fi
+        else
+          echo "Copilot review gate disabled for PR #$PR_NUMBER; proceeding to merge."
         fi
         
         gh pr review "$PR_NUMBER" \

@@ -14,6 +14,14 @@ on:
         type: string
         required: false
         default: merge
+      copilot-review-required:
+        description: >-
+          When false, skip the Copilot review gate and merge immediately once
+          all other checks pass. Set to false for repos that do not have
+          Copilot code review enabled.
+        type: boolean
+        required: false
+        default: false
 
     secrets:
       github-token:
@@ -72,6 +80,7 @@ jobs:
           pr-number: ${{ steps.pr.outputs.number }}
           label: ${{ inputs.label }}
           merge-method: ${{ inputs.merge-method }}
+          copilot-review-required: ${{ inputs.copilot-review-required }}
           github-token: ${{ secrets.github-token }}
           pull-request-event-action: ${{ github.event.action }}
           pull-request-event-label: ${{ github.event.label.name }}
