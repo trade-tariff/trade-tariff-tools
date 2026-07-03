@@ -93,10 +93,29 @@ Interactive script to execute commands in AWS ECS tasks. Uses `fzf` for interact
 
 # Run a rake task
 ./bin/ecs 'bundle exec rake tariff:jobs'
+
+# Select and run a scheduled job from the current AWS account
+./bin/ecs run
+
+# Run a scheduled job by name from the current AWS account
+./bin/ecs run backend-database-replication
+
+# Run the replication job without prompts and without tailing logs
+./bin/ecs run --yes --no-tail backend-database-replication
+
+# Filter explicitly if a job name exists in more than one environment in the account
+./bin/ecs run --environment staging --yes --no-tail backend-database-replication
 ```
+
+`ecs run` discovers scheduled jobs from the AWS account represented by your
+current credentials. Use `--environment` only as a filter when that account has
+more than one matching environment.
 
 **Features:**
 - Interactive selection of clusters, services, and tasks using `fzf`
+- Starts scheduled EventBridge-backed ECS jobs on demand with `ecs run`
+- Discovers scheduled jobs from the current AWS account credentials
+- Resolves the latest active task definition before starting scheduled jobs
 - Automatically starts `backend-job` tasks if none are running
 - Automatically stops `backend-job` tasks when you exit
 - Sets `RAILS_LOG_LEVEL=debug` for all commands
