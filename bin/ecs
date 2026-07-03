@@ -7,7 +7,7 @@ set -o pipefail
 set -o noclobber
 
 readonly SCRIPT_NAME="$(basename "$0")"
-readonly REGION="eu-west-2"
+REGION="${AWS_REGION:-eu-west-2}"
 readonly MAX_WAIT_TIME=60
 
 print_usage() {
@@ -59,16 +59,24 @@ error_exit() {
     exit "${2:-1}"
 }
 
-check_dependencies() {
+check_core_dependencies() {
     local missing_deps=()
 
     command -v aws >/dev/null || missing_deps+=("aws")
     command -v jq >/dev/null || missing_deps+=("jq")
-    command -v fzf >/dev/null || missing_deps+=("fzf")
 
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         error_exit "Missing required dependencies: ${missing_deps[*]}"
     fi
+}
+
+check_fzf_dependency() {
+    command -v fzf >/dev/null || error_exit "Missing required dependency: fzf"
+}
+
+check_dependencies() {
+    check_core_dependencies
+    check_fzf_dependency
 }
 
 check_aws_credentials() {
@@ -417,54 +425,127 @@ and dispatches them as ECS tasks.
 OPTIONS:
     -h, --help      Show this help message and exit
     -r, --region    AWS region (default: $REGION)
+    -e, --environment
+                    Environment to run in (development, staging, production)
+    -y, --yes       Skip the confirmation prompt
     --no-tail       Start the task and exit without tailing logs
+
+ARGUMENTS:
+    JOB             Scheduled job name, for example backend-database-replication
 
 EXAMPLES:
     $SCRIPT_NAME run                    # Select and run a scheduled job
+    $SCRIPT_NAME run backend-database-replication
+    $SCRIPT_NAME run -e staging backend-database-replication
     $SCRIPT_NAME run --no-tail          # Start a job without tailing logs
 EOF
 }
 
-discover_eventbridge_jobs() {
-    local environment="$1"
-    local cluster="$2"
+rule_environment() {
+    local rule_name="$1"
+
+    case "$rule_name" in
+        *-development) echo "development" ;;
+        *-staging) echo "staging" ;;
+        *-production) echo "production" ;;
+        *) return 1 ;;
+    esac
+}
+
+discover_account_eventbridge_jobs() {
+    local requested_job="$1"
+    local environment_filter="$2"
+
+    local list_rules_args=(aws events list-rules --region "$REGION")
+    if [[ -n "$requested_job" ]]; then
+        list_rules_args+=(--name-prefix "${requested_job}-")
+    fi
 
     local rules
-    rules=$(aws events list-rules --region "$REGION" \
-        | jq -r --arg env "$environment" \
-            '.Rules[] | select(.Name | endswith("-" + $env)) | .Name')
-
-    [[ -n "$rules" ]] || error_exit "No EventBridge rules found for environment: $environment"
+    rules=$("${list_rules_args[@]}" | jq -r '.Rules[] | .Name')
 
     local results=""
 
     while IFS= read -r rule_name; do
-        local targets
-        targets=$(aws events list-targets-by-rule --rule "$rule_name" --region "$REGION")
+        [[ -n "$rule_name" ]] || continue
 
-        # Filter targets that reference the selected cluster
-        local matching
-        matching=$(echo "$targets" | jq -r --arg cluster "$cluster" \
-            '.Targets[] | select(.Arn | contains($cluster))')
+        local environment
+        environment=$(rule_environment "$rule_name") || continue
 
-        [[ -n "$matching" ]] || continue
-
-        local command
-        command=$(echo "$matching" | jq -r \
-            '.Input | fromjson | .containerOverrides[0].command | join(" ")')
+        if [[ -n "$environment_filter" && "$environment" != "$environment_filter" ]]; then
+            continue
+        fi
 
         local display_name
         display_name="${rule_name%-"$environment"}"
 
-        if [[ -n "$results" ]]; then
-            results+=$'\n'
+        if [[ -n "$requested_job" && "$display_name" != "$requested_job" ]]; then
+            continue
         fi
-        results+="${display_name}"$'\t'"${command}"
+
+        local targets
+        targets=$(aws events list-targets-by-rule --rule "$rule_name" --region "$REGION")
+
+        local matching
+        matching=$(echo "$targets" | jq -c '.Targets[] | select(.EcsParameters.TaskDefinitionArn != null)')
+        [[ -n "$matching" ]] || continue
+
+        while IFS= read -r target; do
+            [[ -n "$target" ]] || continue
+
+            local command cluster
+            command=$(echo "$target" | jq -r '.Input | fromjson | .containerOverrides[0].command | join(" ")')
+            cluster=$(echo "$target" | jq -r '.Arn | split("/") | .[-1]')
+
+            if [[ -n "$results" ]]; then
+                results+=$'\n'
+            fi
+            results+="${display_name}"$'\t'"${command}"$'\t'"${environment}"$'\t'"${cluster}"
+        done <<< "$matching"
     done <<< "$rules"
 
-    [[ -n "$results" ]] || error_exit "No ECS jobs found for cluster: $cluster"
-
     echo "$results"
+}
+
+latest_active_task_definition() {
+    local task_def_arn="$1"
+    local family_revision="${task_def_arn##*/}"
+    local family="${family_revision%:*}"
+
+    local latest
+    latest=$(aws ecs describe-task-definition \
+        --task-definition "$family" \
+        --region "$REGION" \
+        | jq -r '.taskDefinition.taskDefinitionArn // empty')
+
+    [[ -n "$latest" ]] || error_exit "Could not find active task definition for family: $family"
+
+    echo "$latest"
+}
+
+eventbridge_target_for_rule() {
+    local rule_name="$1"
+    local cluster="$2"
+
+    local targets
+    targets=$(aws events list-targets-by-rule --rule "$rule_name" --region "$REGION")
+
+    local matching
+    matching=$(echo "$targets" | jq -c --arg cluster "$cluster" \
+        '[.Targets[] | select(.EcsParameters.TaskDefinitionArn != null and (.Arn | split("/") | .[-1]) == $cluster)]')
+
+    local count
+    count=$(echo "$matching" | jq -r 'length')
+
+    if [[ "$count" -ne 1 ]]; then
+        echo "Expected exactly one ECS target for $rule_name in $cluster, found $count" >&2
+        if [[ "$count" -gt 0 ]]; then
+            echo "$matching" | jq -r '.[] | " - " + (.Id // "unknown-target") + " " + (.EcsParameters.TaskDefinitionArn // "unknown-task-definition")' >&2
+        fi
+        return 1
+    fi
+
+    echo "$matching" | jq -c '.[0]'
 }
 
 tail_task_logs() {
@@ -500,7 +581,7 @@ tail_task_logs() {
     local log_group="platform-logs-${environment}"
     local stream_prefix="ecs/${container}/${task_id}"
 
-    echo "Task is running. Tailing logs (Ctrl+C to detach)..." >&2
+    echo "Task status is $task_status. Tailing logs (Ctrl+C to detach)..." >&2
 
     local tail_pid=""
 
@@ -522,7 +603,7 @@ tail_task_logs() {
 
     aws logs tail "$log_group" \
         --log-stream-name-prefix "$stream_prefix" \
-        --since "1s" \
+        --since "5m" \
         --format short \
         --follow \
         --region "$REGION" &
@@ -530,28 +611,37 @@ tail_task_logs() {
 
     # Poll task status until stopped
     while true; do
-        sleep 15
+        sleep "${TASK_POLL_SECONDS:-15}"
         local status
         status=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task_arn" --region "$REGION" \
             | jq -r '.tasks[0].lastStatus')
 
         if [[ "$status" == "STOPPED" ]]; then
             # Wait for final logs to flush
-            sleep 10
+            sleep "${FINAL_LOG_FLUSH_SECONDS:-10}"
             cleanup_tail
 
-            local exit_code
-            exit_code=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task_arn" --region "$REGION" \
-                | jq -r '.tasks[0].containers[0].exitCode // "unknown"')
+            local stopped
+            stopped=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task_arn" --region "$REGION")
+
+            local exit_code stopped_reason container_reason
+            exit_code=$(echo "$stopped" | jq -r --arg container "$container" '.tasks[0].containers[] | select(.name == $container) | .exitCode // "unknown"')
+            stopped_reason=$(echo "$stopped" | jq -r '.tasks[0].stoppedReason // empty')
+            container_reason=$(echo "$stopped" | jq -r --arg container "$container" '.tasks[0].containers[] | select(.name == $container) | .reason // empty')
 
             if [[ "$exit_code" == "0" ]]; then
                 echo "Task completed successfully (exit code: 0)" >&2
+                trap - INT
+                return 0
             else
                 echo "Task failed (exit code: $exit_code)" >&2
+                [[ -n "$stopped_reason" ]] && echo "Stopped reason: $stopped_reason" >&2
+                [[ -n "$container_reason" ]] && echo "Container reason: $container_reason" >&2
             fi
 
             trap - INT
-            return
+            [[ "$exit_code" =~ ^[0-9]+$ && "$exit_code" -gt 0 && "$exit_code" -le 255 ]] && return "$exit_code"
+            return 1
         fi
     done
 }
@@ -559,6 +649,9 @@ tail_task_logs() {
 run_main() {
     local region="$REGION"
     local tail=true
+    local environment=""
+    local assume_yes=false
+    local requested_job=""
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -571,6 +664,15 @@ run_main() {
                 region="$2"
                 shift 2
                 ;;
+            -e|--environment)
+                [[ -n "${2:-}" ]] || error_exit "--environment requires a value"
+                environment="$2"
+                shift 2
+                ;;
+            -y|--yes)
+                assume_yes=true
+                shift
+                ;;
             --no-tail)
                 tail=false
                 shift
@@ -579,52 +681,109 @@ run_main() {
                 error_exit "Unknown option: $1. See '$SCRIPT_NAME run --help'"
                 ;;
             *)
-                error_exit "Unexpected argument: $1. See '$SCRIPT_NAME run --help'"
+                [[ -z "$requested_job" ]] || error_exit "Too many arguments. See '$SCRIPT_NAME run --help'"
+                requested_job="$1"
+                shift
                 ;;
         esac
     done
 
-    check_dependencies
+    REGION="$region"
+
+    check_core_dependencies
     check_aws_credentials
 
-    local cluster
-    cluster=$(select_cluster)
+    local cluster=""
+    local jobs=""
+    local selected=""
+    local target=""
 
-    local environment
-    environment="${cluster##*-}"
+    if [[ -n "$environment" ]]; then
+        case "$environment" in
+            development|staging|production) ;;
+            *) error_exit "Unknown environment: $environment" ;;
+        esac
+    fi
 
     echo "Discovering scheduled jobs..." >&2
 
-    local jobs
-    jobs=$(discover_eventbridge_jobs "$environment" "$cluster")
+    jobs=$(discover_account_eventbridge_jobs "$requested_job" "$environment")
+    if [[ -z "$jobs" ]]; then
+        if [[ -n "$requested_job" ]]; then
+            if [[ -n "$environment" ]]; then
+                local available_jobs
+                available_jobs=$(discover_account_eventbridge_jobs "" "$environment")
+                if [[ -n "$available_jobs" ]]; then
+                    echo "Available jobs:" >&2
+                    echo "$available_jobs" | cut -f1 | sort -u >&2
+                fi
+                error_exit "No ECS job named '$requested_job' found in $environment"
+            fi
 
-    local selected
-    selected=$(echo "$jobs" | column -t -s $'\t' \
-        | fzf --height 40% --prompt "Select a Job: " --no-info)
+            error_exit "No ECS job named '$requested_job' found"
+        fi
+
+        error_exit "No scheduled ECS jobs found"
+    fi
+
+    if [[ -n "$requested_job" ]]; then
+        local match_count
+        match_count=$(echo "$jobs" | cut -f3,4 | sort -u | wc -l | tr -d ' ')
+        if [[ "$match_count" -gt 1 ]]; then
+            echo "Multiple ECS jobs named '$requested_job' found:" >&2
+            echo "$jobs" | awk -F '\t' '{ print $1 " (" $3 ")" }' | sort -u >&2
+            error_exit "Specify --environment to choose one"
+        fi
+
+        selected=$(echo "$jobs" | head -n 1)
+    elif [[ -z "$selected" ]]; then
+        check_fzf_dependency
+        selected=$(echo "$jobs" \
+            | fzf --height 40% --prompt "Select a Job: " --no-info --delimiter $'\t' --with-nth 1,3,2)
+    fi
 
     [[ -n "$selected" ]] || error_exit "No job selected"
 
     local job_name
-    job_name=$(echo "$selected" | awk '{print $1}')
+    job_name=$(echo "$selected" | cut -f1)
+    environment=$(echo "$selected" | cut -f3)
+    cluster=$(echo "$selected" | cut -f4)
+    [[ -n "$environment" ]] || error_exit "Could not determine environment for selected job"
+    [[ -n "$cluster" ]] || error_exit "Could not determine cluster for selected job"
 
     # Look up the full details from the original jobs list
     local rule_name="${job_name}-${environment}"
 
-    local targets
-    targets=$(aws events list-targets-by-rule --rule "$rule_name" --region "$REGION")
+    target=$(eventbridge_target_for_rule "$rule_name" "$cluster")
 
-    local target
-    target=$(echo "$targets" | jq -r --arg cluster "$cluster" \
-        '.Targets[] | select(.Arn | contains($cluster))')
+    local event_task_def_arn task_def_arn overrides container command
+    event_task_def_arn=$(echo "$target" | jq -r '.EcsParameters.TaskDefinitionArn // empty')
+    [[ -n "$event_task_def_arn" ]] || error_exit "EventBridge target for $rule_name does not include a task definition"
 
-    local task_def_arn overrides
-    task_def_arn=$(echo "$target" | jq -r '.EcsParameters.TaskDefinitionArn')
+    task_def_arn=$(latest_active_task_definition "$event_task_def_arn")
     overrides=$(echo "$target" | jq -r '.Input')
+    [[ -n "$overrides" && "$overrides" != "null" ]] || error_exit "EventBridge target for $rule_name does not include container overrides"
+
+    container=$(echo "$overrides" | jq -r '.containerOverrides[0].name // empty')
+    command=$(echo "$overrides" | jq -r '.containerOverrides[0].command // [] | join(" ")')
+    [[ -n "$container" ]] || error_exit "EventBridge target for $rule_name does not include a container name"
 
     echo "" >&2
-    echo "Run '$job_name' in $environment? [y/N] " >&2
-    read -r confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || exit 0
+    echo "Job: $job_name" >&2
+    echo "Environment: $environment" >&2
+    echo "Cluster: $cluster" >&2
+    echo "Container: $container" >&2
+    echo "Command: $command" >&2
+    echo "EventBridge task definition: $event_task_def_arn" >&2
+    echo "Latest active task definition: $task_def_arn" >&2
+    echo "Logs: platform-logs-${environment}/ecs/${container}/<task-id>" >&2
+    echo "Tail logs: $tail" >&2
+
+    if [[ "$assume_yes" == false ]]; then
+        echo "Run '$job_name' in $environment? [y/N] " >&2
+        read -r confirm
+        [[ "$confirm" =~ ^[Yy]$ ]] || exit 0
+    fi
 
     # Get network config
     local network_config
@@ -635,8 +794,8 @@ run_main() {
 
     echo "Starting task..." >&2
 
-    local task_arn
-    task_arn=$(aws ecs run-task \
+    local run_task_response
+    run_task_response=$(aws ecs run-task \
         --cluster "$cluster" \
         --task-definition "$task_def_arn" \
         --launch-type FARGATE \
@@ -644,9 +803,19 @@ run_main() {
         --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg],assignPublicIp=DISABLED}" \
         --started-by ecs-run-script \
         --overrides "$overrides" \
-        | jq -r '.tasks[0].taskArn')
+    )
 
-    [[ -n "$task_arn" ]] || error_exit "Failed to start task"
+    local failure_count
+    failure_count=$(echo "$run_task_response" | jq -r '.failures | length')
+    if [[ "$failure_count" -gt 0 ]]; then
+        echo "Failed to start task:" >&2
+        echo "$run_task_response" | jq -r '.failures[] | " - " + (.arn // "unknown-arn") + " " + (.reason // "unknown-reason") + ": " + (.detail // "no detail")' >&2
+        return 1
+    fi
+
+    local task_arn
+    task_arn=$(echo "$run_task_response" | jq -r '.tasks[0].taskArn // empty')
+    [[ -n "$task_arn" ]] || error_exit "Failed to start task: AWS response did not include a task ARN"
 
     local task_id
     task_id=$(echo "$task_arn" | awk -F'/' '{print $NF}')
@@ -655,10 +824,6 @@ run_main() {
     if [[ "$tail" == false ]]; then
         return
     fi
-
-    # Derive container name from the overrides
-    local container
-    container=$(echo "$overrides" | jq -r '.containerOverrides[0].name')
 
     tail_task_logs "$cluster" "$task_arn" "$environment" "$container"
 }
