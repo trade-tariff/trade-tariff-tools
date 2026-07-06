@@ -13,3 +13,5 @@
 .nix
 .envrc
 .pre-commit-config-nix.yaml
+
+node_modules
