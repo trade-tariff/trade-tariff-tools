@@ -1,0 +1,11 @@
+name: Risk Labeler
+description: Detect risk from pull request and apply correct label
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/github-script@v9
+      with:
+        script: |
+          const { default: riskLabel } = await import('${{ github.action_path }}/label.js')
+          await riskLabel({github, context, core});

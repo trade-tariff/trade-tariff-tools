@@ -55,7 +55,7 @@ runs:
               --json autoMergeRequest \
               -q '.autoMergeRequest != null'
           )
-        
+
           if [[ "$auto_merge_enabled" == "true" ]]; then
             echo "Disabling auto-merge for PR #$PR_NUMBER"
             gh pr merge "$PR_NUMBER" \
@@ -130,7 +130,7 @@ runs:
           echo "Copilot review requirements not met for PR #$PR_NUMBER; skipping auto-merge."
           exit 0
         fi
-        
+
         gh pr review "$PR_NUMBER" \
           --repo "$repo" \
           --approve
@@ -141,7 +141,7 @@ runs:
             --json autoMergeRequest \
             -q '.autoMergeRequest != null'
         )
-          
+
         if [[ "$auto_merge_enabled" == "true" ]]; then
           echo "Auto-merge already enabled for PR #$PR_NUMBER."
           exit 0
