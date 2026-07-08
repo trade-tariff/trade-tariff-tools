@@ -1,0 +1,35 @@
+name: Update importmap dependencies
+description: Run thoughtbot/importmap-update to open dependabot style PRs for outdated importmap packages 
+
+inputs:
+  github-token:
+    description: >-
+      Token used for checkout and for creating, updating, and closing importmap
+      update pull requests. The caller workflow needs contents: write and
+      pull-requests: write permissions.
+    required: false
+    default: ${{ github.token }}
+  dry-run:
+    description: Run importmap-update without creating, updating, or closing pull requests.
+    required: false
+    default: 'false'
+  bundler-cache:
+    description: Whether ruby/setup-ruby should install and cache bundle dependencies.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v7.0.0
+      with:
+        token: ${{ inputs.github-token }}
+
+    - uses: ruby/setup-ruby@v1.316.0
+      with:
+        bundler-cache: ${{ inputs.bundler-cache }}
+
+    - uses: thoughtbot/importmap-update@v1.0.0-alpha3
+      with:
+        github-token: ${{ inputs.github-token }}
+        dry-run: ${{ inputs.dry-run }}

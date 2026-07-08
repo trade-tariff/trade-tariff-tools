@@ -14,6 +14,7 @@ on:
       - '.github/actions/auto-merge-low-risk/**'
       - '.github/actions/check-pr-lines/**'
       - '.github/actions/debride/**'
+      - '.github/actions/importmap-update/**'
       - '.github/workflows/auto-merge-low-risk.yml'
       - '.pre-commit-hooks.yaml'
       - 'scripts/deploy-pr-info.sh'
