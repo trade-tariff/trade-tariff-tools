@@ -68,6 +68,27 @@ teardown() {
   rm -f "$exclude_file"
 }
 
+@test "excludes generated and vendored Rails assets by default" {
+  mkdir -p "$repo/vendor/javascript" "$repo/app/assets/builds" "$repo/public/assets"
+  seq 1 700 > "$repo/vendor/javascript/govuk-frontend.js"
+  seq 1 700 > "$repo/app/assets/builds/application.js"
+  seq 1 700 > "$repo/public/assets/application-digest.js"
+  printf 'app change\n' > "$repo/app.rb"
+  git -C "$repo" add app.rb vendor/javascript/govuk-frontend.js app/assets/builds/application.js public/assets/application-digest.js
+  git -C "$repo" commit -qm "add generated assets"
+  head_with_assets="$(git -C "$repo" rev-parse HEAD)"
+
+  cd "$repo" || return 1
+
+  run bash "$script" \
+    --threshold 2 \
+    --base "$base_sha" \
+    --head "$head_with_assets"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PR changes 2 lines"* ]]
+}
+
 @test "counts changes from the merge base when the base branch has moved" {
   git -C "$repo" switch -qc pr-branch "$base_sha"
   printf 'branch change\n' > "$repo/feature.txt"

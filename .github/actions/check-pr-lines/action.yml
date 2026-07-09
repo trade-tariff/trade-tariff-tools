@@ -2,6 +2,7 @@ name: Check PR line count
 description: >-
   Fail when a pull request changes more lines than the configured threshold.
   Supports pull_request and push events (push looks up the open PR for the branch).
+  Generated Rails asset outputs are excluded from the count by default.
 
 inputs:
   threshold:

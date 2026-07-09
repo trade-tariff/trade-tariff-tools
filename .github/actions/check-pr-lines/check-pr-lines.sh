@@ -70,7 +70,11 @@ fi
 
 merge_base="$(git merge-base "$merge_base_input" "$head_sha")"
 
-exclude_specs=()
+exclude_specs=(
+  ":(exclude)app/assets/builds/**"
+  ":(exclude)public/assets/**"
+  ":(exclude)vendor/javascript/**"
+)
 if [[ -n "$exclude_paths_file" && -f "$exclude_paths_file" ]]; then
   while IFS= read -r pattern || [[ -n "$pattern" ]]; do
     pattern="${pattern#"${pattern%%[![:space:]]*}"}"
