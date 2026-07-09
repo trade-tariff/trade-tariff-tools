@@ -102,7 +102,7 @@ jobs:
             echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
           } >> "$GITHUB_ENV"
 
-      - uses: aws-actions/configure-aws-credentials@v6.2.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.1
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ inputs.region }}
