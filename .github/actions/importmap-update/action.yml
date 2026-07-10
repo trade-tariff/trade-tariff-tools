@@ -31,5 +31,6 @@ runs:
 
     - uses: thoughtbot/importmap-update@v1.0.0-alpha3
       with:
+        config-file: ${{ github.action_path }}/importmap-updates.yml
         github-token: ${{ inputs.github-token }}
         dry-run: ${{ inputs.dry-run }}
