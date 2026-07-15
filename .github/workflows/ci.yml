@@ -37,7 +37,7 @@ jobs:
           sudo apt-get install -y bats
 
       - name: Check bash syntax
-        run: bash -n scripts/deploy-pr-info.sh scripts/trufflehog-pre-commit.sh scripts/lib/ecs-task-definitions.sh .github/actions/check-pr-lines/check-pr-lines.sh .github/actions/debride/debride-check .github/actions/auto-merge-low-risk/check-copilot-review-gate.sh bin/cleanup-ecs-families bin/db-migrate bin/ecs bin/fetch-commodities bin/ott-search-stat bin/rotate-revisions bin/rotate-task-definitions bin/run-task tests/test_helper.bash
+        run: bash -n scripts/deploy-pr-info.sh scripts/trufflehog-pre-commit.sh scripts/lib/ecs-task-definitions.sh .github/actions/check-pr-lines/check-pr-lines.sh .github/actions/debride/debride-check .github/actions/auto-merge-low-risk/check-copilot-review-gate.sh .github/actions/auto-merge-low-risk/request-copilot-review.sh bin/cleanup-ecs-families bin/db-migrate bin/ecs bin/fetch-commodities bin/ott-search-stat bin/rotate-revisions bin/rotate-task-definitions bin/run-task tests/test_helper.bash
 
       - name: Run regression tests
         run: bats tests
