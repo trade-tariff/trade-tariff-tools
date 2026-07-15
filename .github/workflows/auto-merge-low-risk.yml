@@ -27,8 +27,9 @@ permissions:
 jobs:
   auto-merge:
     if: >-
-      github.event_name != 'pull_request' ||
-      !github.event.pull_request.draft
+      (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
+      (github.event_name != 'pull_request_review' ||
+      contains(github.event.review.user.login, 'copilot'))
     runs-on: ubuntu-latest
     steps:
       - name: Resolve pull request number
