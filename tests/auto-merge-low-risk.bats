@@ -78,6 +78,17 @@ teardown() {
   assert_contains "$output" "::warning::Unable to request Copilot code review for PR #42; auto-merge will retry after a review is available."
 }
 
+@test "blocks auto-merge when Copilot cannot review because its quota is exhausted" {
+  export GH_REVIEW_REQUESTS_JSON='{"reviews":[{"author":{"login":"copilot-pull-request-reviewer"},"body":"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.","submittedAt":"2026-07-16T15:47:00Z"}]}'
+
+  run "$repo_root/.github/actions/auto-merge-low-risk/check-copilot-review-gate.sh" \
+    --repo trade-tariff/example \
+    --pr 42
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "Copilot could not review PR #42 because its review quota is exhausted; blocking auto-merge."
+}
+
 @test "reusable workflow only handles Copilot review events" {
   workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
 
