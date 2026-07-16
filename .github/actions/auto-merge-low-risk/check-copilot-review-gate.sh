@@ -71,12 +71,26 @@ COPILOT_REVIEW_JQ='[
       or .author.login == "github-copilot[bot]"
       or ((.author.login // "") | test("copilot"; "i"))
     )
-] | length'
+] as $reviews
+| [
+    ($reviews | length),
+    ($reviews
+      | sort_by(.submittedAt // "")
+      | last
+      | (.body // "")
+      | test("reached (their|the) (quota|budget) limit"; "i"))
+  ]
+| @tsv'
 
-copilot_review_count="$(gh pr view "$pr" \
+read -r copilot_review_count copilot_quota_exhausted <<< "$(gh pr view "$pr" \
   --repo "$repo" \
   --json reviews \
   -q "$COPILOT_REVIEW_JQ")"
+
+if [[ "$copilot_quota_exhausted" == "true" ]]; then
+  echo "::warning::Copilot could not review PR #$pr because its review quota is exhausted; blocking auto-merge." >&2
+  exit 1
+fi
 
 if [[ "${copilot_review_count:-0}" -lt 1 ]]; then
   echo "PR #$pr has not been reviewed by Copilot yet." >&2
