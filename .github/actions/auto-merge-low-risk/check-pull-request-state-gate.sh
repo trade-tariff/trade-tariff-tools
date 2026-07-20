@@ -97,7 +97,7 @@ blocking_checks="$(jq -c '
   def acceptable_conclusion:
     . == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL";
   [
-    .statusCheckRollup[]
+    (.statusCheckRollup // [])[]
     | select((.workflowName // "") != "Auto-merge low-risk PRs")
     | if .__typename == "StatusContext" then
         select(.state != "SUCCESS")
