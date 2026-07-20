@@ -87,7 +87,20 @@ teardown() {
   assert_contains "$output" "Requesting Copilot code review for PR #42"
   run grep -Fx -- "--add-reviewer" "$GH_CAPTURE_FILE"
   [ "$status" -eq 0 ]
-  run grep -Fx "copilot" "$GH_CAPTURE_FILE"
+  run grep -Fx "copilot-pull-request-reviewer" "$GH_CAPTURE_FILE"
+  [ "$status" -eq 0 ]
+}
+
+@test "does not treat an impostor account as an outstanding Copilot request" {
+  export GH_REVIEW_REQUESTS_JSON='{"reviewRequests":[{"__typename":"User","login":"helpful-copilot-reviewer"}]}'
+
+  run "$repo_root/.github/actions/auto-merge-low-risk/request-copilot-review.sh" \
+    --repo trade-tariff/example \
+    --pr 42
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Requesting Copilot code review for PR #42"
+  run grep -Fx "copilot-pull-request-reviewer" "$GH_CAPTURE_FILE"
   [ "$status" -eq 0 ]
 }
 
