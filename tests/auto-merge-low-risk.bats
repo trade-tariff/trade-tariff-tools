@@ -552,9 +552,12 @@ EOF
   [ "$status" -ne 0 ]
 }
 
-@test "reusable workflow can read exact-head workflow runs" {
+@test "reusable workflow does not require callers to grant actions read" {
   workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
 
   run grep -F "actions: read" "$workflow"
+  [ "$status" -eq 1 ]
+
+  run grep -F 'github-token: ${{ secrets.github-token }}' "$workflow"
   [ "$status" -eq 0 ]
 }
