@@ -75,7 +75,7 @@ COPILOT_REVIEW_JQ='. as $pr
     or . == "copilot-pull-request-reviewer[bot]"
     or . == "github-copilot[bot]";
 [
-  .reviews[]
+  .reviews[]?
   | select(.author.login | copilot_login)
   | select(.commit.oid == $pr.headRefOid)
 ] as $reviews

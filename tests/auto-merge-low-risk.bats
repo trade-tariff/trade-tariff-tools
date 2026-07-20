@@ -158,6 +158,18 @@ teardown() {
   assert_contains "$output" "PR #42 has not been reviewed by Copilot at its current head."
 }
 
+@test "treats a null review collection as not reviewed" {
+  export GH_REVIEW_REQUESTS_JSON='{"headRefOid":"current-head","reviews":null}'
+
+  run "$repo_root/.github/actions/auto-merge-low-risk/check-copilot-review-gate.sh" \
+    --repo trade-tariff/example \
+    --pr 42
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "PR #42 has not been reviewed by Copilot at its current head."
+  [[ "$output" != *"Cannot iterate over null"* ]]
+}
+
 @test "does not accept an impostor account as Copilot" {
   export GH_REVIEW_REQUESTS_JSON='{"headRefOid":"current-head","reviews":[{"author":{"login":"helpful-copilot-reviewer"},"commit":{"oid":"current-head"},"body":"","submittedAt":"2026-07-20T08:41:33Z"}]}'
 
@@ -386,6 +398,19 @@ teardown() {
     --workflow ci.yml
 
   [ "$status" -eq 0 ]
+}
+
+@test "treats a null check rollup as empty after exact-head CI succeeds" {
+  export GH_REVIEW_REQUESTS_JSON='{"isDraft":false,"headRefOid":"current-head","statusCheckRollup":null}'
+  export GH_RUNS_JSON='[{"headSha":"current-head","status":"completed","conclusion":"success","createdAt":"2026-07-20T08:43:10Z"}]'
+
+  run "$repo_root/.github/actions/auto-merge-low-risk/check-pull-request-state-gate.sh" \
+    --repo trade-tariff/example \
+    --pr 42 \
+    --workflow ci.yml
+
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Cannot iterate over null"* ]]
 }
 
 @test "reusable workflow wires the current pull request state gate" {
