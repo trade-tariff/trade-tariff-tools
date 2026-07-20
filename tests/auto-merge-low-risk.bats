@@ -470,3 +470,10 @@ EOF
   run grep -F "contains(github.event.review.user.login, 'copilot')" "$workflow"
   [ "$status" -ne 0 ]
 }
+
+@test "reusable workflow can read exact-head workflow runs" {
+  workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
+
+  run grep -F "actions: read" "$workflow"
+  [ "$status" -eq 0 ]
+}
