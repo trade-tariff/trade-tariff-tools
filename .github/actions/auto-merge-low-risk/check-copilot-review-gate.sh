@@ -4,17 +4,18 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: check-copilot-review-gate.sh --repo <owner/name> --pr <number>
+Usage: check-copilot-review-gate.sh --repo <owner/name> --pr <number> [--head <expected-oid>]
 
-Exits 0 when Copilot has submitted at least one PR review and every Copilot
-inline review thread is resolved.
-Exits 2 when Copilot has not reviewed yet.
+Exits 0 when Copilot has reviewed the current PR head and every Copilot inline
+review thread is resolved.
+Exits 2 when Copilot has not reviewed the current PR head yet.
 Exits 1 when Copilot review threads are still unresolved.
 EOF
 }
 
 repo=""
 pr=""
+expected_head=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,6 +25,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pr)
       pr="$2"
+      shift 2
+      ;;
+    --head)
+      expected_head="$2"
       shift 2
       ;;
     -h|--help)
@@ -63,14 +68,16 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 # Copilot code review author logins (see GitHub Copilot code review docs).
-COPILOT_REVIEW_JQ='[
+COPILOT_REVIEW_JQ='. as $pr
+| def copilot_login:
+    . == "copilot"
+    or . == "copilot-pull-request-reviewer"
+    or . == "copilot-pull-request-reviewer[bot]"
+    or . == "github-copilot[bot]";
+[
   .reviews[]
-  | select(
-      .author.login == "copilot"
-      or .author.login == "copilot-pull-request-reviewer"
-      or .author.login == "github-copilot[bot]"
-      or ((.author.login // "") | test("copilot"; "i"))
-    )
+  | select(.author.login | copilot_login)
+  | select(.commit.oid == $pr.headRefOid)
 ] as $reviews
 | [
     ($reviews | length),
@@ -82,10 +89,17 @@ COPILOT_REVIEW_JQ='[
   ]
 | @tsv'
 
-read -r copilot_review_count copilot_quota_exhausted <<< "$(gh pr view "$pr" \
+review_state="$(gh pr view "$pr" \
   --repo "$repo" \
-  --json reviews \
-  -q "$COPILOT_REVIEW_JQ")"
+  --json headRefOid,reviews)"
+current_head="$(jq -r '.headRefOid' <<< "$review_state")"
+
+if [[ -n "$expected_head" && "$current_head" != "$expected_head" ]]; then
+  echo "PR #$pr head changed from $expected_head to $current_head; blocking auto-merge." >&2
+  exit 1
+fi
+
+read -r copilot_review_count copilot_quota_exhausted <<< "$(jq -r "$COPILOT_REVIEW_JQ" <<< "$review_state")"
 
 if [[ "$copilot_quota_exhausted" == "true" ]]; then
   echo "::warning::Copilot could not review PR #$pr because its review quota is exhausted; blocking auto-merge. GitHub reports that the user who requested the review has reached their quota or budget limit." >&2
@@ -93,7 +107,7 @@ if [[ "$copilot_quota_exhausted" == "true" ]]; then
 fi
 
 if [[ "${copilot_review_count:-0}" -lt 1 ]]; then
-  echo "PR #$pr has not been reviewed by Copilot yet." >&2
+  echo "PR #$pr has not been reviewed by Copilot at its current head." >&2
   exit 2
 fi
 
@@ -127,8 +141,8 @@ while true; do
       -F pr="$pr" \
       -f cursor="$cursor" 2>&1)" || {
       if grep -qi "resource not accessible by personal access token" <<< "$response"; then
-        echo "::warning::Insufficient token permissions to check Copilot review threads. Skipping detailed review gate check. This allows workflow to continue." >&2
-        exit 0
+        echo "::error::Insufficient token permissions to check Copilot review threads; blocking auto-merge." >&2
+        exit 1
       fi
       echo "$response" >&2
       exit 1
@@ -157,8 +171,8 @@ while true; do
       -f repo="$name" \
       -F pr="$pr" 2>&1)" || {
       if grep -qi "resource not accessible by personal access token" <<< "$response"; then
-        echo "::warning::Insufficient token permissions to check Copilot review threads. Skipping detailed review gate check. This allows workflow to continue." >&2
-        exit 0
+        echo "::error::Insufficient token permissions to check Copilot review threads; blocking auto-merge." >&2
+        exit 1
       fi
       echo "$response" >&2
       exit 1
@@ -182,8 +196,8 @@ unresolved="$(jq -s '
   def copilot_login:
     . == "copilot"
     or . == "copilot-pull-request-reviewer"
-    or . == "github-copilot[bot]"
-    or ((. // "") | test("copilot"; "i"));
+    or . == "copilot-pull-request-reviewer[bot]"
+    or . == "github-copilot[bot]";
   [
     .[]
     | select(.isResolved == false)

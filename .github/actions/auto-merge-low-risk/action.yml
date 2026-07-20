@@ -1,8 +1,8 @@
 name: Auto-merge low-risk PR
 description: >-
-  Enable or disable GitHub auto-merge for low-risk PRs. Requests Copilot review
-  when needed, then enables auto-merge once Copilot has reviewed and all Copilot
-  threads are resolved.
+  Merge low-risk PRs after the current head is reviewed, all Copilot threads
+  are resolved, and the current pull request checks are green. Disable any
+  legacy auto-merge request before evaluating fresh gates.
 
 inputs:
   pr-number:
@@ -19,6 +19,10 @@ inputs:
     description: 'merge, squash, or rebase.'
     required: false
     default: merge
+  required-workflow:
+    description: Workflow file that must succeed for the current pull request head.
+    required: false
+    default: ci.yml
   pull-request-event-action:
     description: >-
       github.event.action from the caller workflow (e.g. labeled, unlabeled).
@@ -41,100 +45,18 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         AUTO_MERGE_LABEL: ${{ inputs.label }}
         AUTO_MERGE_METHOD: ${{ inputs.merge-method }}
+        REQUIRED_WORKFLOW: ${{ inputs.required-workflow }}
         PR_EVENT_ACTION: ${{ inputs.pull-request-event-action }}
         PR_EVENT_LABEL: ${{ inputs.pull-request-event-label }}
       run: |
         set -euo pipefail
-
-        repo="${{ github.repository }}"
-
-        disable_auto_merge() {
-          auto_merge_enabled=$(
-            gh pr view "$PR_NUMBER" \
-              --repo "$repo" \
-              --json autoMergeRequest \
-              -q '.autoMergeRequest != null'
-          )
-
-          if [[ "$auto_merge_enabled" == "true" ]]; then
-            echo "Disabling auto-merge for PR #$PR_NUMBER"
-            gh pr merge "$PR_NUMBER" \
-              --repo "$repo" \
-              "--${AUTO_MERGE_METHOD}" \
-              --disable-auto
-          else
-            echo "Auto-merge is not enabled for PR #$PR_NUMBER; nothing to disable."
-          fi
-        }
-
-        # Label removed — turn off auto-merge.
-        if [[ "$PR_EVENT_ACTION" == "unlabeled" && "$PR_EVENT_LABEL" == "$AUTO_MERGE_LABEL" ]]; then
-          disable_auto_merge
-          exit 0
-        fi
-
-        gate_script="${{ github.action_path }}/check-copilot-review-gate.sh"
-        request_script="${{ github.action_path }}/request-copilot-review.sh"
-        for helper in "$gate_script" "$request_script"; do
-          if [[ ! -f "$helper" ]]; then
-            echo "::error::Missing ${helper}" >&2
-            exit 1
-          fi
-          chmod +x "$helper"
-        done
-
-        case "$AUTO_MERGE_METHOD" in
-          merge|squash|rebase) ;;
-          *)
-            echo "::error::Invalid merge-method: $AUTO_MERGE_METHOD (expected merge, squash, or rebase)" >&2
-            exit 1
-            ;;
-        esac
-
-        labels="$(gh pr view "$PR_NUMBER" \
-          --repo "$repo" \
-          --json labels \
-          -q '.labels[].name')"
-
-        if ! grep -qx "$AUTO_MERGE_LABEL" <<< "$labels"; then
-          echo "PR #$PR_NUMBER does not have the ${AUTO_MERGE_LABEL} label; skipping."
-          exit 0
-        fi
-
-        set +e
-        "$gate_script" --repo "$repo" --pr "$PR_NUMBER"
-        gate_status=$?
-        set -e
-
-        if [[ "$gate_status" -eq 2 ]]; then
-          "$request_script" --repo "$repo" --pr "$PR_NUMBER"
-          echo "Waiting for Copilot to review PR #$PR_NUMBER; auto-merge will be retried on the next workflow run."
-          exit 0
-        fi
-
-        if [[ "$gate_status" -ne 0 ]]; then
-          echo "Copilot review requirements not met for PR #$PR_NUMBER; skipping auto-merge."
-          exit 0
-        fi
-
-        gh pr review "$PR_NUMBER" \
-          --repo "$repo" \
-          --approve
-
-        auto_merge_enabled=$(
-          gh pr view "$PR_NUMBER" \
-            --repo "$repo" \
-            --json autoMergeRequest \
-            -q '.autoMergeRequest != null'
-        )
-
-        if [[ "$auto_merge_enabled" == "true" ]]; then
-          echo "Auto-merge already enabled for PR #$PR_NUMBER."
-          exit 0
-        fi
-
-        echo "Enabling auto-merge (${AUTO_MERGE_METHOD}) for PR #$PR_NUMBER"
-        gh pr merge "$PR_NUMBER" \
-          --repo "$repo" \
-          "--${AUTO_MERGE_METHOD}" \
-          --auto
+        orchestrator="${{ github.action_path }}/auto-merge.sh"
+        chmod +x "$orchestrator"
+        "$orchestrator" \
+          --repo "${{ github.repository }}" \
+          --pr "$PR_NUMBER" \
+          --label "$AUTO_MERGE_LABEL" \
+          --merge-method "$AUTO_MERGE_METHOD" \
+          --required-workflow "$REQUIRED_WORKFLOW" \
+          --event-action "$PR_EVENT_ACTION" \
+          --event-label "$PR_EVENT_LABEL"

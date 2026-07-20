@@ -14,6 +14,11 @@ on:
         type: string
         required: false
         default: merge
+      required-workflow:
+        description: Workflow file that must succeed for the current pull request head.
+        type: string
+        required: false
+        default: ci.yml
 
     secrets:
       github-token:
@@ -29,7 +34,10 @@ jobs:
     if: >-
       (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
       (github.event_name != 'pull_request_review' ||
-      contains(github.event.review.user.login, 'copilot'))
+      github.event.review.user.login == 'copilot' ||
+      github.event.review.user.login == 'copilot-pull-request-reviewer' ||
+      github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' ||
+      github.event.review.user.login == 'github-copilot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Resolve pull request number
@@ -73,6 +81,7 @@ jobs:
           pr-number: ${{ steps.pr.outputs.number }}
           label: ${{ inputs.label }}
           merge-method: ${{ inputs.merge-method }}
+          required-workflow: ${{ inputs.required-workflow }}
           github-token: ${{ secrets.github-token }}
           pull-request-event-action: ${{ github.event.action }}
           pull-request-event-label: ${{ github.event.label.name }}
