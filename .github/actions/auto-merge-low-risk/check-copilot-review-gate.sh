@@ -88,7 +88,7 @@ read -r copilot_review_count copilot_quota_exhausted <<< "$(gh pr view "$pr" \
   -q "$COPILOT_REVIEW_JQ")"
 
 if [[ "$copilot_quota_exhausted" == "true" ]]; then
-  echo "::warning::Copilot could not review PR #$pr because its review quota is exhausted; blocking auto-merge." >&2
+  echo "::warning::Copilot could not review PR #$pr because its review quota is exhausted; blocking auto-merge. GitHub reports that the user who requested the review has reached their quota or budget limit." >&2
   exit 1
 fi
 

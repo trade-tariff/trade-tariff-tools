@@ -87,6 +87,7 @@ teardown() {
 
   [ "$status" -eq 1 ]
   assert_contains "$output" "Copilot could not review PR #42 because its review quota is exhausted; blocking auto-merge."
+  assert_contains "$output" "GitHub reports that the user who requested the review has reached their quota or budget limit."
 }
 
 @test "reusable workflow only handles Copilot review events" {
