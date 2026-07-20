@@ -42,7 +42,15 @@ fi
 pending="$(gh pr view "$pr" \
   --repo "$repo" \
   --json reviewRequests \
-  -q '[.reviewRequests[]? | select((.login // "") | test("copilot"; "i"))] | length')"
+  -q '[
+    .reviewRequests[]?
+    | select(
+        .login == "copilot"
+        or .login == "copilot-pull-request-reviewer"
+        or .login == "copilot-pull-request-reviewer[bot]"
+        or .login == "github-copilot[bot]"
+      )
+  ] | length')"
 
 if [[ "${pending:-0}" -gt 0 ]]; then
   echo "Copilot review already requested on PR #$pr."
@@ -50,6 +58,6 @@ if [[ "${pending:-0}" -gt 0 ]]; then
 fi
 
 echo "Requesting Copilot code review for PR #$pr"
-if ! gh pr edit "$pr" --repo "$repo" --add-reviewer copilot; then
+if ! gh pr edit "$pr" --repo "$repo" --add-reviewer copilot-pull-request-reviewer; then
   echo "::warning::Unable to request Copilot code review for PR #$pr; auto-merge will retry after a review is available."
 fi
