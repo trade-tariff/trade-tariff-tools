@@ -127,6 +127,13 @@ teardown() {
   assert_contains "$output" "GitHub reports that the user who requested the review has reached their quota or budget limit."
 }
 
+@test "Copilot gate help describes every exit-one condition as blocking" {
+  run "$repo_root/.github/actions/auto-merge-low-risk/check-copilot-review-gate.sh" --help
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Exits 1 when a Copilot review requirement blocks auto-merge."
+}
+
 @test "requires Copilot to review the current pull request head" {
   export GH_REVIEW_REQUESTS_JSON='{"headRefOid":"current-head","reviews":[{"author":{"login":"copilot-pull-request-reviewer"},"commit":{"oid":"previous-head"},"body":"","submittedAt":"2026-07-20T08:41:33Z"}]}'
 
