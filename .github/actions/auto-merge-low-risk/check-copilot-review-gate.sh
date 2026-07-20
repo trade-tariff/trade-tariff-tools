@@ -9,7 +9,7 @@ Usage: check-copilot-review-gate.sh --repo <owner/name> --pr <number> [--head <e
 Exits 0 when Copilot has reviewed the current PR head and every Copilot inline
 review thread is resolved.
 Exits 2 when Copilot has not reviewed the current PR head yet.
-Exits 1 when Copilot review threads are still unresolved.
+Exits 1 when a Copilot review requirement blocks auto-merge.
 EOF
 }
 
