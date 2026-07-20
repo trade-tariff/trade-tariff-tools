@@ -174,6 +174,26 @@ teardown() {
   assert_contains "$output" "PR #42 has not been reviewed by Copilot at its current head."
 }
 
+@test "disable helper documents its accepted merge methods" {
+  run "$repo_root/.github/actions/auto-merge-low-risk/disable-auto-merge.sh" --help
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "--merge-method <merge|squash|rebase>"
+}
+
+@test "disable helper rejects an invalid merge method before calling GitHub" {
+  export GH_REVIEW_REQUESTS_JSON='{"autoMergeRequest":{"enabledAt":"2026-07-20T08:40:00Z"}}'
+
+  run "$repo_root/.github/actions/auto-merge-low-risk/disable-auto-merge.sh" \
+    --repo trade-tariff/example \
+    --pr 42 \
+    --merge-method invalid
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Invalid merge method: invalid"
+  [ ! -e "$GH_MERGE_CAPTURE_FILE" ]
+}
+
 @test "Copilot gate rejects a pull request head change during evaluation" {
   export GH_REVIEW_REQUESTS_JSON='{"headRefOid":"new-head","reviews":[{"author":{"login":"copilot-pull-request-reviewer"},"commit":{"oid":"new-head"},"body":"","submittedAt":"2026-07-20T08:45:35Z"}]}'
 

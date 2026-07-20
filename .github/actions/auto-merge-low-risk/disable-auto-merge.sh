@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: disable-auto-merge.sh --repo <owner/name> --pr <number> --merge-method <method>
+Usage: disable-auto-merge.sh --repo <owner/name> --pr <number> --merge-method <merge|squash|rebase>
 EOF
 }
 
@@ -43,6 +43,14 @@ if [[ -z "$repo" || -z "$pr" || -z "$merge_method" ]]; then
   usage >&2
   exit 2
 fi
+
+case "$merge_method" in
+  merge|squash|rebase) ;;
+  *)
+    echo "Invalid merge method: $merge_method (expected merge, squash, or rebase)." >&2
+    exit 2
+    ;;
+esac
 
 auto_merge_enabled="$(gh pr view "$pr" \
   --repo "$repo" \
