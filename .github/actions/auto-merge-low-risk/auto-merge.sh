@@ -69,7 +69,7 @@ if [[ "$event_action" == "unlabeled" && "$event_label" == "$label" ]]; then
 fi
 
 labels="$(gh pr view "$pr" --repo "$repo" --json labels -q '.labels[].name')"
-if ! grep -qx "$label" <<< "$labels"; then
+if ! grep -Fqx "$label" <<< "$labels"; then
   echo "PR #$pr does not have the ${label} label; skipping."
   exit 0
 fi

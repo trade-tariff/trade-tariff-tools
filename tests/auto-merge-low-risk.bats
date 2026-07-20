@@ -418,6 +418,22 @@ run_orchestration() {
     --required-workflow ci.yml
 }
 
+@test "orchestration treats the enabling label as a literal string" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"lowXrisk"}],"headRefOid":"expected-head"}'
+
+  run "$harness/auto-merge.sh" \
+    --repo trade-tariff/example \
+    --pr 42 \
+    --label 'low.risk' \
+    --merge-method squash \
+    --required-workflow ci.yml
+
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
+  assert_contains "$output" "does not have the low.risk label; skipping."
+}
+
 @test "orchestration disarms first and never approves or merges without a current-head review" {
   make_orchestration_harness
   export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
