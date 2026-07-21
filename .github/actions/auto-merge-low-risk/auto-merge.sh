@@ -82,7 +82,14 @@ gate_status=$?
 set -e
 
 if [[ "$gate_status" -eq 2 ]]; then
+  set +e
   "$request_script" --repo "$repo" --pr "$pr"
+  request_status=$?
+  set -e
+  if [[ "$request_status" -ne 0 ]]; then
+    echo "::warning::Unable to request Copilot review for PR #$pr (exit $request_status); Copilot may not be enabled for this repository. Skipping auto-merge."
+    exit 0
+  fi
   echo "Waiting for Copilot to review PR #$pr; auto-merge will be retried on the next workflow run."
   exit 0
 fi
