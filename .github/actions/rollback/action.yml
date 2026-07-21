@@ -1,0 +1,51 @@
+name: 'Rollback ECS deployment'
+description: 'Rolls back an ECS deployment by re-applying Terraform with the previous Docker image tag.'
+
+env:
+  TF_INPUT: 0
+  TF_IN_AUTOMATION: 1
+  TERRAFORM_VERSION: 1.12
+
+inputs:
+  environment:
+    required: true
+    description: 'The environment to roll back.'
+  previous-ref:
+    required: true
+    description: 'The Docker image tag to roll back to.'
+  role-to-assume:
+    description: 'The IAM role ARN to assume for AWS operations.'
+    required: true
+  region:
+    required: false
+    default: 'eu-west-2'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.region }}
+    - uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+    - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
+      shell: bash
+    - name: Roll back to previous image tag
+      run: |
+        echo "::notice::Rolling back ${{ inputs.environment }} to ${{ inputs.previous-ref }}"
+        cd terraform && terraform apply \
+          -var-file=config_${{ inputs.environment }}.tfvars \
+          -auto-approve \
+          -lock-timeout=10m
+      shell: bash
+      env:
+        TF_VAR_docker_tag: ${{ inputs.previous-ref }}
+    - name: Log rollback to step summary
+      if: always()
+      shell: bash
+      run: |
+        echo "## Rollback" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Environment:** ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Rolled back to:** \`${{ inputs.previous-ref }}\`" >> "$GITHUB_STEP_SUMMARY"
