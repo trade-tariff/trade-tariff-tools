@@ -64,5 +64,5 @@ if [[ "$auto_merge_enabled" == "true" ]]; then
     "--${merge_method}" \
     --disable-auto
 else
-  echo "Auto-merge is not enabled for PR #$pr; nothing to disable."
+  echo "No GitHub auto-merge request is running for PR #$pr; nothing to disable."
 fi

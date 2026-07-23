@@ -199,6 +199,18 @@ teardown() {
   assert_contains "$output" "PR #42 has not been reviewed by Copilot at its current head."
 }
 
+@test "describes an absent auto-merge request as not running" {
+  export GH_REVIEW_REQUESTS_JSON='{"autoMergeRequest":null}'
+
+  run "$repo_root/.github/actions/auto-merge-low-risk/disable-auto-merge.sh" \
+    --repo trade-tariff/example \
+    --pr 42 \
+    --merge-method rebase
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "No GitHub auto-merge request is running for PR #42; nothing to disable."
+}
+
 @test "disable helper documents its accepted merge methods" {
   run "$repo_root/.github/actions/auto-merge-low-risk/disable-auto-merge.sh" --help
 
