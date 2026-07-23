@@ -335,14 +335,20 @@ jobs:
         run: .trade-tariff-tools/scripts/deploy-pr-info.sh
 
       - id: notify-message
+        env:
+          BASE: ${{ steps.pr-info.outputs.message || format('Deploy to {0} {1}', inputs.environment, steps.result.outputs.result) }}
+          ROLLBACK: ${{ steps.result.outputs.rollback_message }}
         run: |
-          BASE="${{ steps.pr-info.outputs.message || format('Deploy to {0} {1}', inputs.environment, steps.result.outputs.result) }}"
-          ROLLBACK="${{ steps.result.outputs.rollback_message }}"
+          message="$BASE"
           if [[ -n "$ROLLBACK" ]]; then
-            echo "message=${BASE} — ${ROLLBACK}" >> "$GITHUB_OUTPUT"
-          else
-            echo "message=${BASE}" >> "$GITHUB_OUTPUT"
+            message="${message} — ${ROLLBACK}"
           fi
+
+          {
+            echo 'message<<NOTIFY_EOF'
+            printf '%s\n' "$message"
+            echo 'NOTIFY_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:

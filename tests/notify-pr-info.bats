@@ -276,3 +276,22 @@ STUB
   run grep -F "steps.pr-info.outputs.message ||" "$workflow"
   [ "$status" -eq 0 ]
 }
+
+@test "deploy-ecs preserves multiline notification messages in step output" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F "BASE: \${{ steps.pr-info.outputs.message ||" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "ROLLBACK: \${{ steps.result.outputs.rollback_message }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "echo 'message<<NOTIFY_EOF'" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "printf '%s\\n' \"\$message\"" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "echo 'NOTIFY_EOF'" "$workflow"
+  [ "$status" -eq 0 ]
+}
