@@ -72,7 +72,7 @@ jobs:
 
       - run: yarn install
 
-      - run: yarn playwright install --with-deps chromium
+      - run: yarn playwright install --with-deps --only-shell chromium
 
       - run: |
           {
