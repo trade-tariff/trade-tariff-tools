@@ -25,7 +25,7 @@ runs:
       with:
         token: ${{ inputs.github-token }}
 
-    - uses: ruby/setup-ruby@v1.316.0
+    - uses: ruby/setup-ruby@v1.321.0
       with:
         bundler-cache: ${{ inputs.bundler-cache }}
 
