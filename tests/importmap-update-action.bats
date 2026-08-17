@@ -15,7 +15,7 @@ load test_helper
 @test "importmap-update action sets up Ruby before running the updater" {
   action="$repo_root/.github/actions/importmap-update/action.yml"
 
-  run grep -F "uses: ruby/setup-ruby@v1.316.0" "$action"
+  run grep -F "uses: ruby/setup-ruby@v1.321.0" "$action"
   [ "$status" -eq 0 ]
 
   run grep -F 'bundler-cache: ${{ inputs.bundler-cache }}' "$action"
