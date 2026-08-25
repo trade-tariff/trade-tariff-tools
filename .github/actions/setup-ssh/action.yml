@@ -12,5 +12,12 @@ runs:
         echo "${{ inputs.ssh-key }}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+        ssh-keyscan -H -p 443 ssh.github.com >> ~/.ssh/known_hosts
+        cat >> ~/.ssh/config <<'EOF'
+        Host github.com
+          Hostname ssh.github.com
+          Port 443
+          User git
+        EOF
         git config --global url."git@github.com:".insteadOf "https://github.com/"
       shell: bash
