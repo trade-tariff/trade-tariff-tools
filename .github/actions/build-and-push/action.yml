@@ -79,13 +79,28 @@ runs:
         echo BUILD_ARGS="$build_args" >> "$GITHUB_OUTPUT"
       shell: bash
 
-    - name: Build and push image
+    - name: Build image
       if: steps.check-image.outputs.exists == 'false'
+      id: build-image
       run: |
         REF=${{ inputs.ref }}
         IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
 
         echo "$REF" > REVISION
         docker build --provenance=false -t "$IMAGE_NAME" . ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
-        docker push "$IMAGE_NAME"
+        echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Scan image for vulnerabilities
+      if: steps.check-image.outputs.exists == 'false'
+      uses: aquasecurity/trivy-action@v0.36.0
+      with:
+        image-ref: ${{ steps.build-image.outputs.image_name }}
+        severity: 'CRITICAL,HIGH'
+        ignore-unfixed: true
+        exit-code: '1'
+
+    - name: Push image
+      if: steps.check-image.outputs.exists == 'false'
+      run: docker push "${{ steps.build-image.outputs.image_name }}"
       shell: bash
