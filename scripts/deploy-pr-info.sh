@@ -6,7 +6,7 @@ set -o nounset
 set -o pipefail
 set -o noclobber
 
-fallback="Deploy to ${ENVIRONMENT} ${RESULT}"
+fallback="${SUMMARY:-Deploy to ${ENVIRONMENT} ${RESULT}}"
 
 append_message_output() {
   local message="$1"
