@@ -272,6 +272,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - configure
+      - build
       - deploy
       - e2e-test-tariff
       - e2e-test-fpo
@@ -299,24 +300,22 @@ jobs:
           path: .trade-tariff-tools
           ssh-key: ${{ secrets.ssh-key }}
       - id: result
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          FPO_TEST_RESULT: ${{ needs.e2e-test-fpo.result }}
+          PREVIOUS_DOCKER_TAG: ${{ needs.configure.outputs.previous_docker_tag }}
+          ROLLBACK_RESULT: ${{ needs.rollback.result }}
+          TARIFF_TEST_RESULT: ${{ needs.e2e-test-tariff.result }}
+          TEST_FLAVOUR: ${{ inputs.test-flavour }}
         run: |
-          TEST_FLAVOUR="${{ inputs.test-flavour }}"
-
-          if [[ "$TEST_FLAVOUR" == "tariff" ]]; then
-            E2E_RESULT="${{ needs.e2e-test-tariff.result }}"
-          elif [[ "$TEST_FLAVOUR" == "fpo" ]]; then
-            E2E_RESULT="${{ needs.e2e-test-fpo.result }}"
-          else
-            E2E_RESULT="${{ needs.deploy.result }}"
-          fi
-
-          ROLLBACK_RESULT="${{ needs.rollback.result }}"
-          echo "result=${E2E_RESULT}" >> "$GITHUB_OUTPUT"
+          .trade-tariff-tools/scripts/deploy-result.sh
 
           if [[ "$ROLLBACK_RESULT" == "success" ]]; then
-            echo "rollback_message=Rolled back to \`${{ needs.configure.outputs.previous_docker_tag }}\`" >> "$GITHUB_OUTPUT"
+            echo "rollback_message=Rolled back to \`${PREVIOUS_DOCKER_TAG}\`" >> "$GITHUB_OUTPUT"
           elif [[ "$ROLLBACK_RESULT" == "failure" ]]; then
-            echo "rollback_message=Rollback to \`${{ needs.configure.outputs.previous_docker_tag }}\` FAILED — manual intervention required" >> "$GITHUB_OUTPUT"
+            echo "rollback_message=Rollback to \`${PREVIOUS_DOCKER_TAG}\` FAILED — manual intervention required" >> "$GITHUB_OUTPUT"
           else
             echo "rollback_message=" >> "$GITHUB_OUTPUT"
           fi
@@ -332,11 +331,12 @@ jobs:
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.merge_commit_sha || github.event.pull_request.head.sha || github.sha }}
           ENVIRONMENT: ${{ inputs.environment }}
           RESULT: ${{ steps.result.outputs.result }}
+          SUMMARY: ${{ steps.result.outputs.summary }}
         run: .trade-tariff-tools/scripts/deploy-pr-info.sh
 
       - id: notify-message
         env:
-          BASE: ${{ steps.pr-info.outputs.message || format('Deploy to {0} {1}', inputs.environment, steps.result.outputs.result) }}
+          BASE: ${{ steps.pr-info.outputs.message || steps.result.outputs.summary }}
           ROLLBACK: ${{ steps.result.outputs.rollback_message }}
         run: |
           message="$BASE"

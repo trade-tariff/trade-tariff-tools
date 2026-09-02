@@ -31,6 +31,7 @@ run_script() {
     TRIGGER_SHA="${TRIGGER_SHA:-}" \
     ENVIRONMENT="production" \
     RESULT="success" \
+    SUMMARY="${SUMMARY:-}" \
     GITHUB_OUTPUT="$GITHUB_OUTPUT" \
     "$repo_root/scripts/deploy-pr-info.sh"
 }
@@ -43,6 +44,16 @@ run_script() {
   [ "$status" -eq 0 ]
   output_content="$(cat "$GITHUB_OUTPUT")"
   assert_contains "$output_content" "Deploy to production success"
+}
+
+@test "uses the supplied deployment summary" {
+  make_gh_stub ""
+
+  SUMMARY="Deploy to staging failed during build" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  assert_contains "$output_content" "Deploy to staging failed during build"
 }
 
 @test "uses an explicit pull request number when the triggering event provides one" {
@@ -234,6 +245,19 @@ STUB
   workflow="$repo_root/.github/workflows/deploy-ecs.yml"
 
   run grep -F "run: .trade-tariff-tools/scripts/deploy-pr-info.sh" "$workflow"
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy-ecs derives notification results with the shared script" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F "BUILD_RESULT: \${{ needs.build.result }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F ".trade-tariff-tools/scripts/deploy-result.sh" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "SUMMARY: \${{ steps.result.outputs.summary }}" "$workflow"
   [ "$status" -eq 0 ]
 }
 
