@@ -23,6 +23,9 @@ on:
       admin_bypass_password:
         description: 'Password for admin bypass'
         required: false
+      waf_bypass_token:
+        description: 'Token sent as X-WAF-Bypass to skip WAF rate limiting (see terraform TF_VAR_WAF_E2E_SECRET_TOKEN)'
+        required: false
 
 jobs:
   test:
@@ -68,5 +71,6 @@ jobs:
         env:
           ADMIN_BYPASS_PASSWORD: ${{ secrets.admin_bypass_password }}
           NON_ADMIN_BYPASS_PASSWORD: ${{ secrets.non_admin_bypass_password }}
+          WAF_BYPASS_TOKEN: ${{ secrets.waf_bypass_token }}
           CI: true
           PLAYWRIGHT_ENV: ${{ inputs.test-environment }}
