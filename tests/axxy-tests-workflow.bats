@@ -29,6 +29,7 @@ load test_helper
     abort "Failed test diagnostics must be uploaded" unless upload
     abort "Diagnostics must survive test failure" unless upload["if"] == "failure()"
     abort "Artifact action must use an immutable commit" unless upload.fetch("uses").match?(/@[0-9a-f]{40}\z/)
+    abort "Diagnostics must expire after seven days" unless upload.fetch("with")["retention-days"] == 7
 
     paths = upload.fetch("with").fetch("path").lines.map(&:strip)
     abort "Only reports and test diagnostics should be retained" unless paths == [
