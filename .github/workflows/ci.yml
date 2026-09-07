@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/ci.yml'
+      - '.github/workflows/axxy-tests.yml'
       - '.github/workflows/close-stale-pull-requests-reusable.yml'
       - '.github/workflows/deploy-ecs.yml'
       - '.github/workflows/deploy-multi-ecs.yml'
