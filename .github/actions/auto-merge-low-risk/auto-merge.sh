@@ -38,6 +38,15 @@ if [[ -z "$repo" || -z "$pr" || -z "$label" || -z "$merge_method" || -z "$requir
   exit 2
 fi
 
+# Dependabot-triggered runs cannot access repository secrets, so the caller
+# workflow resolves an empty github-token in that case. Every later gh call
+# would fail outright rather than reporting a review-gate result, so skip
+# gracefully here instead of erroring the whole job.
+if [[ -z "${GITHUB_TOKEN:-}" && -z "${GH_TOKEN:-}" ]]; then
+  echo "::warning::No GitHub token available for PR #$pr (commonly happens on Dependabot-triggered runs); skipping auto-merge."
+  exit 0
+fi
+
 case "$merge_method" in
   merge|squash|rebase) ;;
   *)
