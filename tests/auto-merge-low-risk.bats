@@ -472,6 +472,7 @@ set -euo pipefail
 name="$(basename "$0" .sh)"
 printf '%s %s\n' "$name" "$*" >> "$ORCHESTRATION_LOG"
 case "$name" in
+  disable-auto-merge) exit "${DISABLE_STATUS:-0}" ;;
   check-copilot-review-gate) exit "${COPILOT_GATE_STATUS:-0}" ;;
   check-pull-request-state-gate) exit "${STATE_GATE_STATUS:-0}" ;;
 esac
@@ -514,6 +515,17 @@ run_orchestration() {
   [ "$status" -eq 0 ]
   assert_contains "$output" "::warning::No GitHub token available for PR #42"
   [ ! -s "$ORCHESTRATION_LOG" ]
+}
+
+@test "orchestration skips instead of failing when disabling an existing auto-merge errors" {
+  make_orchestration_harness
+  export DISABLE_STATUS=1
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "::warning::Unable to disable any existing auto-merge request for PR #42"
+  [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
 }
 
 @test "orchestration disarms first and never approves or merges without a current-head review" {
