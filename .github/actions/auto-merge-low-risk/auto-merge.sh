@@ -70,7 +70,15 @@ for helper in "$approval_script" "$disable_script" "$gate_script" "$state_gate_s
   chmod +x "$helper"
 done
 
+set +e
 "$disable_script" --repo "$repo" --pr "$pr" --merge-method "$merge_method"
+disable_status=$?
+set -e
+
+if [[ "$disable_status" -ne 0 ]]; then
+  echo "::warning::Unable to disable any existing auto-merge request for PR #$pr (exit $disable_status); skipping auto-merge."
+  exit 0
+fi
 
 # Label removal only needs to disarm any legacy auto-merge request.
 if [[ "$event_action" == "unlabeled" && "$event_label" == "$label" ]]; then
