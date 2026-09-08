@@ -463,6 +463,7 @@ make_orchestration_harness() {
   cp "$repo_root/.github/actions/auto-merge-low-risk/auto-merge.sh" "$harness/auto-merge.sh"
   chmod +x "$harness/auto-merge.sh"
   export ORCHESTRATION_LOG="$tmpdir/orchestration.log"
+  export GITHUB_TOKEN="test-token"
 
   for helper in disable-auto-merge check-copilot-review-gate check-pull-request-state-gate request-copilot-review approve-pull-request; do
     cat > "$harness/$helper.sh" <<'STUB'
@@ -502,6 +503,17 @@ run_orchestration() {
   [ "$status" -eq 0 ]
   [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
   assert_contains "$output" "does not have the low.risk label; skipping."
+}
+
+@test "orchestration skips without touching gh when no GitHub token is available" {
+  make_orchestration_harness
+  unset GITHUB_TOKEN GH_TOKEN 2>/dev/null || true
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "::warning::No GitHub token available for PR #42"
+  [ ! -s "$ORCHESTRATION_LOG" ]
 }
 
 @test "orchestration disarms first and never approves or merges without a current-head review" {
