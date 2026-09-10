@@ -594,3 +594,55 @@ EOF
   run grep -F "actions: read" "$workflow"
   [ "$status" -eq 0 ]
 }
+
+@test "reusable workflow mints a trade-tariff-pr-bot token scoped to the caller repo" {
+  workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
+
+  run grep -F 'uses: actions/create-github-app-token@v' "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "app-id: \${{ secrets['pr-bot-app-id'] }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "private-key: \${{ secrets['pr-bot-app-private-key'] }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  # No `repositories:` input, so the installation token is scoped to the
+  # caller repository only.
+  run grep -E '^ +repositories:' "$workflow"
+  [ "$status" -ne 0 ]
+
+  for permission in \
+    'permission-actions: read' \
+    'permission-checks: read' \
+    'permission-contents: write' \
+    'permission-pull-requests: write'; do
+    run grep -F "$permission" "$workflow"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "reusable workflow prefers the App token and keeps the legacy PAT optional" {
+  workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
+
+  run grep -F "github-token: \${{ steps.app-token.outputs.token || secrets['github-token'] }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  # Every declared secret is optional so callers can migrate one at a time.
+  run grep -F 'required: true' "$workflow"
+  [ "$status" -ne 0 ]
+}
+
+@test "reusable workflow gates on secret presence without exposing secret values" {
+  workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
+
+  run grep -F "PR_BOT_APP_CONFIGURED: >-" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "if: env.PR_BOT_APP_CONFIGURED == 'true'" "$workflow"
+  [ "$status" -eq 0 ]
+
+  # Presence booleans only: no env may be assigned a bare secret value.
+  run grep -E "^ +[A-Z_]+: \\\$\{\{ secrets\[[^]]+\] \}\}$" "$workflow"
+  [ "$status" -ne 0 ]
+}

@@ -21,9 +21,22 @@ on:
         default: ci.yml
 
     secrets:
+      pr-bot-app-id:
+        description: >-
+          trade-tariff-pr-bot GitHub App ID, from the org-level
+          TRADE_TARIFF_PR_BOT_GITHUB_APP_ID secret.
+        required: false
+      pr-bot-app-private-key:
+        description: >-
+          trade-tariff-pr-bot GitHub App private key, from the org-level
+          TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY secret.
+        required: false
       github-token:
-        description: Token used to call the GitHub API.
-        required: true
+        description: >-
+          Deprecated. Long-lived PAT used to call the GitHub API. Pass the
+          pr-bot-app-* secrets instead; this input is removed once every
+          caller has migrated.
+        required: false
 
 permissions:
   actions: read
@@ -40,7 +53,36 @@ jobs:
       github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' ||
       github.event.review.user.login == 'github-copilot[bot]')
     runs-on: ubuntu-latest
+    env:
+      # Presence booleans only. Never put a secret value in a job-level env,
+      # and note secrets are unavailable to step-level `if:` directly.
+      PR_BOT_APP_CONFIGURED: >-
+        ${{ secrets['pr-bot-app-id'] != ''
+        && secrets['pr-bot-app-private-key'] != '' }}
+      LEGACY_TOKEN_CONFIGURED: ${{ secrets['github-token'] != '' }}
     steps:
+      - name: Fail fast when no credentials were passed
+        if: >-
+          env.PR_BOT_APP_CONFIGURED != 'true'
+          && env.LEGACY_TOKEN_CONFIGURED != 'true'
+        run: |
+          echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-id and pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_APP_* secrets."
+          exit 1
+
+      # Mints a short-lived installation token scoped to the caller repository
+      # only. The action masks the token and revokes it when the job ends.
+      - name: Mint trade-tariff-pr-bot token
+        id: app-token
+        if: env.PR_BOT_APP_CONFIGURED == 'true'
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          app-id: ${{ secrets['pr-bot-app-id'] }}
+          private-key: ${{ secrets['pr-bot-app-private-key'] }}
+          permission-actions: read
+          permission-checks: read
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Resolve pull request number
         id: pr
         env:
@@ -84,6 +126,6 @@ jobs:
           label: ${{ inputs.label }}
           merge-method: ${{ inputs.merge-method }}
           required-workflow: ${{ inputs.required-workflow }}
-          github-token: ${{ secrets.github-token }}
+          github-token: ${{ steps.app-token.outputs.token || secrets['github-token'] }}
           pull-request-event-action: ${{ github.event.action }}
           pull-request-event-label: ${{ github.event.label.name }}
