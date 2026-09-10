@@ -72,7 +72,34 @@ jobs:
 
       - run: yarn install
 
-      - run: yarn playwright install --with-deps --only-shell chromium
+      # Skip `--with-deps` on the normal path: it runs `apt-get update` across
+      # every APT source on the runner, incl. the pre-installed dl.google.com
+      # repo this suite doesn't use, whose flaky mirror has failed scheduled
+      # runs on "Hash Sum mismatch". ubuntu-24.04 already ships Chromium's libs.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright browser (Chromium shell)
+        id: browser
+        continue-on-error: true
+        run: |
+          for attempt in 1 2 3; do
+            yarn playwright install --only-shell chromium && exit 0
+            echo "Attempt $attempt failed; retrying in 30s..." && sleep 30
+          done
+          exit 1
+
+      - name: Fallback - scrub unused APT sources, install deps + browser
+        if: steps.browser.outcome == 'failure'
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/*google* /etc/apt/sources.list.d/*microsoft*
+          sudo apt-get update
+          yarn playwright install --with-deps --only-shell chromium
 
       - run: |
           {
