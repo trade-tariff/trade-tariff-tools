@@ -40,7 +40,14 @@ jobs:
         with:
           cache: 'yarn'
 
-      - run: yarn
+      # --ignore-scripts: this workflow now also runs for dependabot PRs via
+      # pull_request_target (see trade-tariff-fpo-dev-hub-e2e's development.yml),
+      # which puts real secrets (WAF_BYPASS_TOKEN, an AWS OIDC role) in scope
+      # for an unreviewed dependency bump's code. Skipping lifecycle scripts
+      # blocks the standard "malicious postinstall" exfiltration vector; it
+      # doesn't cover a compromised package's own code executing later when
+      # `yarn run test` actually imports it (e.g. mailparser, @aws-sdk/*).
+      - run: yarn install --ignore-scripts
 
       - run: yarn playwright install --with-deps chromium
 
