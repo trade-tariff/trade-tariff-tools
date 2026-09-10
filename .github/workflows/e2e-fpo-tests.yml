@@ -61,7 +61,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
 
-      - uses: aws-actions/configure-aws-credentials@v6.2.3
+      - uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ inputs.region }}

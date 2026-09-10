@@ -111,7 +111,7 @@ jobs:
           app-name: ${{ inputs.app-name }}
           environment: ${{ inputs.environment }}
 
-      - uses: aws-actions/configure-aws-credentials@v6.2.3
+      - uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ steps.environment-config.outputs.deploy-role-arn }}
           aws-region: eu-west-2
