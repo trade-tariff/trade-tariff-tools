@@ -35,14 +35,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        authenticated: [false, true]
+        explicit-token: [false, true]
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - name: Install TFLint through the shared action
+      - name: Install TFLint with the default workflow token
+        if: ${{ !matrix.explicit-token }}
+        uses: ./.github/actions/setup-tflint
+
+      - name: Install TFLint with an explicit token
+        if: ${{ matrix.explicit-token }}
         uses: ./.github/actions/setup-tflint
         with:
-          github-token: ${{ matrix.authenticated && github.token || '' }}
+          github-token: ${{ github.token }}
 
       - name: Verify TFLint is executable
         run: tflint --version

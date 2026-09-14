@@ -15,4 +15,4 @@ runs:
       with:
         tflint_version: latest
         tflint_wrapper: false
-        github_token: ${{ inputs.github-token }}
+        github_token: ${{ inputs.github-token || github.token }}
