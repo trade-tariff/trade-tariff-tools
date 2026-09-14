@@ -9,6 +9,7 @@ on:
       - '.github/workflows/deploy-ecs.yml'
       - '.github/workflows/deploy-multi-ecs.yml'
       - '.github/actions/db-migrate/**'
+      - '.github/actions/setup-tflint/**'
       - 'bin/cleanup-ecs-families'
       - 'bin/run-task'
       - 'bin/rotate-task-definitions'
@@ -28,6 +29,24 @@ permissions:
   contents: read
 
 jobs:
+  setup-tflint-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        authenticated: [false, true]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install TFLint through the shared action
+        uses: ./.github/actions/setup-tflint
+        with:
+          github-token: ${{ matrix.authenticated && github.token || '' }}
+
+      - name: Verify TFLint is executable
+        run: tflint --version
+
   ci:
     runs-on: ubuntu-latest
 

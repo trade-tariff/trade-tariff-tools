@@ -11,11 +11,8 @@ runs:
   using: 'composite'
   steps:
     - name: Install TFLint
-      run: |
-        if [ -n "${{ inputs.github-token }}" ]; then
-          curl -s -H "Authorization: token ${{ inputs.github-token }}" \
-            https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
-        else
-          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
-        fi
-      shell: bash
+      uses: terraform-linters/setup-tflint@6e87008f9dd1fe3e34e66aca6c97b4a69f72a7f4 # v4
+      with:
+        tflint_version: latest
+        tflint_wrapper: false
+        github_token: ${{ inputs.github-token }}
