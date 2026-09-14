@@ -27,11 +27,11 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "setup-tflint forwards only the optional caller token" {
-  run grep -Fx '        github_token: ${{ inputs.github-token }}' "$action"
+@test "setup-tflint prefers the caller token and falls back to the workflow token" {
+  run grep -Fx '        github_token: ${{ inputs.github-token || github.token }}' "$action"
   [ "$status" -eq 0 ]
 
-  run grep -Ei 'github\.token|secrets\.' "$action"
+  run grep -Ei 'secrets\.' "$action"
   [ "$status" -eq 1 ]
 }
 
