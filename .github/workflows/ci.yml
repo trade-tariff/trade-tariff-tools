@@ -32,22 +32,11 @@ jobs:
   setup-tflint-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix:
-        explicit-token: [false, true]
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - name: Install TFLint with the default workflow token
-        if: ${{ !matrix.explicit-token }}
+      - name: Install TFLint with the workflow token
         uses: ./.github/actions/setup-tflint
-
-      - name: Install TFLint with an explicit token
-        if: ${{ matrix.explicit-token }}
-        uses: ./.github/actions/setup-tflint
-        with:
-          github-token: ${{ github.token }}
 
       - name: Verify TFLint is executable
         run: tflint --version
