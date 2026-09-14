@@ -7,7 +7,7 @@ setup() {
 }
 
 @test "setup-tflint uses the SHA-pinned official setup action" {
-  run grep -Fx '      uses: terraform-linters/setup-tflint@6e87008f9dd1fe3e34e66aca6c97b4a69f72a7f4 # v4' "$action"
+  run grep -Fx '      uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1' "$action"
   [ "$status" -eq 0 ]
 }
 
