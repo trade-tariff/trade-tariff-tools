@@ -110,6 +110,9 @@ jobs:
               staging)
                 ACCOUNT_ID="451934005581"
                 ;;
+              production)
+                ACCOUNT_ID="382373577178"
+                ;;
               *)
                 ACCOUNT_ID=""
                 ;;
@@ -126,14 +129,18 @@ jobs:
 
             echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
             echo "CI=true"
+            if [ "${{ inputs.test-environment }}" = "production" ]; then
+              echo "PUBLISH_METRICS=true"
+            fi
             echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
+            echo "ACCOUNT_ID=${ACCOUNT_ID}"
           } >> "$GITHUB_ENV"
 
       - uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ inputs.region }}
-        if: ${{ inputs['test-environment'] == 'development' || inputs['test-environment'] == 'staging' }}
+        if: ${{ env.ACCOUNT_ID != '' }}
 
       - run: yarn run test
         env:
