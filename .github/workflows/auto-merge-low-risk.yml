@@ -69,8 +69,10 @@ jobs:
           echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-id and pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_APP_* secrets."
           exit 1
 
-      # Mints a short-lived installation token scoped to the caller repository
-      # only. The action masks the token and revokes it when the job ends.
+      # With neither `owner` nor `repositories` set, the action scopes the token
+      # to $GITHUB_REPOSITORY alone, which in a reusable workflow is the caller.
+      # The App's all-repo installation caps what a token *could* cover; it does
+      # not widen this one. Masked by the action and revoked when the job ends.
       - name: Mint trade-tariff-pr-bot token
         id: app-token
         if: env.PR_BOT_APP_CONFIGURED == 'true'
@@ -86,7 +88,10 @@ jobs:
       - name: Resolve pull request number
         id: pr
         env:
-          GH_TOKEN: ${{ github.token }}
+          # A reusable workflow's permissions are capped by the caller's, so
+          # github.token can lose pull-requests access if a caller tightens its
+          # default workflow permissions. Prefer the App token where we have it.
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
