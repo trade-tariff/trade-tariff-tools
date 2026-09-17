@@ -190,6 +190,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
+          fetch-depth: 0
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate }}
         with:

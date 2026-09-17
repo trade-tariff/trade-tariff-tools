@@ -15,6 +15,9 @@ set -euo pipefail
 printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/terraform-calls.txt"
 
 case "$1" in
+  init)
+    exit 0
+    ;;
   apply)
     exit 0
     ;;
@@ -62,6 +65,7 @@ run_db_migrate() {
   terraform_calls="$(cat "$tmpdir/terraform-calls.txt")"
   run_task_calls="$(cat "$tmpdir/run-task-calls.txt")"
 
+  assert_contains "$terraform_calls" "init -backend-config=backends/development.tfbackend"
   assert_contains "$terraform_calls" "apply -var-file=config_development.tfvars -auto-approve -lock-timeout=10m -target=module.admin-job"
   assert_contains "$terraform_calls" "state show module.admin-job.aws_ecs_task_definition.this"
   assert_contains "$run_task_calls" "-e development -t admin-job -d arn:aws:ecs:eu-west-2:123456789012:task-definition/backend-job-123456789012:42"

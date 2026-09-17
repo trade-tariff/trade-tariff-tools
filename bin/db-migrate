@@ -87,6 +87,8 @@ task="${repo}-job"
 
 cd terraform
 
+terraform init -backend-config="backends/${environment}.tfbackend"
+
 TF_VAR_docker_tag="$ref" terraform apply \
   -var-file="config_${environment}.tfvars" \
   -auto-approve \
