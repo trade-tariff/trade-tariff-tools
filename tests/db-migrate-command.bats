@@ -84,6 +84,61 @@ run_db_migrate() {
   assert_contains "$run_task_calls" "bundle exec rails db:migrate && bundle exec rails data:migrate"
 }
 
+@test "db-migrate runs the UK and XI migration tasks in parallel" {
+  # Replace the stub with one that simulates task duration and records
+  # start and end times per schema. Sequential execution cannot produce
+  # overlapping intervals.
+  cat > "$run_task_stub" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/run-task-calls.txt"
+service="unknown"
+case "$*" in
+  *'"value":"uk"'*) service="uk" ;;
+  *'"value":"xi"'*) service="xi" ;;
+esac
+start="$(date +%s%3N)"
+printf '%s %s %s\n' start "$service" "$start" >> "$TEST_CAPTURE_DIR/task-timing.txt"
+sleep 0.3
+end="$(date +%s%3N)"
+printf '%s %s %s\n' end "$service" "$end" >> "$TEST_CAPTURE_DIR/task-timing.txt"
+STUB
+  chmod +x "$run_task_stub"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref abc123
+
+  [ "$status" -eq 0 ]
+  start_uk="$(awk '$1 == "start" && $2 == "uk" {print $3}' "$tmpdir/task-timing.txt")"
+  end_uk="$(awk '$1 == "end" && $2 == "uk" {print $3}' "$tmpdir/task-timing.txt")"
+  start_xi="$(awk '$1 == "start" && $2 == "xi" {print $3}' "$tmpdir/task-timing.txt")"
+  end_xi="$(awk '$1 == "end" && $2 == "xi" {print $3}' "$tmpdir/task-timing.txt")"
+  [[ -n "$start_uk" && -n "$end_uk" && -n "$start_xi" && -n "$end_xi" ]]
+  [ "$start_uk" -lt "$end_xi" ]
+  [ "$start_xi" -lt "$end_uk" ]
+}
+
+@test "db-migrate fails when one of the backend migration tasks fails" {
+  cat > "$run_task_stub" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/run-task-calls.txt"
+case "$*" in
+  *'"value":"uk"'*) exit 1 ;;
+esac
+STUB
+  chmod +x "$run_task_stub"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref abc123
+
+  [ "$status" -eq 1 ]
+}
+
 @test "db-migrate requires app name environment and ref" {
   run "$repo_root/bin/db-migrate" --app-name tariff-admin --environment development
 

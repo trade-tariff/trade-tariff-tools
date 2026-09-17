@@ -83,16 +83,26 @@ if [[ "$repo" != "backend" ]]; then
   exit 0
 fi
 
-echo "::notice::Running migration task for UK schema in $environment..."
-"$run_task" \
-  -e "$environment" \
-  -t "$task" \
-  -d "$task_definition_arn" \
-  -o '{"containerOverrides":[{"name":"'"$task"'","environment":[{"name":"SERVICE","value":"uk"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+# The UK and XI migration tasks target different schemas with the same image
+# and have no dependency between them, so run them in parallel and fail the
+# step if either task fails.
+run_backend_migration() {
+  local service="$1"
 
-echo "::notice::Running migration task for XI schema in $environment..."
-"$run_task" \
-  -e "$environment" \
-  -t "$task" \
-  -d "$task_definition_arn" \
-  -o '{"containerOverrides":[{"name":"'"$task"'","environment":[{"name":"SERVICE","value":"xi"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+  echo "::notice::Running migration task for ${service^^} schema in $environment..."
+  "$run_task" \
+    -e "$environment" \
+    -t "$task" \
+    -d "$task_definition_arn" \
+    -o '{"containerOverrides":[{"name":"'"$task"'","environment":[{"name":"SERVICE","value":"'"$service"'"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
+}
+
+run_backend_migration uk &
+uk_pid=$!
+run_backend_migration xi &
+xi_pid=$!
+
+status=0
+wait "$uk_pid" || status=1
+wait "$xi_pid" || status=1
+exit "$status"
