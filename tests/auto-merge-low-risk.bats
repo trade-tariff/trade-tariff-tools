@@ -659,15 +659,23 @@ EOF
   done
 }
 
-@test "reusable workflow prefers the App token and keeps the legacy PAT optional" {
+@test "reusable workflow requires App credentials and never falls back to another identity" {
   workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
+  action="$repo_root/.github/actions/auto-merge-low-risk/action.yml"
 
-  run grep -F "github-token: \${{ steps.app-token.outputs.token || secrets['github-token'] }}" "$workflow"
+  run grep -F 'github-app-token: ${{ steps.app-token.outputs.token }}' "$workflow"
+  [ "$status" -eq 0 ]
+  run grep -F 'GH_TOKEN: ${{ steps.app-token.outputs.token }}' "$workflow"
+  [ "$status" -eq 0 ]
+  run grep -F 'GITHUB_TOKEN: ${{ inputs.github-app-token }}' "$action"
   [ "$status" -eq 0 ]
 
-  # Every declared secret is optional so callers can migrate one at a time.
-  run grep -F 'required: true' "$workflow"
+  [ "$(grep -c 'required: true' "$workflow")" -eq 2 ]
+  run grep -E 'github-token|github.token|LEGACY_TOKEN|use-configured-bypass' "$workflow" "$action"
   [ "$status" -ne 0 ]
+
+  run grep -F "if: env.PR_BOT_APP_CONFIGURED != 'true'" "$workflow"
+  [ "$status" -eq 0 ]
 }
 
 @test "reusable workflow gates on secret presence without exposing secret values" {
