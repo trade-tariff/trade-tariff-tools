@@ -475,6 +475,7 @@ case "$name" in
   disable-auto-merge) exit "${DISABLE_STATUS:-0}" ;;
   check-copilot-review-gate) exit "${COPILOT_GATE_STATUS:-0}" ;;
   check-pull-request-state-gate) exit "${STATE_GATE_STATUS:-0}" ;;
+  approve-pull-request) exit "${APPROVAL_STATUS:-0}" ;;
 esac
 STUB
     chmod +x "$harness/$helper.sh"
@@ -569,10 +570,46 @@ disable-auto-merge --repo trade-tariff/example --pr 42 --merge-method squash
 check-copilot-review-gate --repo trade-tariff/example --pr 42 --head expected-head
 check-pull-request-state-gate --repo trade-tariff/example --pr 42 --workflow ci.yml --head expected-head
 approve-pull-request --repo trade-tariff/example --pr 42 --head expected-head
-merge pr merge 42 --repo trade-tariff/example --squash --match-head-commit expected-head
+merge pr merge 42 --repo trade-tariff/example --squash --admin --match-head-commit expected-head
 EOF
   run diff -u "$expected" "$ORCHESTRATION_LOG"
   [ "$status" -eq 0 ]
+}
+
+@test "orchestration preserves head binding and bypass for every merge method" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+
+  for method in merge squash rebase; do
+    run "$harness/auto-merge.sh" \
+      --repo trade-tariff/example --pr 42 --label low-risk \
+      --merge-method "$method" --required-workflow ci.yml
+
+    [ "$status" -eq 0 ]
+    [ "$(tail -n 1 "$ORCHESTRATION_LOG")" = "merge pr merge 42 --repo trade-tariff/example --${method} --admin --match-head-commit expected-head" ]
+  done
+}
+
+@test "orchestration never merges when approval fails" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+  export APPROVAL_STATUS=1
+
+  run_orchestration
+
+  [ "$status" -ne 0 ]
+  [ ! -s "$GH_MERGE_CAPTURE_FILE" ]
+}
+
+@test "orchestration propagates server merge rejection without retrying" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+  export GH_MERGE_STATUS=1
+
+  run_orchestration
+
+  [ "$status" -ne 0 ]
+  [ "$(grep -c '^merge ' "$ORCHESTRATION_LOG")" -eq 1 ]
 }
 
 @test "reusable workflow only handles Copilot review events" {

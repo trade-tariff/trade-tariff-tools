@@ -131,8 +131,11 @@ fi
 
 "$approval_script" --repo "$repo" --pr "$pr" --head "$expected_head"
 
+# Let GitHub evaluate the App's configured bypass instead of rejecting a
+# BLOCKED merge state in the CLI preflight. This grants no server permissions.
 echo "Merging PR #$pr at $expected_head (${merge_method})"
 gh pr merge "$pr" \
   --repo "$repo" \
   "--${merge_method}" \
+  --admin \
   --match-head-commit "$expected_head"
