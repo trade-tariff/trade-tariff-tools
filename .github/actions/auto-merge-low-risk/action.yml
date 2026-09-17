@@ -8,8 +8,8 @@ inputs:
   pr-number:
     description: Pull request number in the caller repository.
     required: true
-  github-token:
-    description: Token used to call the GitHub API.
+  github-app-token:
+    description: Repository-scoped trade-tariff-pr-bot installation token. Personal access tokens are not supported.
     required: true
   label:
     description: PR label that enables auto-merge.
@@ -41,7 +41,7 @@ runs:
   steps:
     - shell: bash
       env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_TOKEN: ${{ inputs.github-app-token }}
         PR_NUMBER: ${{ inputs.pr-number }}
         AUTO_MERGE_LABEL: ${{ inputs.label }}
         AUTO_MERGE_METHOD: ${{ inputs.merge-method }}
