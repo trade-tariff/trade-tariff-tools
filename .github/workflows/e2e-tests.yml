@@ -40,6 +40,11 @@ on:
         type: string
         default: 'true'
         required: false
+      publish-metrics:
+        description: 'Publish end-to-end journey metrics to CloudWatch. Production only. The caller must grant id-token: write, and its OIDC subject must be trusted by the production GithubActions-E2E-Testing-Role.'
+        type: boolean
+        default: false
+        required: false
       region:
         description: 'AWS region to use when assuming IAM role'
         type: string
@@ -110,6 +115,9 @@ jobs:
               staging)
                 ACCOUNT_ID="451934005581"
                 ;;
+              production)
+                ACCOUNT_ID="382373577178"
+                ;;
               *)
                 ACCOUNT_ID=""
                 ;;
@@ -126,14 +134,21 @@ jobs:
 
             echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
             echo "CI=true"
+            if [ "${{ inputs.publish-metrics }}" = "true" ]; then
+              echo "PUBLISH_METRICS=true"
+            fi
             echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
+            echo "ACCOUNT_ID=${ACCOUNT_ID}"
           } >> "$GITHUB_ENV"
 
       - uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ inputs.region }}
-        if: ${{ inputs['test-environment'] == 'development' || inputs['test-environment'] == 'staging' }}
+        # Development and staging need AWS for the S3 and Cognito journeys. Only
+        # the e2e-tests repo can assume the production role, so production
+        # callers must opt in with publish-metrics.
+        if: ${{ env.ACCOUNT_ID != '' && (inputs.test-environment != 'production' || inputs.publish-metrics) }}
 
       - run: yarn run test
         env:
