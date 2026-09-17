@@ -52,6 +52,33 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
+@test "db-migrate action passes the previous ref to the command" {
+  action="$repo_root/.github/actions/db-migrate/action.yml"
+
+  run grep -F "previous-ref:" "$action"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- "args+=(--previous-ref \${{ inputs.previous-ref }})" "$action"
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy-ecs passes the previous docker tag to db-migrate" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F "previous-ref: \${{ needs.configure.outputs.previous_docker_tag }}" "$workflow"
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy-ecs matches services named without the tariff- prefix" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F 'REPO_NAME="${APP_NAME#tariff-}"' "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'if [[ "$SERVICE_NAME" == ${APP_NAME}* || "$SERVICE_NAME" == ${REPO_NAME}* ]]; then' "$workflow"
+  [ "$status" -eq 0 ]
+}
+
 @test "deploy-multi-ecs only migrates apps that explicitly opt in" {
   workflow="$repo_root/.github/workflows/deploy-multi-ecs.yml"
 

@@ -174,3 +174,105 @@ STUB
   [ "$status" -eq 1 ]
   assert_contains "$output" "Usage:"
 }
+
+# Create a git repository in the project directory with a base commit that
+# contains migration files. Prints the short sha of the base commit.
+setup_migration_repo() {
+  (
+    cd "$tmpdir/project"
+    git init -q
+    git config user.email "test@example.com"
+    git config user.name "Test"
+    mkdir -p db/migrate db/data_migrate
+    echo "class Initial" > db/migrate/20260101000000_initial.rb
+    git add -A
+    git commit -qm "base"
+  )
+  git -C "$tmpdir/project" rev-parse --short HEAD
+}
+
+commit_app_change() {
+  (
+    cd "$tmpdir/project"
+    echo "change" >> app_change.txt
+    git add -A
+    git commit -qm "app change only"
+  )
+  git -C "$tmpdir/project" rev-parse --short HEAD
+}
+
+commit_migration_change() {
+  (
+    cd "$tmpdir/project"
+    echo "class Second" > db/data_migrate/20260201000000_second.rb
+    git add -A
+    git commit -qm "add data migration"
+  )
+  git -C "$tmpdir/project" rev-parse --short HEAD
+}
+
+@test "db-migrate skips when no migration file changed since the previous ref" {
+  local previous current
+  previous="$(setup_migration_repo)"
+  current="$(commit_app_change)"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref "$current" \
+    --previous-ref "$previous"
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Skipping the database migration tasks"
+  [ ! -f "$tmpdir/terraform-calls.txt" ]
+  [ ! -f "$tmpdir/run-task-calls.txt" ]
+}
+
+@test "db-migrate skips when the previous ref is the same as the deployed ref" {
+  local ref
+  ref="$(setup_migration_repo)"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref "$ref" \
+    --previous-ref "$ref"
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Skipping the database migration tasks"
+  [ ! -f "$tmpdir/terraform-calls.txt" ]
+  [ ! -f "$tmpdir/run-task-calls.txt" ]
+}
+
+@test "db-migrate runs when a data migration file changed since the previous ref" {
+  local previous current
+  previous="$(setup_migration_repo)"
+  current="$(commit_migration_change)"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref "$current" \
+    --previous-ref "$previous"
+
+  [ "$status" -eq 0 ]
+  terraform_calls="$(cat "$tmpdir/terraform-calls.txt")"
+  assert_contains "$terraform_calls" "apply -var-file=config_development.tfvars"
+  run_task_calls="$(cat "$tmpdir/run-task-calls.txt")"
+  assert_contains "$run_task_calls" "\"SERVICE\",\"value\":\"uk\""
+}
+
+@test "db-migrate runs when the previous ref does not resolve" {
+  local current
+  current="$(setup_migration_repo)"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref "$current" \
+    --previous-ref 0000000
+
+  [ "$status" -eq 0 ]
+  terraform_calls="$(cat "$tmpdir/terraform-calls.txt")"
+  assert_contains "$terraform_calls" "apply -var-file=config_development.tfvars"
+}
