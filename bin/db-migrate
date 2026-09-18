@@ -85,11 +85,14 @@ fi
 
 # The UK and XI migration tasks target different schemas with the same image
 # and have no dependency between them, so run them in parallel and fail the
-# step if either task fails.
+# step if either task fails. Capture each task's output so the logs stay
+# attributed to one schema rather than interleaving on stdout.
 run_backend_migration() {
   local service="$1"
+  local label
 
-  echo "::notice::Running migration task for ${service^^} schema in $environment..."
+  label="$(printf '%s' "$service" | tr '[:lower:]' '[:upper:]')"
+  echo "::notice::Running migration task for ${label} schema in $environment..."
   "$run_task" \
     -e "$environment" \
     -t "$task" \
@@ -97,12 +100,18 @@ run_backend_migration() {
     -o '{"containerOverrides":[{"name":"'"$task"'","environment":[{"name":"SERVICE","value":"'"$service"'"}],"command":["/bin/sh","-c","bundle exec rails db:migrate && bundle exec rails data:migrate"]}]}'
 }
 
-run_backend_migration uk &
+uk_log="$(mktemp)"
+xi_log="$(mktemp)"
+trap 'rm -f "$uk_log" "$xi_log"' EXIT
+
+run_backend_migration uk >|"$uk_log" 2>&1 &
 uk_pid=$!
-run_backend_migration xi &
+run_backend_migration xi >|"$xi_log" 2>&1 &
 xi_pid=$!
 
 status=0
 wait "$uk_pid" || status=1
+cat "$uk_log"
 wait "$xi_pid" || status=1
+cat "$xi_log"
 exit "$status"

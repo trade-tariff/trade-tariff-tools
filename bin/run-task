@@ -135,13 +135,9 @@ run_task() {
     --cluster "${CLUSTER}"   \
     --tasks "${task_arn}"    \
 
-  # attempt to get the log stream by creationTime, it should be the newest
-  # (therefore the largest creationTime timestamp). waiting until the task
-  # has stopped gives us buffer against slow CloudWatch log ingestion.
-  log_stream_name=$(aws logs describe-log-streams   \
-    --log-group-name "platform-logs-${environment}" \
-    --log-stream-name-prefix "ecs/${task}/"         \
-  | jq -r '.logStreams | max_by(.creationTime).logStreamName')
+  # Use the started task id. Choosing the newest stream by creationTime can
+  # report another concurrent task's logs, including a parallel UK/XI migrate.
+  log_stream_name="ecs/${task}/${task_id}"
   echo -e "Found log stream with name: ${log_stream_name}\n"
 
   aws logs get-log-events                           \

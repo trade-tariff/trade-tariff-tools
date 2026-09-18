@@ -85,9 +85,10 @@ run_db_migrate() {
 }
 
 @test "db-migrate runs the UK and XI migration tasks in parallel" {
-  # Replace the stub with one that simulates task duration and records
-  # start and end times per schema. Sequential execution cannot produce
-  # overlapping intervals.
+  # Each stub records that it started, then waits for the other schema's
+  # start marker before recording overlap. Sequential execution cannot
+  # produce both overlap markers because the second stub never starts
+  # until the first has finished waiting.
   cat > "$run_task_stub" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -97,11 +98,16 @@ case "$*" in
   *'"value":"uk"'*) service="uk" ;;
   *'"value":"xi"'*) service="xi" ;;
 esac
-start="$(date +%s%3N)"
-printf '%s %s %s\n' start "$service" "$start" >> "$TEST_CAPTURE_DIR/task-timing.txt"
-sleep 0.3
-end="$(date +%s%3N)"
-printf '%s %s %s\n' end "$service" "$end" >> "$TEST_CAPTURE_DIR/task-timing.txt"
+touch "$TEST_CAPTURE_DIR/started-$service"
+i=0
+while [ ! -f "$TEST_CAPTURE_DIR/started-uk" ] || [ ! -f "$TEST_CAPTURE_DIR/started-xi" ]; do
+  i=$((i + 1))
+  if [ "$i" -gt 50 ]; then
+    exit 0
+  fi
+  sleep 0.1
+done
+touch "$TEST_CAPTURE_DIR/overlapped-$service"
 STUB
   chmod +x "$run_task_stub"
 
@@ -111,13 +117,36 @@ STUB
     --ref abc123
 
   [ "$status" -eq 0 ]
-  start_uk="$(awk '$1 == "start" && $2 == "uk" {print $3}' "$tmpdir/task-timing.txt")"
-  end_uk="$(awk '$1 == "end" && $2 == "uk" {print $3}' "$tmpdir/task-timing.txt")"
-  start_xi="$(awk '$1 == "start" && $2 == "xi" {print $3}' "$tmpdir/task-timing.txt")"
-  end_xi="$(awk '$1 == "end" && $2 == "xi" {print $3}' "$tmpdir/task-timing.txt")"
-  [[ -n "$start_uk" && -n "$end_uk" && -n "$start_xi" && -n "$end_xi" ]]
-  [ "$start_uk" -lt "$end_xi" ]
-  [ "$start_xi" -lt "$end_uk" ]
+  [ -f "$tmpdir/overlapped-uk" ]
+  [ -f "$tmpdir/overlapped-xi" ]
+}
+
+@test "db-migrate prints each backend migration's logs as a block" {
+  cat > "$run_task_stub" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/run-task-calls.txt"
+case "$*" in
+  *'"value":"uk"'*)
+    echo UK-START
+    sleep 0.2
+    echo UK-END
+    ;;
+  *'"value":"xi"'*)
+    echo XI-START
+    echo XI-END
+    ;;
+esac
+STUB
+  chmod +x "$run_task_stub"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref abc123
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"UK-START"*"UK-END"*"XI-START"*"XI-END"* ]]
 }
 
 @test "db-migrate fails when one of the backend migration tasks fails" {
