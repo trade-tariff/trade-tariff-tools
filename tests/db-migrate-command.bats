@@ -84,6 +84,90 @@ run_db_migrate() {
   assert_contains "$run_task_calls" "bundle exec rails db:migrate && bundle exec rails data:migrate"
 }
 
+@test "db-migrate runs the UK and XI migration tasks in parallel" {
+  # Each stub records that it started, then waits for the other schema's
+  # start marker before recording overlap. Sequential execution cannot
+  # produce both overlap markers because the second stub never starts
+  # until the first has finished waiting.
+  cat > "$run_task_stub" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/run-task-calls.txt"
+service="unknown"
+case "$*" in
+  *'"value":"uk"'*) service="uk" ;;
+  *'"value":"xi"'*) service="xi" ;;
+esac
+touch "$TEST_CAPTURE_DIR/started-$service"
+i=0
+while [ ! -f "$TEST_CAPTURE_DIR/started-uk" ] || [ ! -f "$TEST_CAPTURE_DIR/started-xi" ]; do
+  i=$((i + 1))
+  if [ "$i" -gt 50 ]; then
+    exit 0
+  fi
+  sleep 0.1
+done
+touch "$TEST_CAPTURE_DIR/overlapped-$service"
+STUB
+  chmod +x "$run_task_stub"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref abc123
+
+  [ "$status" -eq 0 ]
+  [ -f "$tmpdir/overlapped-uk" ]
+  [ -f "$tmpdir/overlapped-xi" ]
+}
+
+@test "db-migrate prints each backend migration's logs as a block" {
+  cat > "$run_task_stub" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/run-task-calls.txt"
+case "$*" in
+  *'"value":"uk"'*)
+    echo UK-START
+    sleep 0.2
+    echo UK-END
+    ;;
+  *'"value":"xi"'*)
+    echo XI-START
+    echo XI-END
+    ;;
+esac
+STUB
+  chmod +x "$run_task_stub"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref abc123
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"UK-START"*"UK-END"*"XI-START"*"XI-END"* ]]
+}
+
+@test "db-migrate fails when one of the backend migration tasks fails" {
+  cat > "$run_task_stub" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/run-task-calls.txt"
+case "$*" in
+  *'"value":"uk"'*) exit 1 ;;
+esac
+STUB
+  chmod +x "$run_task_stub"
+
+  run run_db_migrate \
+    --app-name tariff-backend \
+    --environment development \
+    --ref abc123
+
+  [ "$status" -eq 1 ]
+}
+
 @test "db-migrate requires app name environment and ref" {
   run "$repo_root/bin/db-migrate" --app-name tariff-admin --environment development
 

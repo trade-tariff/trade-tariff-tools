@@ -43,9 +43,11 @@ case "$1 $2" in
   "ecs wait")
     ;;
   "logs describe-log-streams")
-    printf '{"logStreams":[{"creationTime":1,"logStreamName":"ecs/dev-hub-job/task-123"}]}'
+    echo "run-task should fetch logs by task id, not the newest stream" >&2
+    exit 1
     ;;
   "logs get-log-events")
+    printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/get-log-events.txt"
     printf '["migration ok"]'
     ;;
   "ecs describe-tasks")
@@ -74,4 +76,6 @@ STUB
   [ "$status" -eq 0 ]
   [ "$(cat "$capture/run-task-definition.txt")" = "$explicit_arn" ]
   assert_not_contains "$(cat "$capture/aws-calls.txt")" "ecs list-task-definitions"
+  assert_not_contains "$(cat "$capture/aws-calls.txt")" "logs describe-log-streams"
+  assert_contains "$(cat "$capture/get-log-events.txt")" "--log-stream-name ecs/dev-hub-job/task-123"
 }
