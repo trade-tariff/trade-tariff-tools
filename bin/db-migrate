@@ -12,12 +12,18 @@ run_task="${DB_MIGRATE_RUN_TASK:-$script_dir/run-task}"
 app_name=""
 environment=""
 ref=""
+previous_ref=""
 
 usage() {
   cat <<EOF
-Usage: db-migrate --app-name APP --environment ENV --ref REF
+Usage: db-migrate --app-name APP --environment ENV --ref REF [--previous-ref PREVIOUS_REF]
 
 Runs the ECS database migration task for a deployed Tariff app.
+
+If --previous-ref is given and no file under db/migrate, db/data_migrate,
+or db/data_migrations changed between that ref and REF, the migration
+tasks are skipped: the deployment currently running already applied every
+migration in REF.
 EOF
 }
 
@@ -33,6 +39,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --ref)
       ref="$2"
+      shift 2
+      ;;
+    --previous-ref)
+      previous_ref="$2"
       shift 2
       ;;
     -h|--help)
@@ -52,10 +62,37 @@ if [[ -z "$app_name" || -z "$environment" || -z "$ref" ]]; then
   exit 1
 fi
 
+# Return success only when we can positively determine that no file under
+# the schema or data migration directories differs between the two refs.
+# Watch db/data_migrations (backend) and db/data_migrate (data_migrate gem).
+# Return failure (run the migrations) when files differ or the comparison
+# cannot be made, for example when this is not a git checkout or a ref does
+# not resolve.
+migration_pathspecs=(db/migrate db/data_migrate db/data_migrations)
+
+migrations_unchanged() {
+  local previous="$1"
+  local current="$2"
+  local changed
+
+  git rev-parse --quiet --verify "${previous}^{commit}" >/dev/null || return 1
+  git rev-parse --quiet --verify "${current}^{commit}" >/dev/null || return 1
+
+  changed="$(git diff --name-only "$previous" "$current" -- "${migration_pathspecs[@]}")" || return 1
+  [[ -z "$changed" ]]
+}
+
+if [[ -n "$previous_ref" ]] && migrations_unchanged "$previous_ref" "$ref"; then
+  echo "::notice::No files changed under db/migrate, db/data_migrate, or db/data_migrations between ${previous_ref} and ${ref}. Skipping the database migration tasks."
+  exit 0
+fi
+
 repo="${app_name#tariff-}"
 task="${repo}-job"
 
 cd terraform
+
+terraform init -backend-config="backends/${environment}.tfbackend"
 
 TF_VAR_docker_tag="$ref" terraform apply \
   -var-file="config_${environment}.tfvars" \

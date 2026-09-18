@@ -19,6 +19,10 @@ inputs:
   ref:
     required: true
     description: 'The git ref to deploy.'
+  previous-ref:
+    required: false
+    default: ''
+    description: 'The git ref currently running in this environment. When set, the migration tasks are skipped if no migration file changed between this ref and ref.'
   role-to-assume:
     description: 'The IAM role ARN to assume for AWS operations.'
     required: true
@@ -35,24 +39,31 @@ runs:
       with:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-    - name: Initialise Terraform
-      shell: bash
-      run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
-
     - name: Apply database migrations
       shell: bash
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        REF: ${{ inputs.ref }}
+        PREVIOUS_REF: ${{ inputs.previous-ref }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        ${{ github.action_path }}/../../../bin/db-migrate \
-          --app-name ${{ inputs.app-name }} \
-          --environment ${{ inputs.environment }} \
-          --ref ${{ inputs.ref }}
+        args=(--app-name "$APP_NAME" --environment "$ENVIRONMENT" --ref "$REF")
+
+        if [[ -n "$PREVIOUS_REF" ]]; then
+          args+=(--previous-ref "$PREVIOUS_REF")
+        fi
+
+        "$ACTION_PATH/../../../bin/db-migrate" "${args[@]}"
 
     - name: Force unlock terraform state on cancellation
       if: cancelled()
       shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
       run: |
-        BUCKET=$(grep '^bucket' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
-        KEY=$(grep '^key' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
+        BUCKET=$(grep '^bucket' "terraform/backends/${ENVIRONMENT}.tfbackend" | awk -F'"' '{print $2}')
+        KEY=$(grep '^key' "terraform/backends/${ENVIRONMENT}.tfbackend" | awk -F'"' '{print $2}')
         aws s3 cp "s3://${BUCKET}/${KEY}.tflock" /tmp/terraform.tflock || exit 0
         LOCK_ID=$(jq -r '.ID' /tmp/terraform.tflock)
         cd terraform && terraform force-unlock -force "${LOCK_ID}"
