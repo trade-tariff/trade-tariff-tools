@@ -187,7 +187,7 @@ setup_migration_repo() {
     git init -q
     git config user.email "test@example.com"
     git config user.name "Test"
-    mkdir -p db/migrate db/data_migrate
+    mkdir -p db/migrate db/data_migrations
     echo "class Initial" > db/migrate/20260101000000_initial.rb
     git add -A
     git commit -qm "base"
@@ -205,10 +205,10 @@ commit_app_change() {
   git -C "$tmpdir/project" rev-parse --short HEAD
 }
 
-commit_migration_change() {
+commit_data_migration_change() {
   (
     cd "$tmpdir/project"
-    echo "class Second" > db/data_migrate/20260201000000_second.rb
+    echo "class Second" > db/data_migrations/20260201000000_second.rb
     git add -A
     git commit -qm "add data migration"
   )
@@ -248,10 +248,10 @@ commit_migration_change() {
   [ ! -f "$tmpdir/run-task-calls.txt" ]
 }
 
-@test "db-migrate runs when a data migration file changed since the previous ref" {
+@test "db-migrate runs when a backend data migration file changed since the previous ref" {
   local previous current
   previous="$(setup_migration_repo)"
-  current="$(commit_migration_change)"
+  current="$(commit_data_migration_change)"
 
   run run_db_migrate \
     --app-name tariff-backend \
