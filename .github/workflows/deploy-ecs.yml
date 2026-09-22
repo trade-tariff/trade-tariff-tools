@@ -122,12 +122,16 @@ jobs:
           CLUSTER: ${{ steps.environment-config.outputs.cluster }}
         run: |
           PREVIOUS_DOCKER_TAG=""
-          # Derive the ECS service name from the app name (e.g. tariff-backend -> tariff-backend-uk)
-          # Services follow the pattern <app-name>-<suffix>; we pick the first matching service.
+          # Derive the ECS service name from the app name. Services follow the
+          # pattern <name>-<suffix> where <name> is either the full app name
+          # (e.g. tariff-dev-hub) or the name with the tariff- prefix stripped
+          # (e.g. tariff-backend -> backend-uk). We pick the first matching
+          # service; all services of one app run the same image tag.
+          REPO_NAME="${APP_NAME#tariff-}"
           SERVICES=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns' --output text)
           for SERVICE_ARN in $SERVICES; do
             SERVICE_NAME=$(basename "$SERVICE_ARN")
-            if [[ "$SERVICE_NAME" == ${APP_NAME}* ]]; then
+            if [[ "$SERVICE_NAME" == ${APP_NAME}* || "$SERVICE_NAME" == ${REPO_NAME}* ]]; then
               TASK_DEF=$(aws ecs describe-services \
                 --cluster "$CLUSTER" \
                 --services "$SERVICE_NAME" \
@@ -186,12 +190,14 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
+          fetch-depth: 0
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate }}
         with:
           app-name: ${{ inputs.app-name }}
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
+          previous-ref: ${{ needs.configure.outputs.previous_docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:
