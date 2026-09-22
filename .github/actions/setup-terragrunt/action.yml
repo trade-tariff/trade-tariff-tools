@@ -1,0 +1,36 @@
+name: 'Setup Terragrunt'
+description: 'Install a specific version of the terragrunt binary and add it to the PATH'
+
+inputs:
+  terragrunt-version:
+    description: 'Terragrunt version to install, without the leading v. Example: 0.78.1'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Terragrunt
+      shell: bash
+      env:
+        TERRAGRUNT_VERSION: ${{ inputs.terragrunt-version }}
+      run: |
+        set -euo pipefail
+
+        release_url="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}"
+        download_dir="$(mktemp -d)"
+        install_dir="${RUNNER_TEMP}/terragrunt-bin"
+
+        cd "$download_dir"
+        curl --fail --silent --show-error --location --remote-name "${release_url}/terragrunt_linux_amd64"
+        curl --fail --silent --show-error --location --remote-name "${release_url}/SHA256SUMS"
+
+        # SHA256SUMS lists every platform. Keep only our asset so sha256sum does not
+        # fail on the files we did not download.
+        grep 'terragrunt_linux_amd64$' SHA256SUMS > terragrunt_linux_amd64.sha256
+        sha256sum --check terragrunt_linux_amd64.sha256
+
+        mkdir -p "$install_dir"
+        install -m 0755 terragrunt_linux_amd64 "${install_dir}/terragrunt"
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+        "${install_dir}/terragrunt" --version
