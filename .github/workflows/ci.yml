@@ -9,6 +9,7 @@ on:
       - '.github/workflows/deploy-ecs.yml'
       - '.github/workflows/deploy-multi-ecs.yml'
       - '.github/workflows/e2e-tests.yml'
+      - '.github/workflows/preview-cleanup.yml'
       - '.github/actions/db-migrate/**'
       - '.github/actions/setup-tflint/**'
       - 'bin/**'
