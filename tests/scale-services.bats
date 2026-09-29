@@ -101,11 +101,12 @@ teardown() {
   assert_contains "$output" "Usage: scale-services.sh"
 }
 
-@test "rejects a call with no service names" {
+@test "does nothing and succeeds with no service names, like the old loop" {
   run "$script" --cluster trade-tariff-cluster --region eu-west-2 --desired-count 1 --verb start
 
-  [ "$status" -eq 2 ]
-  assert_contains "$output" "At least one service name is required."
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "::notice::All services started successfully!"
+  [ ! -f "$tmpdir/aws-commands.txt" ]
 }
 
 @test "rejects a missing flag value" {

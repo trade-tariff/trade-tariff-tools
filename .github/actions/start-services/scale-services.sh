@@ -17,7 +17,7 @@ Arguments:
   --region <region>     AWS region, for example eu-west-2.
   --desired-count <n>   Desired task count for each service.
   --verb <start|stop>   Selects the words in log messages.
-  <service-name>...     One or more ECS service names.
+  <service-name>...     ECS service names. With none, nothing changes and the script exits 0.
 
 Environment:
   AWS credentials for the aws CLI (required).
@@ -100,12 +100,6 @@ case "$verb" in
     exit 2
     ;;
 esac
-
-if [[ ${#service_names[@]} -eq 0 ]]; then
-  echo "At least one service name is required." >&2
-  usage >&2
-  exit 2
-fi
 
 succeeded=()
 failed=()
