@@ -21,6 +21,7 @@ on:
       - '.github/actions/start-services/**'
       - '.github/actions/stop-services/**'
       - '.github/actions/close-stale-pull-requests/**'
+      - '.github/actions/slack-notify/**'
       - '.github/workflows/auto-merge-low-risk.yml'
       - '.github/workflows/auto-merge.yml'
       - 'flake.lock'
