@@ -17,6 +17,8 @@ on:
       - '.github/actions/importmap-update/**'
       - '.github/actions/risk-label/**'
       - '.github/workflows/risk-label-reusable.yml'
+      - '.github/actions/start-services/**'
+      - '.github/actions/stop-services/**'
       - '.github/workflows/auto-merge-low-risk.yml'
       - '.github/workflows/auto-merge.yml'
       - 'flake.lock'
