@@ -50,3 +50,19 @@ TOPMATTER
   run grep -F "./bin/rotate-revisions" "$workflow"
   [ "$status" -ne 0 ]
 }
+
+@test "composite action scripts are executable" {
+  while IFS= read -r script; do
+    [ -x "$script" ] || fail "$script is not executable"
+  done < <(find "$repo_root/.github/actions" -mindepth 2 -maxdepth 2 -type f -name '*.sh' | sort)
+}
+
+@test "ci checks bash syntax one file at a time" {
+  workflow="$repo_root/.github/workflows/ci.yml"
+
+  run grep -F 'bash -n "$file"' "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do" "$workflow"
+  [ "$status" -eq 0 ]
+}
