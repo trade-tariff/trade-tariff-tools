@@ -106,6 +106,26 @@ payload_field() {
   assert_contains "$output" "Missing required environment variable: GITHUB_RUN_ID"
 }
 
+@test "keeps an explicitly empty colour" {
+  run_notify WEBHOOK="https://hooks.slack.test/abc" COLOR="" MESSAGE="m"
+
+  [ "$status" -eq 0 ]
+  [ "$(payload_field '.attachments[0].color')" = "" ]
+}
+
+@test "uses defaults when optional inputs are unset" {
+  run env -u CHANNEL -u USERNAME -u ICON_EMOJI -u COLOR \
+    WEBHOOK="https://hooks.slack.test/abc" MESSAGE="m" \
+    GITHUB_REPOSITORY="trade-tariff/example" GITHUB_SERVER_URL="https://github.com" GITHUB_RUN_ID="123" GITHUB_ACTOR="octocat" \
+    "$script"
+
+  [ "$status" -eq 0 ]
+  [ "$(payload_field '.channel')" = "deployments" ]
+  [ "$(payload_field '.username')" = "Deploy Bot" ]
+  [ "$(payload_field '.icon_emoji')" = ":robot_face:" ]
+  [ "$(payload_field '.attachments[0].color')" = "good" ]
+}
+
 @test "prints help" {
   run "$script" --help
 
