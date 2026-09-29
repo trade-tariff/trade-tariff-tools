@@ -32,7 +32,10 @@ jobs:
           sudo apt-get install -y bats
 
       - name: Check bash syntax
-        run: bash -n scripts/deploy-pr-info.sh scripts/deploy-result.sh scripts/trufflehog-pre-commit.sh scripts/lib/ecs-task-definitions.sh .github/actions/check-pr-lines/check-pr-lines.sh .github/actions/auto-merge-low-risk/approve-pull-request.sh .github/actions/auto-merge-low-risk/auto-merge.sh .github/actions/auto-merge-low-risk/check-copilot-review-gate.sh .github/actions/auto-merge-low-risk/check-dependabot-pull-request.sh .github/actions/auto-merge-low-risk/check-pull-request-state-gate.sh .github/actions/auto-merge-low-risk/disable-auto-merge.sh .github/actions/auto-merge-low-risk/request-copilot-review.sh bin/cleanup-ecs-families bin/db-migrate bin/ecs bin/fetch-commodities bin/ott-search-stat bin/rotate-revisions bin/rotate-task-definitions bin/run-task tests/test_helper.bash
+        run: |
+          for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do
+            bash -n "$file"
+          done
 
       - name: Run regression tests
         run: bats tests
