@@ -61,6 +61,12 @@ base_ref=""
 event_name="${EVENT_NAME:-}"
 
 if [[ -z "$base_sha" || -z "$head_sha" ]]; then
+  if [[ -z "$event_name" ]]; then
+    echo "Missing required environment variable: EVENT_NAME" >&2
+    usage >&2
+    exit 2
+  fi
+
   case "$event_name" in
     pull_request)
       base_sha="${PR_BASE_SHA:-}"

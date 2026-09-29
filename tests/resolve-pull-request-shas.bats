@@ -104,6 +104,13 @@ run_resolve() {
   assert_contains "$output" "::error::Could not determine base-sha and head-sha."
 }
 
+@test "requires EVENT_NAME when shas are not given" {
+  run env -u EVENT_NAME GITHUB_OUTPUT="$output_file" "$script"
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Missing required environment variable: EVENT_NAME"
+}
+
 @test "prints help" {
   run "$script" --help
 

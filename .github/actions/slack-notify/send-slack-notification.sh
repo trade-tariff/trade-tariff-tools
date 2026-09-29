@@ -16,10 +16,10 @@ Environment:
   WEBHOOK            (optional) Slack webhook URL. When empty, log a notice and exit 0.
   MESSAGE            (optional, default: empty) Message body in Slack mrkdwn.
   TITLE              (optional, default: empty) Message title.
-  CHANNEL            (optional, default: deployments) Slack channel.
-  USERNAME           (optional, default: Deploy Bot) Bot username.
-  ICON_EMOJI         (optional, default: :robot_face:) Bot icon.
-  COLOR              (optional, default: good) good, danger, warning, success,
+  CHANNEL            (optional, default when unset: deployments) Slack channel.
+  USERNAME           (optional, default when unset: Deploy Bot) Bot username.
+  ICON_EMOJI         (optional, default when unset: :robot_face:) Bot icon.
+  COLOR              (optional, default when unset: good) good, danger, warning, success,
                      failure, cancelled, or a hex code.
   GITHUB_REPOSITORY  (required when WEBHOOK is set) Set by the runner.
   GITHUB_SERVER_URL  (required when WEBHOOK is set) Set by the runner.
@@ -64,10 +64,10 @@ done
 
 message="${MESSAGE:-}"
 title="${TITLE:-}"
-channel="${CHANNEL:-deployments}"
-username="${USERNAME:-Deploy Bot}"
-icon_emoji="${ICON_EMOJI:-:robot_face:}"
-color="${COLOR:-good}"
+channel="${CHANNEL-deployments}"
+username="${USERNAME-Deploy Bot}"
+icon_emoji="${ICON_EMOJI-:robot_face:}"
+color="${COLOR-good}"
 
 case "$color" in
   success) color="good" ;;
