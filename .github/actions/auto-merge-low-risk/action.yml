@@ -1,8 +1,10 @@
 name: Auto-merge low-risk PR
 description: >-
   Merge low-risk PRs after the current head is reviewed, all Copilot threads
-  are resolved, and the current pull request checks are green. Disable any
-  legacy auto-merge request before evaluating fresh gates.
+  are resolved, and the current pull request checks are green. Pull requests
+  where Dependabot authored every commit skip the Copilot review gate, because
+  Copilot does not review them. Disable any legacy auto-merge request before
+  evaluating fresh gates.
 
 inputs:
   pr-number:

@@ -465,7 +465,7 @@ make_orchestration_harness() {
   export ORCHESTRATION_LOG="$tmpdir/orchestration.log"
   export GITHUB_TOKEN="test-token"
 
-  for helper in disable-auto-merge check-copilot-review-gate check-pull-request-state-gate request-copilot-review approve-pull-request; do
+  for helper in disable-auto-merge check-dependabot-pull-request check-copilot-review-gate check-pull-request-state-gate request-copilot-review approve-pull-request; do
     cat > "$harness/$helper.sh" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -473,6 +473,7 @@ name="$(basename "$0" .sh)"
 printf '%s %s\n' "$name" "$*" >> "$ORCHESTRATION_LOG"
 case "$name" in
   disable-auto-merge) exit "${DISABLE_STATUS:-0}" ;;
+  check-dependabot-pull-request) exit "${DEPENDABOT_STATUS:-1}" ;;
   check-copilot-review-gate) exit "${COPILOT_GATE_STATUS:-0}" ;;
   check-pull-request-state-gate) exit "${STATE_GATE_STATUS:-0}" ;;
   approve-pull-request) exit "${APPROVAL_STATUS:-0}" ;;
@@ -567,6 +568,7 @@ run_orchestration() {
   expected="$tmpdir/expected.log"
   cat > "$expected" <<'EOF'
 disable-auto-merge --repo trade-tariff/example --pr 42 --merge-method squash
+check-dependabot-pull-request --repo trade-tariff/example --pr 42 --head expected-head
 check-copilot-review-gate --repo trade-tariff/example --pr 42 --head expected-head
 check-pull-request-state-gate --repo trade-tariff/example --pr 42 --workflow ci.yml --head expected-head
 approve-pull-request --repo trade-tariff/example --pr 42 --head expected-head
@@ -610,6 +612,57 @@ EOF
 
   [ "$status" -ne 0 ]
   [ "$(grep -c '^merge ' "$ORCHESTRATION_LOG")" -eq 1 ]
+}
+
+@test "orchestration skips only the Copilot gate for a Dependabot pull request" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+  export DEPENDABOT_STATUS=0
+  export COPILOT_GATE_STATUS=2
+  export STATE_GATE_STATUS=0
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Dependabot authored every commit on PR #42; skipping the Copilot review gate."
+  expected="$tmpdir/expected.log"
+  cat > "$expected" <<'EOF'
+disable-auto-merge --repo trade-tariff/example --pr 42 --merge-method squash
+check-dependabot-pull-request --repo trade-tariff/example --pr 42 --head expected-head
+check-pull-request-state-gate --repo trade-tariff/example --pr 42 --workflow ci.yml --head expected-head
+approve-pull-request --repo trade-tariff/example --pr 42 --head expected-head
+merge pr merge 42 --repo trade-tariff/example --squash --admin --match-head-commit expected-head
+EOF
+  run diff -u "$expected" "$ORCHESTRATION_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "orchestration keeps the Copilot gate when the Dependabot check cannot read GitHub" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+  export DEPENDABOT_STATUS=3
+  export COPILOT_GATE_STATUS=2
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  run grep -E '^check-copilot-review-gate ' "$ORCHESTRATION_LOG"
+  [ "$status" -eq 0 ]
+  run grep -E '^(approve-pull-request|merge) ' "$ORCHESTRATION_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "orchestration never merges a Dependabot pull request when state or checks fail" {
+  make_orchestration_harness
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+  export DEPENDABOT_STATUS=0
+  export STATE_GATE_STATUS=1
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  run grep -E '^(approve-pull-request|merge) ' "$ORCHESTRATION_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "reusable workflow only handles Copilot review events" {

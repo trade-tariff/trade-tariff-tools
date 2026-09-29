@@ -45,7 +45,11 @@ permissions:
 
 jobs:
   auto-merge:
+    # Events that Dependabot triggers get only Dependabot secrets, so the
+    # pr-bot App secrets are empty. Skip them. The workflow_run event after CI
+    # gets the Actions secrets and handles Dependabot pull requests.
     if: >-
+      (github.event_name == 'workflow_run' || github.actor != 'dependabot[bot]') &&
       (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
       (github.event_name != 'pull_request_review' ||
       github.event.review.user.login == 'copilot' ||
