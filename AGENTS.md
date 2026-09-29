@@ -171,6 +171,9 @@ script version must match the reusable workflow SHA exactly.
   `${{ }}`. In `run:`, the only expression is `${{ github.action_path }}`.
 - Flags are for values a person types for a local run. Environment variables
   are for values the runner supplies.
+- If the script also works as a local command with arguments (for example
+  `scale-services.sh`), use flags for its inputs. Otherwise use environment
+  variables.
 - A missing required environment variable exits 2 with
   `Missing required environment variable: NAME`.
 - Write outputs to `"${GITHUB_OUTPUT:-/dev/stdout}"`.
