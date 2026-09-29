@@ -57,12 +57,13 @@ esac
 
 action_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 approval_script="$action_path/approve-pull-request.sh"
+dependabot_script="$action_path/check-dependabot-pull-request.sh"
 disable_script="$action_path/disable-auto-merge.sh"
 gate_script="$action_path/check-copilot-review-gate.sh"
 state_gate_script="$action_path/check-pull-request-state-gate.sh"
 request_script="$action_path/request-copilot-review.sh"
 
-for helper in "$approval_script" "$disable_script" "$gate_script" "$state_gate_script" "$request_script"; do
+for helper in "$approval_script" "$dependabot_script" "$disable_script" "$gate_script" "$state_gate_script" "$request_script"; do
   if [[ ! -f "$helper" ]]; then
     echo "::error::Missing ${helper}" >&2
     exit 1
@@ -93,26 +94,39 @@ fi
 
 expected_head="$(gh pr view "$pr" --repo "$repo" --json headRefOid -q '.headRefOid')"
 
+# Copilot does not review Dependabot pull requests, so the Copilot gate would
+# block them forever. A pull request where Dependabot authored every commit
+# skips only that gate. Any other result (including a failed GitHub read)
+# keeps the Copilot gate.
 set +e
-"$gate_script" --repo "$repo" --pr "$pr" --head "$expected_head"
-gate_status=$?
+"$dependabot_script" --repo "$repo" --pr "$pr" --head "$expected_head"
+dependabot_status=$?
 set -e
 
-if [[ "$gate_status" -eq 2 ]]; then
+if [[ "$dependabot_status" -eq 0 ]]; then
+  echo "Dependabot authored every commit on PR #$pr; skipping the Copilot review gate."
+else
   set +e
-  "$request_script" --repo "$repo" --pr "$pr"
-  request_status=$?
+  "$gate_script" --repo "$repo" --pr "$pr" --head "$expected_head"
+  gate_status=$?
   set -e
-  if [[ "$request_status" -ne 0 ]]; then
-    echo "::warning::Unable to request Copilot review for PR #$pr (exit $request_status); Copilot may not be enabled for this repository. Skipping auto-merge."
+
+  if [[ "$gate_status" -eq 2 ]]; then
+    set +e
+    "$request_script" --repo "$repo" --pr "$pr"
+    request_status=$?
+    set -e
+    if [[ "$request_status" -ne 0 ]]; then
+      echo "::warning::Unable to request Copilot review for PR #$pr (exit $request_status); Copilot may not be enabled for this repository. Skipping auto-merge."
+      exit 0
+    fi
+    echo "Waiting for Copilot to review PR #$pr; auto-merge will be retried on the next workflow run."
     exit 0
   fi
-  echo "Waiting for Copilot to review PR #$pr; auto-merge will be retried on the next workflow run."
-  exit 0
-fi
-if [[ "$gate_status" -ne 0 ]]; then
-  echo "Copilot review requirements not met for PR #$pr; skipping auto-merge."
-  exit 0
+  if [[ "$gate_status" -ne 0 ]]; then
+    echo "Copilot review requirements not met for PR #$pr; skipping auto-merge."
+    exit 0
+  fi
 fi
 
 set +e
