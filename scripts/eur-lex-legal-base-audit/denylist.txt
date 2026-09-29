@@ -1,0 +1,9 @@
+# Legal bases whose OJ citation must never be linked. A human checked these
+# in a browser: the citation page is dead, or it opens a different law.
+# combine.mjs drops these ids from the browser results.
+I0001840 # dead
+I0103640 # dead
+I0400240 # dead
+I9902620 # dead
+I1401380 # opens the wrong law
+I1401440 # opens the wrong law

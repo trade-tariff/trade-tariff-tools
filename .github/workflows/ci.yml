@@ -24,6 +24,7 @@ on:
       - 'scripts/deploy-pr-info.sh'
       - 'scripts/deploy-result.sh'
       - 'scripts/trufflehog-pre-commit.sh'
+      - 'scripts/eur-lex-legal-base-audit/**'
       - 'tests/**'
 
 permissions:
