@@ -30,60 +30,36 @@ inputs:
 runs:
   using: composite
   steps:
-    - shell: bash
+    - id: resolve
+      shell: bash
+      env:
+        INPUT_BASE_SHA: ${{ inputs.base-sha }}
+        INPUT_HEAD_SHA: ${{ inputs.head-sha }}
+        EVENT_NAME: ${{ github.event_name }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        REPOSITORY: ${{ github.repository }}
+        REPOSITORY_OWNER: ${{ github.repository_owner }}
+        REF_NAME: ${{ github.ref_name }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: '"${{ github.action_path }}/resolve-pull-request-shas.sh"'
+
+    - if: steps.resolve.outputs.skip != 'true'
+      shell: bash
       env:
         THRESHOLD: ${{ inputs.threshold }}
         EXCLUDE_PATHS: ${{ inputs.exclude-paths }}
-        INPUT_BASE_SHA: ${{ inputs.base-sha }}
-        INPUT_HEAD_SHA: ${{ inputs.head-sha }}
-        GITHUB_TOKEN: ${{ inputs.github-token }}
+        BASE_SHA: ${{ steps.resolve.outputs.base_sha }}
+        BASE_REF: ${{ steps.resolve.outputs.base_ref }}
+        HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}
       run: |
-        set -euo pipefail
-
-        base_sha="$INPUT_BASE_SHA"
-        head_sha="$INPUT_HEAD_SHA"
-        base_ref=""
-
-        if [[ -z "$base_sha" || -z "$head_sha" ]]; then
-          case "${{ github.event_name }}" in
-            pull_request)
-              base_sha="${{ github.event.pull_request.base.sha }}"
-              head_sha="${{ github.event.pull_request.head.sha }}"
-              base_ref="${{ github.event.pull_request.base.ref }}"
-              ;;
-            push)
-              response="$(
-                curl -fsSL \
-                  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                  -H "Accept: application/vnd.github+json" \
-                  "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ github.ref_name }}&state=open"
-              )"
-              if [[ "$(jq 'length' <<< "$response")" -eq 0 ]]; then
-                echo "::notice::No open pull request for ${{ github.ref_name }}; skipping line check."
-                exit 0
-              fi
-              base_sha="$(jq -r '.[0].base.sha' <<< "$response")"
-              base_ref="$(jq -r '.[0].base.ref' <<< "$response")"
-              head_sha="$(jq -r '.[0].head.sha' <<< "$response")"
-              ;;
-            *)
-              echo "::error::Unsupported event: ${{ github.event_name }}. Use pull_request or push." >&2
-              exit 1
-              ;;
-          esac
-        fi
-
-        if [[ -z "$base_sha" || -z "$head_sha" ]]; then
-          echo "::error::Could not determine base-sha and head-sha." >&2
-          exit 1
-        fi
-
         exclude_file="$(mktemp)"
         printf '%s\n' "$EXCLUDE_PATHS" > "$exclude_file"
 
         "${{ github.action_path }}/check-pr-lines.sh" \
           --threshold "$THRESHOLD" \
-          --base "$base_sha" \
-          --base-ref "$base_ref" \
-          --head "$head_sha" \
+          --base "$BASE_SHA" \
+          --base-ref "$BASE_REF" \
+          --head "$HEAD_SHA" \
           --exclude-paths-file "$exclude_file"
