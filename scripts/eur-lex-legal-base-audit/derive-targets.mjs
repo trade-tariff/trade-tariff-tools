@@ -1,6 +1,6 @@
-// Step 1: list every non-regulation legal base (D/A/J/C/I) behind a live UK or
-// XI measure, with its CELEX guess and OJ citation, and the citation URLs for
-// audit.mjs to open in a browser. Writes derived-targets.json.
+// Step 1: list every non-regulation legal base (D/A/J/C/I) behind a live or
+// future-dated UK or XI measure, with its CELEX guess and OJ citation, and the
+// citation URLs for audit.mjs to open in a browser. Writes derived-targets.json.
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { CITATION_CUTOFF_DATE, celexGuess, ojCitation } from './rules.mjs';
@@ -13,11 +13,12 @@ const regulations = (schema, kind) => `
          published_date, officialjournal_number, officialjournal_page
   FROM ${schema}.${kind}_regulations`;
 
-const liveMeasures = (schema) => `
+// Future-dated measures are included so their legal bases are already in the
+// backend file when they go live, instead of waiting for the next run.
+const liveOrFutureMeasures = (schema) => `
   SELECT DISTINCT '${schema}' AS service, measure_generating_regulation_id AS rid, measure_generating_regulation_role AS role
   FROM ${schema}.measures
-  WHERE validity_start_date <= CURRENT_DATE
-    AND (validity_end_date IS NULL OR validity_end_date >= CURRENT_DATE)`;
+  WHERE validity_end_date IS NULL OR validity_end_date >= CURRENT_DATE`;
 
 // UK national regulations (OJ number '1', page 1) are out of scope: the
 // backend links them to legislation.gov.uk, not EUR-Lex.
@@ -27,7 +28,7 @@ FROM (
   SELECT DISTINCT regulations.*
   FROM (${regulations('uk', 'base')} UNION ALL ${regulations('uk', 'modification')}
         UNION ALL ${regulations('xi', 'base')} UNION ALL ${regulations('xi', 'modification')}) regulations
-  JOIN (${liveMeasures('uk')} UNION ${liveMeasures('xi')}) live USING (service, rid, role)
+  JOIN (${liveOrFutureMeasures('uk')} UNION ${liveOrFutureMeasures('xi')}) measures USING (service, rid, role)
   WHERE left(rid, 1) IN ('D', 'A', 'J', 'C', 'I')
     AND NOT (coalesce(officialjournal_number, '') = '1' AND coalesce(officialjournal_page, 0) = 1)
 ) candidates;

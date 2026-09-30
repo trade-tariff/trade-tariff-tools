@@ -6,11 +6,13 @@
 import { chromium } from 'playwright';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { needsBrowserCheck } from './rules.mjs';
 
 // Playwright resolves its own installed browser; set AUDIT_CHROMIUM_PATH to override.
 const executablePath = process.env.AUDIT_CHROMIUM_PATH || undefined;
+const playwrightVersion = createRequire(import.meta.url)('playwright/package.json').version;
 const defaultOutput = new URL('./audit-results.json', import.meta.url);
 const targetsText = readFileSync(new URL('./derived-targets.json', import.meta.url), 'utf8');
 const targetsSha256 = createHash('sha256').update(targetsText).digest('hex');
@@ -46,7 +48,7 @@ function saveAudit(audit) {
   renameSync(temporaryUrl, outputUrl);
 }
 
-function loadAudit() {
+function loadAudit(browserDescription) {
   if (existsSync(outputUrl)) {
     const existing = JSON.parse(readFileSync(outputUrl, 'utf8'));
     if (existing.provenance?.derived_targets_sha256 !== targetsSha256) {
@@ -62,7 +64,7 @@ function loadAudit() {
       commit: targetsDocument.provenance.commit,
       targets_generated_at: targetsDocument.provenance.generated_at,
       derived_targets_sha256: targetsSha256,
-      browser: 'Playwright 1.62.1, Chromium headless shell 149.0.7827.55 (revision 1228)',
+      browser: browserDescription,
     },
     settings: {
       base_delay_ms: baseDelayMs,
@@ -255,16 +257,17 @@ async function fetchTarget(page, target, attemptNumber) {
 
 const neededTargets = targetsDocument.targets.filter((target) => needsBrowserCheck(target, celexStatus));
 const allTargets = limit ? neededTargets.slice(0, limit) : neededTargets;
-const audit = loadAudit();
-const completedUrls = new Set(audit.results.map((result) => result.url));
-let requestDelayMs = baseDelayMs;
-let stopped = false;
 
 const browser = await chromium.launch({
   headless: true,
   executablePath,
   args: ['--single-process', '--no-zygote'],
 });
+const audit = loadAudit(`Playwright ${playwrightVersion}, Chromium ${browser.version()}`);
+const completedUrls = new Set(audit.results.map((result) => result.url));
+let requestDelayMs = baseDelayMs;
+let stopped = false;
+
 const context = await browser.newContext({
   locale: 'en-GB',
   serviceWorkers: 'block',

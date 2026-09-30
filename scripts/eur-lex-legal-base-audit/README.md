@@ -38,10 +38,12 @@ backend links them to legislation.gov.uk.
 ## The steps
 
 1. **`derive-targets.mjs`** lists every D, A, J, C and I legal base behind a
-   live UK or XI measure. For each one it works out the backend's CELEX guess
-   and, where the OJ data allows, the OJ citation. Citations only work for
-   documents published before 1 October 2023, when the EU changed its OJ
-   numbering. Writes `derived-targets.json`.
+   live or future-dated UK or XI measure. Future-dated measures are included
+   so their legal bases are covered before they go live. For each one it
+   works out the backend's CELEX guess and, where the OJ data allows, the OJ
+   citation. Citations only work for documents published before
+   1 October 2023, when the EU changed its OJ numbering. Writes
+   `derived-targets.json`.
 2. **`check-celex.mjs`** asks the EU Cellar API whether each decision's CELEX
    guess exists (`303` = exists, `404` = doesn't). Cellar is the EU's
    machine-readable store behind EUR-Lex, and it's reliable for CELEX ids.
@@ -81,7 +83,7 @@ and `xi` schemas loaded. The defaults are database `tariff_development`, host
 From this directory:
 
 ```bash
-npm install
+npm ci
 npx playwright install chromium
 node derive-targets.mjs
 node check-celex.mjs
