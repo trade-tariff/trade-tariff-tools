@@ -1,0 +1,23 @@
+# Decisions whose CELEX guess exists in Cellar but opens a different act.
+# TARIC ids only carry a number and year, and many EU bodies number their
+# decisions the same way. Acts of bodies set up by an agreement are CELEX
+# sector 2, and ECSC decisions are type S, so the sector 3, type D guess finds
+# an unrelated act. A person checked each one: Cellar files the guess in a
+# different OJ issue, with an unrelated title. find-wrong-celex.mjs lists
+# suspects to review. combine.mjs treats these like a Cellar 404.
+#
+# Reviewed and left out (the guess seems to open the right act):
+# D1502371, D1502372: 2015/237 matches the subject; TARIC's OJ L 125 is wrong
+# D9900680, D9900681: 1999/68/EC (protocols with Lithuania) fits TARIC's "LT" text
+D0000023 # EC-Mexico Joint Council Decision 2/2000 (22000D0630(02)); guess is 2000/2/EC on bovine imports
+D0100050 # EU-Lithuania Association Council Decision 5/2001 (22002D0869); guess is 2001/5/EC
+D0101400 # EEA Joint Committee Decision 140/2001 (22001D0140); guess is 2001/140/EC on swine fever in Austria
+D0101401 # EEA Joint Committee Decision 140/2001 (22001D0140); guess is 2001/140/EC on swine fever in Austria
+D0204660 # Latvia, measure 142 (OJ L 162/2002); guess is Decision 466/2002/EC on environmental NGOs
+D0401380 # EEA Joint Committee Decision 138/2004 (22004D0138); guess is 2004/138/EC on Austrian banks
+D9401760 # ECSC Decision 176/94 on iron and steel surveillance (31994S0176); guess is 94/176/EC on Structural Funds
+D9500010 # Measure 143 (OJ L 326/1995); guess is 95/1/EC on the 1995 accession
+D9500019 # EC-Turkey Association Council Decision 1/95 (21996D0213(01)); guess is 95/1/EC. The backend also maps it to D9601421
+D9600550 # ECSC Decision 55/96 on Czech pig-iron (31996S0055); guess is 96/55/EC on Portuguese fish disease
+D9603020 # ECSC Decision 302/96 (31996S0302); guess is 96/302/EC on an information format
+D9805630 # ECSC Decision 563/98 (31998S0563); guess is 98/563/EC on synthetic fibre ropes

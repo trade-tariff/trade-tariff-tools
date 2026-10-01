@@ -22,19 +22,44 @@ export function ojCitation({ officialjournal_number: number, officialjournal_pag
 
 // buildLinks never uses the citation of a decision whose CELEX link works, so
 // the browser only needs to check a citation if another legal base uses it.
-export function needsBrowserCheck({ rids }, celexStatus) {
-  return rids.some((rid) => !rid.startsWith('D') || celexStatus[celexGuess(rid)] !== 303);
+// A decision in wrong-celex.txt counts as broken: its CELEX link opens another act.
+export function needsBrowserCheck({ rids }, celexStatus, wrongCelex = new Set()) {
+  return rids.some((rid) => !rid.startsWith('D') || celexStatus[celexGuess(rid)] !== 303 || wrongCelex.has(rid));
+}
+
+// True when Cellar files the act behind a CELEX guess in a different OJ issue
+// from the one TARIC cites, so the guess probably opens a different act.
+// Only pre-2023 Cellar OJ ids (oj:JO{L|C}_YYYY_NNN_...) can be compared. Their
+// last part is a page before 2013 and a sequence number after, so pages are
+// ignored. find-wrong-celex.mjs lists these for a person to review.
+export function ojIssueMismatch({ officialjournal_number: number, published_date: publishedDate }, cellarOjIds) {
+  const taric = String(number ?? '').trim().match(/^([LC])\s*(\d+)$/i);
+  const cellar = cellarOjIds.map((id) => id.match(/^oj:JO([LC])_(\d{4})_(\d+)_/)).filter(Boolean);
+  if (!taric || !publishedDate || cellar.length === 0) return false;
+
+  return !cellar.some(([, series, year, issue]) => series === taric[1].toUpperCase()
+    && year === publishedDate.slice(0, 4)
+    && Number(issue) === Number(taric[2]));
+}
+
+// Reads denylist.txt and wrong-celex.txt: one id per line, # starts a comment.
+export function parseIdList(text) {
+  return new Set(text
+    .split('\n')
+    .map((line) => line.replace(/#.*/, '').trim())
+    .filter(Boolean));
 }
 
 // Rows for trade-tariff-backend db/eur_lex_legal_base_links.csv. Only legal
-// bases whose CELEX formula link is dead are listed, so working links never
-// change:
+// bases whose CELEX formula link is broken are listed, so working links never
+// change. A CELEX link is broken when Cellar doesn't have the guess (404), or
+// when the decision is in wrong-celex.txt because the guess opens another act.
 // - a browser-verified, non-denylisted citation for any A/C/I/J id, and for a
-//   D id whose CELEX guess is missing from Cellar
-// - a blank citation (no link) for any other D id whose CELEX guess is missing
+//   D id whose CELEX link is broken
+// - a blank citation (no link) for any other D id whose CELEX link is broken
 // Everything else is left out: the backend keeps the CELEX link for D and
 // shows no link for A/C/I/J.
-export function buildLinks({ candidates, browserPass, denylist, celexStatus }) {
+export function buildLinks({ candidates, browserPass, denylist, celexStatus, wrongCelex = new Set() }) {
   const links = new Map();
 
   for (const { rid, celex } of candidates) {
@@ -44,7 +69,7 @@ export function buildLinks({ candidates, browserPass, denylist, celexStatus }) {
       throw new Error(`No Cellar result for ${rid} (${celex}); run check-celex.mjs first`);
     }
 
-    const celexDead = !decision || status === 404;
+    const celexDead = !decision || status === 404 || wrongCelex.has(rid);
     const citation = denylist.has(rid) ? null : browserPass.get(rid);
     if (celexDead && citation) {
       links.set(rid, citation);

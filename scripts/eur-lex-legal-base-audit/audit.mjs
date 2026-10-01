@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { needsBrowserCheck } from './rules.mjs';
+import { needsBrowserCheck, parseIdList } from './rules.mjs';
 
 // Playwright resolves its own installed browser; set AUDIT_CHROMIUM_PATH to override.
 const executablePath = process.env.AUDIT_CHROMIUM_PATH || undefined;
@@ -18,6 +18,7 @@ const targetsText = readFileSync(new URL('./derived-targets.json', import.meta.u
 const targetsSha256 = createHash('sha256').update(targetsText).digest('hex');
 const targetsDocument = JSON.parse(targetsText);
 const celexStatus = JSON.parse(readFileSync(new URL('./celex-results.json', import.meta.url), 'utf8'));
+const wrongCelex = parseIdList(readFileSync(new URL('./wrong-celex.txt', import.meta.url), 'utf8'));
 
 const option = (name) => process.argv.find((argument) => argument.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
 const limit = Number.parseInt(option('limit') ?? '', 10) || null;
@@ -255,7 +256,7 @@ async function fetchTarget(page, target, attemptNumber) {
   return { ...evidence, ...judge(target, evidence) };
 }
 
-const neededTargets = targetsDocument.targets.filter((target) => needsBrowserCheck(target, celexStatus));
+const neededTargets = targetsDocument.targets.filter((target) => needsBrowserCheck(target, celexStatus, wrongCelex));
 const allTargets = limit ? neededTargets.slice(0, limit) : neededTargets;
 
 const browser = await chromium.launch({
