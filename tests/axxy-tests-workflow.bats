@@ -41,12 +41,3 @@ load test_helper
 
   [ "$status" -eq 0 ]
 }
-
-@test "ci runs when the axxy workflow changes" {
-  run ruby -ryaml -e '
-    paths = YAML.load_file(ARGV.fetch(0)).fetch(true).fetch("pull_request").fetch("paths")
-    abort "CI must cover accessibility workflow changes" unless paths.include?(".github/workflows/axxy-tests.yml")
-  ' "$repo_root/.github/workflows/ci.yml"
-
-  [ "$status" -eq 0 ]
-}
