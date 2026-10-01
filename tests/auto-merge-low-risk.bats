@@ -449,11 +449,11 @@ teardown() {
   [ "$status" -eq 0 ]
   run grep -F 'required-workflow: ${{ inputs.required-workflow }}' "$workflow"
   [ "$status" -eq 0 ]
-  run grep -F '.github/actions/auto-merge-low-risk/check-pull-request-state-gate.sh' "$ci_workflow"
-  [ "$status" -eq 0 ]
-  run grep -F '.github/actions/auto-merge-low-risk/disable-auto-merge.sh' "$ci_workflow"
-  [ "$status" -eq 0 ]
-  run grep -F '.github/actions/auto-merge-low-risk/approve-pull-request.sh' "$ci_workflow"
+  [ -f "$repo_root/.github/actions/auto-merge-low-risk/check-pull-request-state-gate.sh" ]
+  [ -f "$repo_root/.github/actions/auto-merge-low-risk/disable-auto-merge.sh" ]
+  [ -f "$repo_root/.github/actions/auto-merge-low-risk/approve-pull-request.sh" ]
+
+  run grep -F 'for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do' "$ci_workflow"
   [ "$status" -eq 0 ]
 }
 
