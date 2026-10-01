@@ -1,0 +1,44 @@
+name: Close stale pull requests
+description: >-
+  Close open pull requests with no recent activity, then delete stale branches
+  that have no open pull request.
+
+inputs:
+  stale_days:
+    description: Close pull requests and delete branches with no activity for at least this many days.
+    required: false
+    default: '14'
+  keep_label:
+    description: Label that exempts a pull request from automatic closure.
+    required: false
+    default: keep
+  dry_run:
+    description: '"true" lists pull requests and branches without changing them.'
+    required: false
+    default: 'true'
+  github-token:
+    description: Token with contents write and pull-requests write access.
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Close stale pull requests
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        STALE_DAYS: ${{ inputs.stale_days }}
+        KEEP_LABEL: ${{ inputs.keep_label }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: '"${{ github.action_path }}/close-stale-pull-requests.sh"'
+
+    - name: Clean stale branches
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        STALE_DAYS: ${{ inputs.stale_days }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: '"${{ github.action_path }}/delete-stale-branches.sh"'
