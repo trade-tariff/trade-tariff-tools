@@ -1,0 +1,7 @@
+# Outputs of each run. The result that matters is committed to
+# trade-tariff-backend as db/eur_lex_legal_base_links.csv.
+derived-targets.json
+celex-results.json
+audit-results.json
+audit-results.json.tmp
+eur_lex_legal_base_links.csv

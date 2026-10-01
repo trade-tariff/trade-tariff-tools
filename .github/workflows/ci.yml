@@ -2,29 +2,7 @@ name: CI
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/axxy-tests.yml'
-      - '.github/workflows/close-stale-pull-requests-reusable.yml'
-      - '.github/workflows/deploy-ecs.yml'
-      - '.github/workflows/deploy-multi-ecs.yml'
-      - '.github/workflows/e2e-tests.yml'
-      - '.github/actions/db-migrate/**'
-      - '.github/actions/setup-tflint/**'
-      - 'bin/**'
-      - '.github/actions/auto-merge-low-risk/**'
-      - '.github/actions/check-pr-lines/**'
-      - '.github/actions/importmap-update/**'
-      - '.github/actions/risk-label/**'
-      - '.github/workflows/risk-label-reusable.yml'
-      - '.github/actions/start-services/**'
-      - '.github/actions/stop-services/**'
-      - '.github/workflows/auto-merge-low-risk.yml'
-      - '.github/workflows/auto-merge.yml'
-      - 'flake.lock'
-      - 'flake.nix'
-      - 'scripts/**'
-      - 'tests/**'
+  merge_group:
 
 permissions:
   contents: read
