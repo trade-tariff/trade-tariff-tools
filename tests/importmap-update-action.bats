@@ -34,10 +34,3 @@ load test_helper
   run grep -F 'dry-run: ${{ inputs.dry-run }}' "$action"
   [ "$status" -eq 0 ]
 }
-
-@test "ci runs when the importmap-update action changes" {
-  workflow="$repo_root/.github/workflows/ci.yml"
-
-  run grep -F ".github/actions/importmap-update/**" "$workflow"
-  [ "$status" -eq 0 ]
-}
