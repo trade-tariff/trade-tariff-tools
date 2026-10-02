@@ -149,8 +149,9 @@ more than one matching environment.
 - Starts scheduled EventBridge-backed ECS jobs on demand with `ecs run`
 - Discovers scheduled jobs from the current AWS account credentials
 - Resolves the latest active task definition before starting scheduled jobs
-- Automatically starts `backend-job` tasks if none are running
-- Automatically stops `backend-job` tasks when you exit
+- Lists every job (`admin-job`, `backend-job`, `dev-hub-job`, `identity-job`, ...) next to the ECS services
+- Reuses a running job task that has ECS Exec enabled, or starts a new one if none exists
+- Automatically stops the job tasks that it started when you exit
 - Sets `RAILS_LOG_LEVEL=debug` for all commands
 
 **Note:** The script requires Session Manager Plugin to be installed. If you encounter an error about SessionManagerPlugin not being found, install it using:
