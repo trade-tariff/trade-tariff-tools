@@ -42,9 +42,14 @@ EXAMPLES:
     $SCRIPT_NAME run --no-tail                                 # Start a job without tailing logs
 
 SPECIAL BEHAVIOR:
-    - If selecting 'backend-job', looks for standalone tasks (not services)
-    - If no running 'backend-job' tasks exist, automatically starts a new one
-    - backend-job tasks are automatically stopped when you exit
+    - Job tasks (task definition families named '<name>-job-<account-id>', such as
+      backend-job, admin-job, identity-job or dev-hub-job) are listed next to the
+      ECS services, because jobs have no ECS service
+    - If selecting a job, looks for running standalone tasks of that job that
+      have ECS Exec enabled
+    - If no such task exists, automatically starts a new one from the latest
+      task definition
+    - Job tasks started by this script are automatically stopped when you exit
     - All commands run with RAILS_LOG_LEVEL=debug for better debugging
 
 PREREQUISITES:
@@ -124,15 +129,30 @@ select_cluster() {
     echo "$cluster"
 }
 
+# Job task definition families are named "<job>-<account-id>", e.g.
+# "admin-job-123456789012". Jobs have no ECS service, so we discover them from
+# their task definition families and print the job names ("admin-job").
+list_job_names() {
+    aws ecs list-task-definition-families --status ACTIVE --region "$REGION" \
+        | jq -r '.families[] | select(test("-job-[0-9]{12}$")) | sub("-[0-9]{12}$"; "")'
+}
+
+service_exists() {
+    local cluster="$1"
+    local service="$2"
+
+    aws ecs describe-services --cluster "$cluster" --services "$service" --region "$REGION" \
+        | jq -e '[.services[] | select(.status == "ACTIVE")] | length > 0' >/dev/null
+}
+
 select_service() {
     local cluster="$1"
     local service
 
-    # NOTE: Inject "backend-job" into the list since it's no longer an ECS Service
     service=$({
         aws ecs list-services --cluster "$cluster" --region "$REGION" \
             | jq -r '.serviceArns[] | split("/") | .[2]'
-        echo "backend-job"
+        list_job_names
     } | sort | uniq | fzf --height 40% --prompt "Select a Service (or Job): " --no-info)
 
     [[ -n "$service" ]] || error_exit "No service selected"
@@ -145,17 +165,7 @@ select_task() {
     local service="$2"
     local task
 
-    local task_list_cmd
-
-    if [[ "$service" == "backend-job" ]]; then
-        # For backend-job, we filter by Family, not Service Name
-        task_list_cmd="aws ecs list-tasks --cluster \"$cluster\" --family \"backend-job\" --region \"$REGION\""
-    else
-        # For standard services, we filter by Service Name
-        task_list_cmd="aws ecs list-tasks --cluster \"$cluster\" --service-name \"$service\" --region \"$REGION\""
-    fi
-
-    task=$(eval "$task_list_cmd" \
+    task=$(aws ecs list-tasks --cluster "$cluster" --service-name "$service" --region "$REGION" \
         | jq -r '.taskArns[] | split("/") | .[2]' \
         | fzf --height 40% --prompt "Select a Task: " --no-info)
 
@@ -203,31 +213,68 @@ get_network_config() {
     echo "$subnets,$sg"
 }
 
-find_task_definition() {
-    local search_term="$1"
+job_family() {
+    local job="$1"
 
-    # List all active task definitions and grep for the search term
-    # We sort DESC to get the latest revisions first
-    local task_def_arn
-    task_def_arn=$(aws ecs list-task-definitions --status ACTIVE --sort DESC --region "$REGION" \
-        | jq -r '.taskDefinitionArns[]' \
-        | grep -E "$search_term" \
-        | head -n 1)
+    local account
+    account=$(aws sts get-caller-identity --region "$REGION" | jq -r '.Account')
+    [[ -n "$account" && "$account" != "null" ]] || error_exit "Could not determine AWS account ID"
 
-    echo "$task_def_arn"
+    echo "${job}-${account}"
 }
 
-start_backend_job_task() {
-    local cluster="$1"
-    local service="$2"
+latest_job_task_definition() {
+    local family="$1"
 
     local task_def
-    task_def=$(find_task_definition ".*/backend-job-[0-9]{12}:[0-9]+$")
-    echo "Using Task Definition ARN: $task_def" >&2
+    task_def=$(aws ecs describe-task-definition --task-definition "$family" --region "$REGION" 2>/dev/null \
+        | jq -r '.taskDefinition.taskDefinitionArn // empty') || true
 
-    if [[ -z "$task_def" ]]; then
-        error_exit "Could not find any active Task Definition containing 'backend-job'. Please check your AWS Task Definitions."
-    fi
+    [[ -n "$task_def" ]] || error_exit "Could not find an active task definition for family '$family'. Please check your AWS Task Definitions."
+
+    echo "$task_def"
+}
+
+# Prints the ID of a running job task that has ECS Exec enabled. Scheduled runs
+# are started without ECS Exec, so they are skipped. Prints nothing if no such
+# task exists.
+select_job_task() {
+    local cluster="$1"
+    local family="$2"
+
+    local task_arns
+    task_arns=$(aws ecs list-tasks --cluster "$cluster" --family "$family" --desired-status RUNNING --region "$REGION" \
+        | jq -r '.taskArns[]')
+
+    [[ -n "$task_arns" ]] || return 0
+
+    local exec_tasks
+    # shellcheck disable=SC2086 # word splitting passes each task ARN as an argument
+    exec_tasks=$(aws ecs describe-tasks --cluster "$cluster" --tasks $task_arns --region "$REGION" \
+        | jq -r '.tasks[] | select(.enableExecuteCommand == true) | .taskArn | split("/") | .[-1]')
+
+    [[ -n "$exec_tasks" ]] || return 0
+
+    local count
+    count=$(echo "$exec_tasks" | wc -l | tr -d ' ')
+    echo "$family has $count running task(s) with ECS Exec enabled. Proceeding with task selection..." >&2
+
+    local task
+    task=$(echo "$exec_tasks" | fzf --height 40% --prompt "Select a Task: " --no-info)
+    [[ -n "$task" ]] || error_exit "No task selected"
+    echo "Selected Task: $task" >&2
+    echo "$task"
+}
+
+start_job_task() {
+    local cluster="$1"
+    local service="$2"
+    local family="$3"
+
+    local task_def
+    # errexit does not apply inside command substitution, so exit explicitly
+    task_def=$(latest_job_task_definition "$family") || exit 1
+    echo "Using Task Definition ARN: $task_def" >&2
 
     # Get network configuration
     local network_config
@@ -256,7 +303,7 @@ start_backend_job_task() {
     echo "Started task: $task" >&2
 
     # Wait for task to be ready
-    wait_for_task_ready "$cluster" "$task"
+    wait_for_task_ready "$cluster" "$task" "$service"
 
     echo "$task"
 }
@@ -264,12 +311,16 @@ start_backend_job_task() {
 wait_for_task_agent() {
     local cluster="$1"
     local task="$2"
+    local container="$3"
     local wait_count=0
 
     while [[ $wait_count -lt $MAX_WAIT_TIME ]]; do
         local agent_status
+        # Match the app container by name: tasks with a read-only root filesystem
+        # also have a short-lived volume-permissions init container.
         agent_status=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" --region "$REGION" \
-            | jq -r '.tasks[0].containers[0].managedAgents[0].lastStatus // empty')
+            | jq -r --arg container "$container" \
+                '.tasks[0].containers[] | select(.name == $container) | .managedAgents[0].lastStatus // empty')
         if [[ "$agent_status" == "RUNNING" ]]; then
             printf "\r%-80s\n" "Task status: AGENT $agent_status" >&2
             return 0
@@ -285,6 +336,7 @@ wait_for_task_agent() {
 wait_for_task_ready() {
     local cluster="$1"
     local task="$2"
+    local container="$3"
     printf "Waiting for task to be ready for exec..." >&2
     local wait_count=0
     while [[ $wait_count -lt $MAX_WAIT_TIME ]]; do
@@ -293,7 +345,7 @@ wait_for_task_ready() {
             | jq -r '.tasks[0].lastStatus')
         if [[ "$task_status" == "RUNNING" ]]; then
             printf "\r%-80s\n" "Task status: $task_status, checking agent..." >&2
-            wait_for_task_agent "$cluster" "$task"
+            wait_for_task_agent "$cluster" "$task" "$container"
             return 0
         fi
         printf "\r%-80s" "Task status: $task_status, waiting..." >&2
@@ -303,11 +355,11 @@ wait_for_task_ready() {
     error_exit "Task did not start within expected time ($MAX_WAIT_TIME seconds)"
 }
 
-cleanup_backend_job() {
+cleanup_job_task() {
     local cluster="$1"
     local task="$2"
 
-    echo "Stopping backend-job task..." >&2
+    echo "Stopping job task $task..." >&2
     if aws ecs stop-task --cluster "$cluster" --task "$task" --region "$REGION" >/dev/null; then
         echo "Task stopped successfully" >&2
     else
@@ -855,19 +907,16 @@ main() {
     cluster=$(select_cluster)
     service=$(select_service "$cluster")
 
-    # Handle backend-job special case
-    local backend_job_started=false
-    if [[ "$service" == "backend-job" ]]; then
-        local running_tasks
-        running_tasks=$(aws ecs list-tasks --cluster "$cluster" --family "$service" --region "$REGION" --desired-status RUNNING \
-            | jq -r '.taskArns | length')
+    # Jobs have no ECS service: reuse a running exec-enabled job task, or start one
+    local job_task_started=false
+    if [[ "$service" == *-job ]] && ! service_exists "$cluster" "$service"; then
+        local family
+        family=$(job_family "$service")
+        task=$(select_job_task "$cluster" "$family")
 
-        if [[ "$running_tasks" -eq 0 ]]; then
-            task=$(start_backend_job_task "$cluster" "$service")
-            backend_job_started=true
-        else
-            echo "backend-job has $running_tasks running task(s). Proceeding with task selection..." >&2
-            task=$(select_task "$cluster" "$service")
+        if [[ -z "$task" ]]; then
+            task=$(start_job_task "$cluster" "$service" "$family")
+            job_task_started=true
         fi
     else
         task=$(select_task "$cluster" "$service")
@@ -881,8 +930,9 @@ main() {
         exec_command="/bin/sh -c \"RAILS_LOG_LEVEL=debug $COMMAND\""
     fi
 
-    if [[ "$service" == "backend-job" && "$backend_job_started" == true ]]; then
-        trap "cleanup_backend_job '$cluster' '$task'" EXIT
+    if [[ "$job_task_started" == true ]]; then
+        # shellcheck disable=SC2064 # expand cluster and task now, not at exit
+        trap "cleanup_job_task '$cluster' '$task'" EXIT
     fi
 
     local exec_enabled
