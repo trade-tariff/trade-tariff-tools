@@ -1,5 +1,5 @@
 name: 'Setup SSH'
-description: 'Setup SSH key for Git operations. Skips setup when the key is empty, for example on pull requests from forks.'
+description: 'Setup SSH key for Git operations. When the key is empty, for example on pull requests from forks, it skips SSH setup and sends GitHub SSH URLs over HTTPS.'
 
 inputs:
   ssh-key:
@@ -9,7 +9,12 @@ runs:
   steps:
     - run: |
         if [ -z "$SSH_KEY" ]; then
-          echo "No SSH key given. Skipping SSH setup, so git keeps using HTTPS."
+          echo "No SSH key given. Skipping SSH setup. Sending GitHub SSH URLs over HTTPS."
+          # Public repos referenced over SSH (for example Terraform module
+          # sources) then still clone. Terraform turns "git@github.com:" into
+          # "ssh://git@github.com/" before it calls git, so both need a rule.
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
           exit 0
         fi
 

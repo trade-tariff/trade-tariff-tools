@@ -44,11 +44,17 @@ teardown() {
   assert_contains "$(cat "$tmpdir/git-calls.txt")" 'config --global url.git@github.com:.insteadOf https://github.com/'
 }
 
-@test "setup-ssh skips all setup when the key is empty" {
+@test "setup-ssh skips SSH setup and sends GitHub SSH URLs over HTTPS when the key is empty" {
   run env HOME="$tmpdir" SSH_KEY="" bash "$script"
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "No SSH key given"
   [ ! -e "$tmpdir/.ssh/id_ed25519" ]
-  [ ! -e "$tmpdir/git-calls.txt" ]
+  [ ! -e "$tmpdir/.ssh/known_hosts" ]
+
+  # Terraform turns "git@github.com:org/repo" into "ssh://git@github.com/org/repo"
+  # before it calls git, so both forms need a rule.
+  expected_calls="config --global url.https://github.com/.insteadOf git@github.com:
+config --global --add url.https://github.com/.insteadOf ssh://git@github.com/"
+  [ "$(cat "$tmpdir/git-calls.txt")" = "$expected_calls" ]
 }
