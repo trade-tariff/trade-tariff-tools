@@ -1,5 +1,5 @@
 name: 'Setup SSH'
-description: 'Setup SSH key for Git operations'
+description: 'Setup SSH key for Git operations. Skips setup when the key is empty, for example on pull requests from forks.'
 
 inputs:
   ssh-key:
@@ -8,9 +8,16 @@ runs:
   using: 'composite'
   steps:
     - run: |
+        if [ -z "$SSH_KEY" ]; then
+          echo "No SSH key given. Skipping SSH setup, so git keeps using HTTPS."
+          exit 0
+        fi
+
         mkdir -p ~/.ssh
-        echo "${{ inputs.ssh-key }}" > ~/.ssh/id_ed25519
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H github.com >> ~/.ssh/known_hosts
         git config --global url."git@github.com:".insteadOf "https://github.com/"
       shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh-key }}
