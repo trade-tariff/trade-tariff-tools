@@ -109,6 +109,23 @@ teardown() {
   [ ! -f "$tmpdir/aws-commands.txt" ]
 }
 
+@test "does nothing and succeeds with no service names under the system bash" {
+  # /bin/bash is bash 3.2 on macOS. It treats an empty array as unbound under nounset.
+  run /bin/bash "$script" --cluster trade-tariff-cluster --region eu-west-2 --desired-count 1 --verb start
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "::notice::All services started successfully!"
+  [ ! -f "$tmpdir/aws-commands.txt" ]
+}
+
+@test "rejects a desired count that is not a non-negative integer" {
+  run "$script" --cluster trade-tariff-cluster --region eu-west-2 --desired-count abc --verb start frontend
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Invalid --desired-count: abc (expected a non-negative integer)"
+  [ ! -f "$tmpdir/aws-commands.txt" ]
+}
+
 @test "rejects a missing flag value" {
   run "$script" --cluster trade-tariff-cluster --region eu-west-2 --verb start frontend
 

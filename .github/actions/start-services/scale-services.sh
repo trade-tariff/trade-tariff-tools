@@ -84,6 +84,11 @@ if [[ -z "$desired_count" ]]; then
   exit 2
 fi
 
+if [[ ! "$desired_count" =~ ^[0-9]+$ ]]; then
+  echo "Invalid --desired-count: $desired_count (expected a non-negative integer)" >&2
+  exit 2
+fi
+
 case "$verb" in
   start)
     verb_ing="Starting"
@@ -104,37 +109,41 @@ esac
 succeeded=()
 failed=()
 
-for service_name in "${service_names[@]}"; do
-  echo "::group::${verb_ing} service: $service_name"
+# Bash 3.2 (macOS) treats an empty array as unbound under nounset, so only
+# expand service_names when it has entries.
+if [[ ${#service_names[@]} -gt 0 ]]; then
+  for service_name in "${service_names[@]}"; do
+    echo "::group::${verb_ing} service: $service_name"
 
-  if ! aws ecs describe-services \
-    --cluster "$cluster" \
-    --services "$service_name" \
-    --region "$region" \
-    --query "services[?status=='ACTIVE'].serviceName" \
-    --output text | grep -q "$service_name"; then
-    echo "::error::Service '$service_name' does not exist or is not active in cluster '$cluster'"
-    failed+=("$service_name (not found)")
+    if ! aws ecs describe-services \
+      --cluster "$cluster" \
+      --services "$service_name" \
+      --region "$region" \
+      --query "services[?status=='ACTIVE'].serviceName" \
+      --output text | grep -q "$service_name"; then
+      echo "::error::Service '$service_name' does not exist or is not active in cluster '$cluster'"
+      failed+=("$service_name (not found)")
+      echo "::endgroup::"
+      continue
+    fi
+
+    if aws ecs update-service \
+      --cluster "$cluster" \
+      --service "$service_name" \
+      --desired-count "$desired_count" \
+      --region "$region" \
+      --output text \
+      --query "service.{name:serviceName,desired:desiredCount,running:runningCount}" > /dev/null; then
+      echo "::notice::✓ ${verb_past} $service_name (desired count: $desired_count)"
+      succeeded+=("$service_name")
+    else
+      echo "::error::✗ Failed to $verb $service_name"
+      failed+=("$service_name")
+    fi
+
     echo "::endgroup::"
-    continue
-  fi
-
-  if aws ecs update-service \
-    --cluster "$cluster" \
-    --service "$service_name" \
-    --desired-count "$desired_count" \
-    --region "$region" \
-    --output text \
-    --query "service.{name:serviceName,desired:desiredCount,running:runningCount}" > /dev/null; then
-    echo "::notice::✓ ${verb_past} $service_name (desired count: $desired_count)"
-    succeeded+=("$service_name")
-  else
-    echo "::error::✗ Failed to $verb $service_name"
-    failed+=("$service_name")
-  fi
-
-  echo "::endgroup::"
-done
+  done
+fi
 
 echo ""
 echo "=========================================="
