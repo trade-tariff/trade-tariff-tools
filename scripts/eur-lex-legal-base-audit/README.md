@@ -22,8 +22,17 @@ instead, for example
 But EUR-Lex's citation index has gaps, so each citation must be checked before
 the backend uses it.
 
-The file only lists legal bases whose CELEX link is dead. A legal base with a
-working link is never listed, so a new run can't break a link that works.
+Some decisions have the opposite problem: the guess exists, but it opens a
+different act. A TARIC id only carries a number and year, and many EU bodies
+number their decisions the same way. For example, `D0000023` is EC-Mexico
+Joint Council Decision 2/2000, but the guess `32000D0002` opens Commission
+Decision 2000/2/EC on bovine imports. Decisions of bodies set up by an
+agreement are filed in sector 2, and ECSC decisions use type S, so the guess
+can't find them.
+
+The file only lists legal bases whose CELEX link is dead or opens a different
+act. A legal base with a working link is never listed, so a new run can't
+break a link that works.
 
 | In the file? | Type | The backend shows |
 | --- | --- | --- |
@@ -49,13 +58,23 @@ backend links them to legislation.gov.uk.
    machine-readable store behind EUR-Lex, and it's reliable for CELEX ids.
    Only decisions are checked, because the guess never exists for A, C, I or J
    (0 of 620 in the 2026-09 audit). Writes `celex-results.json`.
+
+   Then **`find-wrong-celex.mjs`** lists decisions whose guess exists but
+   probably opens a different act: Cellar files the guess in a different OJ
+   issue from the one TARIC cites. It prints each suspect's TARIC OJ reference
+   and the title of the act the guess opens. A person reviews each one, and
+   adds the ids whose guess opens the wrong act to `wrong-celex.txt` with the
+   reason. Some suspects are false alarms where TARIC's OJ data is wrong, so
+   nothing is listed automatically. Suspects reviewed and left out are noted
+   at the top of `wrong-celex.txt`.
 3. **`audit.mjs`** opens every citation URL in a headless browser and checks
    the page shows the expected OJ reference (series, issue, year and first
    page). A browser is needed because EUR-Lex blocks plain HTTP clients, and
    Cellar can't be used for citations: in the 2026-09 audit it missed 281 of
    753 citations a browser confirmed, including almost all after 2013. It
-   skips citations used only by decisions whose CELEX link works, because
-   those citations are never used (169 of 686 URLs in the 2026-09 audit).
+   skips citations used only by decisions whose CELEX link works and isn't in
+   `wrong-celex.txt`, because those citations are never used (169 of 686 URLs
+   in the 2026-09 audit).
    Takes about 1 second per URL and resumes if stopped. Writes
    `audit-results.json` with `PASS` or `SUSPECT` for each URL.
 4. **Check by hand.** Open a sample of `PASS` URLs, and any that look odd. If
@@ -64,33 +83,26 @@ backend links them to legislation.gov.uk.
    ids get no link (A, C, I, J) or keep their CELEX link or a blank row (D).
 5. **`combine.mjs`** writes `eur_lex_legal_base_links.csv`:
    - a citation row for each `PASS` id that isn't denylisted, where the id is
-     A, C, I or J, or is a D whose CELEX guess is a Cellar `404`
-   - a blank row for each other D whose CELEX guess is a Cellar `404`
+     A, C, I or J, or is a D whose CELEX link is broken: a Cellar `404`, or
+     listed in `wrong-celex.txt`
+   - a blank row for each other D whose CELEX link is broken
 
    The rules live in `rules.mjs` and are tested by
    `tests/eur-lex-legal-base-audit.test.js`.
 6. **Copy** `eur_lex_legal_base_links.csv` to the backend's `db/` directory,
    run `bundle exec rspec spec/services/measure_service`, and update the
-   "last run" date in `council_regulation_url_generator.rb`.
+   "Last run" line at the end of this README.
 
 ## How to run
 
-You need Node 20 or later, `psql`, and a local tariff database with the `uk`
-and `xi` schemas loaded. The defaults are database `tariff_development`, host
-`localhost` and user `postgres`. Override them with `AUDIT_DB_NAME`,
-`AUDIT_DB_HOST` and `AUDIT_DB_USER`.
+Follow [HOW-TO-UPDATE.md](HOW-TO-UPDATE.md). It takes you through a full
+update step by step, including what each file is for and what to do when
+something goes wrong.
 
-From this directory:
-
-```bash
-npm ci
-npx playwright install chromium
-node derive-targets.mjs
-node check-celex.mjs
-node audit.mjs
-# check by hand and update denylist.txt
-node combine.mjs
-```
+The scripts read a local tariff database with the `uk` and `xi` schemas. The
+defaults are database `tariff_development`, host `localhost` and user
+`postgres`. Override them with `AUDIT_DB_NAME`, `AUDIT_DB_HOST` and
+`AUDIT_DB_USER`.
 
 ## When to re-run
 
@@ -108,5 +120,8 @@ plenty.
   the Cellar check, the denylist and the combine step. The first data file
   it made shipped in
   [trade-tariff-backend#3819](https://github.com/trade-tariff/trade-tariff-backend/pull/3819).
-- Last run: 2026-09-28. 1,011 live legal bases gave 563 rows: 515 citations
-  (D 41, I 468, A 1, J 5) and 48 blank decisions.
+- HMRC-2663 follow-up added future-dated measures and the wrong-CELEX check.
+  It found 12 decisions whose CELEX link opened a different act.
+- Last run: 2026-10-01, on the production dump of 2026-09-30. 1,020 live or
+  future legal bases gave 576 rows: 526 citations (D 51, I 469, A 1, J 5) and
+  50 blank decisions.

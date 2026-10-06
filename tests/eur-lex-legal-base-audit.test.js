@@ -3,6 +3,8 @@ import {
   celexGuess,
   needsBrowserCheck,
   ojCitation,
+  ojIssueMismatch,
+  parseIdList,
   toCsv,
 } from '../scripts/eur-lex-legal-base-audit/rules.mjs';
 
@@ -67,6 +69,18 @@ describe('eur-lex legal base audit rules', () => {
       ]);
     });
 
+    it('treats a decision whose CELEX guess opens the wrong act like a dead one', () => {
+      const wrongCelex = new Set(['D0000040', 'D0000070']);
+
+      expect(buildLinks({ candidates, browserPass, denylist, celexStatus, wrongCelex })).toEqual([
+        { regulation_id: 'D0000040', oj_citation: 'OJ.L_.2000.004.01.0001.01.ENG' },
+        { regulation_id: 'D0000050', oj_citation: 'OJ.L_.2000.005.01.0001.01.ENG' },
+        { regulation_id: 'D0000060', oj_citation: null },
+        { regulation_id: 'D0000070', oj_citation: null },
+        { regulation_id: 'I0000010', oj_citation: 'OJ.C_.2000.001.01.0001.01.ENG' },
+      ]);
+    });
+
     it('refuses to run when a decision has no Cellar result', () => {
       const incomplete = { ...celexStatus, '32000D0006': undefined };
 
@@ -86,6 +100,38 @@ describe('eur-lex legal base audit rules', () => {
       [['D0203090', 'I1002720'], true],
     ])('checks a citation for %p: %p', (rids, expected) => {
       expect(needsBrowserCheck({ rids }, celexStatus)).toBe(expected);
+    });
+
+    it('checks a citation for a decision whose CELEX guess opens the wrong act', () => {
+      expect(needsBrowserCheck({ rids: ['D0203090'] }, celexStatus, new Set(['D0203090']))).toBe(true);
+    });
+  });
+
+  describe('ojIssueMismatch', () => {
+    const candidate = (number, publishedDate) => ({
+      officialjournal_number: number,
+      published_date: publishedDate,
+    });
+
+    it.each([
+      ['a different issue', candidate('L 157', '2000-06-30'), ['oj:JOL_2000_001_R_0017_01'], true],
+      ['a different year', candidate('L 35', '1996-02-13'), ['oj:JOL_1995_035_R_0001_01'], true],
+      ['a different series', candidate('C 35', '1996-02-13'), ['oj:JOL_1996_035_R_0001_01'], true],
+      ['the same issue on another page', candidate('L 114', '2002-04-30'), ['oj:JOL_2002_114_R_0001_01'], false],
+      ['a post-2013 sequence id', candidate('L119', '2014-04-23'), ['oj:JOL_2014_119_R_0009'], false],
+      ['a lowercase series', candidate('c 272', '2010-10-08'), ['oj:JOC_2010_272_R_0005_01'], false],
+      ['one matching id among several', candidate('L 35', '1996-02-13'), ['oj:JOL_1995_001_R_0001_01', 'oj:JOL_1996_035_R_0001_01'], false],
+      ['only a post-2023 act id', candidate('L 671', '2026-03-20'), ['oj:L_202600671'], false],
+      ['no Cellar OJ id', candidate('L 35', '1996-02-13'), [], false],
+      ['no TARIC OJ number', candidate('79', '2007-03-23'), ['oj:JOL_2007_079_R_0041_01'], false],
+    ])('flags %s: %p', (_description, taric, cellarOjIds, expected) => {
+      expect(ojIssueMismatch(taric, cellarOjIds)).toBe(expected);
+    });
+  });
+
+  describe('parseIdList', () => {
+    it('reads one id per line, ignoring comments and blank lines', () => {
+      expect([...parseIdList('# header\nD0000023 # reason\n\n  I0001840\n')]).toEqual(['D0000023', 'I0001840']);
     });
   });
 
