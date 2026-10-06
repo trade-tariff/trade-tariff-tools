@@ -66,7 +66,7 @@ Useful commands:
 
 ```bash
 bats tests
-bash -n scripts/trufflehog-pre-commit.sh scripts/lib/ecs-task-definitions.sh .github/actions/check-pr-lines/check-pr-lines.sh .github/actions/auto-merge-low-risk/check-copilot-review-gate.sh bin/cleanup-ecs-families bin/db-migrate bin/ecs bin/fetch-commodities bin/ott-search-stat bin/rotate-revisions bin/rotate-task-definitions bin/run-task tests/test_helper.bash
+for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do bash -n "$file"; done
 shellcheck bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh
 ```
 
@@ -85,8 +85,17 @@ Run the same checks locally when touching scripts, tests, workflows, or
 composite actions:
 
 ```bash
-bash -n scripts/trufflehog-pre-commit.sh scripts/lib/ecs-task-definitions.sh .github/actions/check-pr-lines/check-pr-lines.sh .github/actions/auto-merge-low-risk/check-copilot-review-gate.sh bin/cleanup-ecs-families bin/db-migrate bin/ecs bin/fetch-commodities bin/ott-search-stat bin/rotate-revisions bin/rotate-task-definitions bin/run-task tests/test_helper.bash
+for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do bash -n "$file"; done
 bats tests
+```
+
+`bash -n` checks only its first file argument. Always loop over files.
+
+On macOS the system Bash is 3.2 and `date` is BSD. Some tests fail there. Run
+Bats in a Linux container that matches CI, for example:
+
+```bash
+docker run --rm -v "$PWD":/repo -w /repo ubuntu:24.04 bash -c 'apt-get update -qq && apt-get install -y -qq bats jq git ruby >/dev/null && git config --global --add safe.directory /repo && bats tests'
 ```
 
 If `bats` is unavailable, install or provide it through your normal local
@@ -141,6 +150,63 @@ Shell implementation guidance:
 - Write clear `--help` output for public commands.
 - Use `mktemp` plus `trap` for temporary files.
 - Avoid parsing JSON with ad hoc text tools when `jq` is available.
+
+## Workflow Script Conventions
+
+Workflow and composite action YAML does orchestration only. Put logic in
+scripts so that it can be run locally, reviewed, and tested with Bats.
+
+### When to use a script
+
+Move a `run:` block to a script when it has more than about 15 lines of logic,
+or any loop or branch. Setup one-liners stay inline.
+
+### Where scripts live
+
+| Owner | Location | How the caller finds it |
+|---|---|---|
+| One composite action | `.github/actions/<action>/<verb-noun>.sh` | `"${{ github.action_path }}/<verb-noun>.sh"` |
+| Two sibling actions | In one of the action directories | `"${{ github.action_path }}/../<other-action>/<verb-noun>.sh"` |
+| A reusable workflow | In a composite action that the workflow uses | `uses: trade-tariff/trade-tariff-tools/.github/actions/<action>@main` |
+| A workflow that runs only in this repo | `scripts/<verb-noun>.sh` | `scripts/<verb-noun>.sh` after `actions/checkout` |
+
+A reusable workflow runs in the caller repository, so `github.action_path` is
+not available to it. Do not put logic in a reusable workflow. Call a
+first-party composite action.
+
+Exception: `deploy-ecs.yml` checks out this repository at `job.workflow_sha`
+into `.trade-tariff-tools` and runs `scripts/*.sh`. Use this only when the
+script version must match the reusable workflow SHA exactly.
+
+### Script contract
+
+- Lines 1-7 are the standard topmatter (see "Shell Script Conventions").
+- Next is a `usage()` heredoc. It documents Usage, purpose, Arguments,
+  Environment (required or optional, with defaults), Outputs, and Exit codes.
+  `-h` and `--help` print it.
+- GitHub context values enter only through `env:`. A script never contains
+  `${{ }}`. In `run:`, the only expression is `${{ github.action_path }}`.
+- Flags are for values a person types for a local run. Environment variables
+  are for values the runner supplies.
+- If the script also works as a local command with arguments (for example
+  `scale-services.sh`), use flags for its inputs. Otherwise use environment
+  variables.
+- A missing required environment variable exits 2 with
+  `Missing required environment variable: NAME`.
+- Write outputs to `"${GITHUB_OUTPUT:-/dev/stdout}"`.
+- Exit codes: 0 success, 1 failure, 2 usage error.
+- Commit scripts as executable (`100755`).
+- Add a Bats test that runs the script with stubbed external commands, and a
+  contract test that greps the YAML for the script call and its `env:` wiring.
+
+Example:
+
+```yaml
+- shell: bash
+  env:
+    STALE_DAYS: ${{ inputs.stale_days }}
+  run: '"${{ github.action_path }}/close-stale-pull-requests.sh"'
+```
 
 ## Existing Command Contracts
 
