@@ -3,6 +3,23 @@
 This file is the repo-local development guide for `trade-tariff-tools`. Read
 it as standalone project context for a fresh checkout.
 
+## Commits MUST Follow Conventional Commits
+
+Every commit in this repository MUST follow
+[Conventional Commits](https://www.conventionalcommits.org/). Write the subject
+as `<type>(<optional scope>): <short imperative description>`.
+
+- Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`,
+  `build`, `ci`, `style`, `revert`.
+- Write the description in the imperative, in lower case, without a trailing
+  full stop.
+- Put ticket keys in the body or footer as `Jira: <TICKET-KEY>`, never in the
+  subject.
+- Mark breaking changes with `!` before the colon or with a
+  `BREAKING CHANGE:` footer.
+- Use the same pattern for squash-merged pull request titles and for the
+  workflow titles that other repositories inherit.
+
 ## What This Repo Is
 
 `trade-tariff-tools` is a shared utility repository for the Trade Tariff team.
