@@ -12,7 +12,7 @@ load test_helper
   run grep -F "role-to-assume: \${{ steps.config.outputs.deploy-role-arn }}" "$start_action"
   [ "$status" -eq 0 ]
 
-  run grep -F "CLUSTER=\"\${{ steps.config.outputs.cluster }}\"" "$start_action"
+  run grep -F "CLUSTER: \${{ steps.config.outputs.cluster }}" "$start_action"
   [ "$status" -eq 0 ]
 
   run grep -F "trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main" "$stop_action"
@@ -21,7 +21,7 @@ load test_helper
   run grep -F "role-to-assume: \${{ steps.config.outputs.deploy-role-arn }}" "$stop_action"
   [ "$status" -eq 0 ]
 
-  run grep -F "CLUSTER=\"\${{ steps.config.outputs.cluster }}\"" "$stop_action"
+  run grep -F "CLUSTER: \${{ steps.config.outputs.cluster }}" "$stop_action"
   [ "$status" -eq 0 ]
 }
 
