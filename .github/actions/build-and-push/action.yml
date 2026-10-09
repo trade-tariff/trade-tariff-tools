@@ -102,5 +102,8 @@ runs:
 
     - name: Push image
       if: steps.check-image.outputs.exists == 'false'
-      run: docker push "${{ steps.build-image.outputs.image_name }}"
       shell: bash
+      env:
+        IMAGE_NAME: ${{ steps.build-image.outputs.image_name }}
+        REGION: ${{ inputs.region }}
+      run: '"${{ github.action_path }}/push-image.sh"'
