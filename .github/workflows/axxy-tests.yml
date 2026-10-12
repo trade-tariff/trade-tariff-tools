@@ -23,7 +23,7 @@ on:
         required: true
       ssh-key:
         description: 'SSH private key used for commits'
-        required: true
+        required: false
       basic-password:
         description: 'The basic auth password'
         required: false

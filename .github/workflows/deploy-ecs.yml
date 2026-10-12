@@ -45,7 +45,7 @@ on:
     secrets:
       ssh-key:
         description: The SSH key to use for accessing github repos (implicitly with terraform init)
-        required: true
+        required: false
       slack-webhook:
         description: The Slack webhook URL to send notifications to
         required: true

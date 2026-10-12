@@ -23,7 +23,7 @@ on:
 
     secrets:
       ssh-key:
-        required: true
+        required: false
       slack-webhook:
         required: true
       basic-password:
