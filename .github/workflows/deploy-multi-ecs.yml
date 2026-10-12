@@ -22,8 +22,6 @@ on:
         required: false
 
     secrets:
-      ssh-key:
-        required: false
       slack-webhook:
         required: true
       basic-password:
@@ -69,7 +67,6 @@ jobs:
       notify: false
       test-flavour: none
     secrets:
-      ssh-key: ${{ secrets.ssh-key }}
       slack-webhook: ${{ secrets.slack-webhook }}
       basic-password: ${{ secrets.basic-password }}
 
