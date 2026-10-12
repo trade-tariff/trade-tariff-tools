@@ -1,5 +1,8 @@
-module.exports = async ({ github, context, core, triggeringActor, approvedForkDeployers }) => {
-  const approved = new Set(approvedForkDeployers.map(login => login.toLowerCase()));
+module.exports = async ({ github, context, core, triggeringActor }) => {
+  if (context.repo.owner !== 'trade-tariff') {
+    throw new Error('Deployment authorization is restricted to the trade-tariff organisation.');
+  }
+
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   const defaultRef = `refs/heads/${context.payload.repository.default_branch}`;
 
@@ -10,6 +13,15 @@ module.exports = async ({ github, context, core, triggeringActor, approvedForkDe
   if (!['pull_request_target', 'workflow_dispatch'].includes(context.eventName)) {
     throw new Error('This event cannot authorize a deployment.');
   }
+
+  const { data } = await github.rest.repos.getContent({
+    owner: 'trade-tariff',
+    repo: 'trade-tariff-tools',
+    path: '.github/approved-fork-deployers.json',
+    ref: 'main',
+  });
+  const policy = JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'));
+  const approved = new Set((policy[context.repo.repo] || []).map(login => login.toLowerCase()));
 
   const hasWriteAccess = async login => {
     try {

@@ -1,11 +1,5 @@
 name: Authorize development deployment
-description: Validate deployment accounts against a trusted caller allowlist and return an exact commit SHA.
-
-inputs:
-  approved-accounts-file:
-    description: JSON array of approved external GitHub logins in the caller repository's default branch.
-    required: false
-    default: .github/approved-fork-deployers.json
+description: Validate deployment accounts against the central tools repository policy and return an exact commit SHA.
 
 outputs:
   sha:
@@ -15,20 +9,13 @@ outputs:
 runs:
   using: composite
   steps:
-    # Never read the allowlist from the PR or execute its authorization code.
-    - uses: actions/checkout@v7.0.1
-      with:
-        ref: ${{ github.event.repository.default_branch }}
-        persist-credentials: false
+    # Authorization reads the tools policy from main, never the caller or PR.
     - uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
       id: authorize
       env:
         AUTHORIZATION_SCRIPT: ${{ github.action_path }}/authorize.cjs
-        APPROVED_ACCOUNTS_FILE: ${{ inputs.approved-accounts-file }}
         TRIGGERING_ACTOR: ${{ github.triggering_actor }}
       with:
         script: |
-          const fs = require('node:fs');
           const authorize = require(process.env.AUTHORIZATION_SCRIPT);
-          const approvedForkDeployers = JSON.parse(fs.readFileSync(process.env.APPROVED_ACCOUNTS_FILE, 'utf8'));
-          await authorize({ github, context, core, triggeringActor: process.env.TRIGGERING_ACTOR, approvedForkDeployers });
+          await authorize({ github, context, core, triggeringActor: process.env.TRIGGERING_ACTOR });

@@ -6,19 +6,13 @@ setup() {
   action="$repo_root/.github/actions/authorize-development-deployment/action.yml"
 }
 
-@test "deployment authorization reads the current default branch without persisting credentials" {
-  run grep -Fx '        ref: ${{ github.event.repository.default_branch }}' "$action"
-  [ "$status" -eq 0 ]
-  run grep -Fx '        persist-credentials: false' "$action"
-  [ "$status" -eq 0 ]
-  run grep -E 'pull_request\.head|id-token|secrets\.' "$action"
+@test "deployment authorization cannot read a caller or PR account list" {
+  run grep -E 'actions/checkout|approved-accounts-file|readFileSync|id-token|secrets\.' "$action"
   [ "$status" -eq 1 ]
 }
 
-@test "deployment authorization loads its own script and the caller account list" {
+@test "deployment authorization loads its own script and checks the rerun account" {
   run grep -Fx '        AUTHORIZATION_SCRIPT: ${{ github.action_path }}/authorize.cjs' "$action"
-  [ "$status" -eq 0 ]
-  run grep -Fx '        APPROVED_ACCOUNTS_FILE: ${{ inputs.approved-accounts-file }}' "$action"
   [ "$status" -eq 0 ]
   run grep -Fx '        TRIGGERING_ACTOR: ${{ github.triggering_actor }}' "$action"
   [ "$status" -eq 0 ]

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from '@jest/globals';
+import { readFileSync } from 'node:fs';
 import authorize from '../.github/actions/authorize-development-deployment/authorize.cjs';
 
 const sha = 'e307b68ab682e6caa4dfcde76b62db8d7771313d';
@@ -7,6 +8,8 @@ const sha = 'e307b68ab682e6caa4dfcde76b62db8d7771313d';
 function fixture() {
   const outputs = {};
   const calls = [];
+  const policyCalls = [];
+  const policy = JSON.parse(readFileSync(new URL('../.github/approved-fork-deployers.json', import.meta.url), 'utf8'));
   const input = {
     context: {
       repo: { owner: 'trade-tariff', repo: 'trade-tariff-frontend' },
@@ -24,7 +27,6 @@ function fixture() {
       },
     },
     triggeringActor: 'fasjkn',
-    approvedForkDeployers: ['fasjkn'],
     core: {
       setOutput: (key, value) => { outputs[key] = value; },
       info: () => {},
@@ -32,6 +34,10 @@ function fixture() {
     github: {
       rest: {
         repos: {
+          getContent: async request => {
+            policyCalls.push(request);
+            return { data: { content: Buffer.from(JSON.stringify(policy)).toString('base64') } };
+          },
           getCollaboratorPermissionLevel: async ({ username }) => {
             calls.push(['permission', username]);
             return { data: { permission: username === 'willfish' ? 'write' : 'read' } };
@@ -44,7 +50,7 @@ function fixture() {
       },
     },
   };
-  return { input, outputs, calls };
+  return { input, outputs, calls, policy, policyCalls };
 }
 
 test('Gabriel can deploy his fork commit without repository write access', async () => {
@@ -55,9 +61,65 @@ test('Gabriel can deploy his fork commit without repository write access', async
 });
 
 test('removing an account from the list denies its next authorization', async () => {
-  const { input, outputs } = fixture();
-  input.approvedForkDeployers = [];
+  const { input, outputs, policy } = fixture();
+  policy['trade-tariff-frontend'] = [];
   await assert.rejects(authorize(input), /fork must belong to an approved/);
+  assert.deepEqual(outputs, {});
+});
+
+test('policy is read only from tools main, not the caller or PR', async () => {
+  const { input, policyCalls } = fixture();
+  await authorize(input);
+  assert.deepEqual(policyCalls, [{
+    owner: 'trade-tariff',
+    repo: 'trade-tariff-tools',
+    path: '.github/approved-fork-deployers.json',
+    ref: 'main',
+  }]);
+});
+
+test('Gabriel is also approved for backend fork code', async () => {
+  const { input, outputs } = fixture();
+  input.context.repo.repo = 'trade-tariff-backend';
+  input.context.payload.pull_request.base.repo.full_name = 'trade-tariff/trade-tariff-backend';
+  input.context.payload.pull_request.head.repo.full_name = 'fasjkn/trade-tariff-backend';
+  await authorize(input);
+  assert.equal(outputs.sha, sha);
+});
+
+test('a repository without an external account entry denies Gabriel', async () => {
+  const { input, outputs } = fixture();
+  input.context.repo.repo = 'trade-tariff-admin';
+  input.context.payload.pull_request.base.repo.full_name = 'trade-tariff/trade-tariff-admin';
+  input.context.payload.pull_request.head.repo.full_name = 'fasjkn/trade-tariff-admin';
+  await assert.rejects(authorize(input), /fork must belong to an approved/);
+  assert.deepEqual(outputs, {});
+});
+
+test('frontend approval does not grant backend approval when its account entry is removed', async () => {
+  const { input, outputs, policy } = fixture();
+  policy['trade-tariff-backend'] = [];
+  input.context.repo.repo = 'trade-tariff-backend';
+  input.context.payload.pull_request.base.repo.full_name = 'trade-tariff/trade-tariff-backend';
+  input.context.payload.pull_request.head.repo.full_name = 'fasjkn/trade-tariff-backend';
+  await assert.rejects(authorize(input), /fork must belong to an approved/);
+  assert.deepEqual(outputs, {});
+});
+
+test('a repository with the same name in another organisation cannot use the policy', async () => {
+  const { input, outputs, policyCalls } = fixture();
+  input.context.repo.owner = 'another-organisation';
+  await assert.rejects(authorize(input), /restricted to the trade-tariff organisation/);
+  assert.deepEqual(outputs, {});
+  assert.deepEqual(policyCalls, []);
+});
+
+test('an unavailable central policy fails closed', async () => {
+  const { input, outputs } = fixture();
+  input.github.rest.repos.getContent = async () => {
+    throw Object.assign(new Error('Policy unavailable'), { status: 503 });
+  };
+  await assert.rejects(authorize(input), /Policy unavailable/);
   assert.deepEqual(outputs, {});
 });
 
