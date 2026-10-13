@@ -21,9 +21,6 @@ on:
       slack-webhook:
         description: 'Slack webhook URL for notifications'
         required: true
-      ssh-key:
-        description: 'SSH private key used for commits'
-        required: false
       basic-password:
         description: 'The basic auth password'
         required: false
@@ -65,17 +62,16 @@ jobs:
 
       - run: cp node_modules/govuk-frontend/dist/govuk/assets/images/favicon.ico dist/favicon.ico
 
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
-        with:
-          ssh-key: ${{ secrets.ssh-key }}
-
       - run: |
           yarn run gh-pages \
+            --repo "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             --dist dist \
             --user "${{ inputs.email }}" \
             --silent \
             --nojekyll \
             --no-history
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
