@@ -31,12 +31,6 @@ on:
           trade-tariff-pr-bot GitHub App private key, from the org-level
           TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY secret.
         required: false
-      github-token:
-        description: >-
-          Deprecated. Long-lived PAT used to call the GitHub API. Pass the
-          pr-bot-app-* secrets instead; this input is removed once every
-          caller has migrated.
-        required: false
 
 permissions:
   actions: read
@@ -62,12 +56,9 @@ jobs:
       PR_BOT_APP_CONFIGURED: >-
         ${{ secrets['pr-bot-app-id'] != ''
         && secrets['pr-bot-app-private-key'] != '' }}
-      LEGACY_TOKEN_CONFIGURED: ${{ secrets['github-token'] != '' }}
     steps:
       - name: Fail fast when no credentials were passed
-        if: >-
-          env.PR_BOT_APP_CONFIGURED != 'true'
-          && env.LEGACY_TOKEN_CONFIGURED != 'true'
+        if: env.PR_BOT_APP_CONFIGURED != 'true'
         run: |
           echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-id and pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_APP_* secrets."
           exit 1
@@ -87,7 +78,7 @@ jobs:
       - name: Resolve pull request number
         id: pr
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
@@ -127,6 +118,6 @@ jobs:
           label: ${{ inputs.label }}
           merge-method: ${{ inputs.merge-method }}
           required-workflow: ${{ inputs.required-workflow }}
-          github-token: ${{ steps.app-token.outputs.token || secrets['github-token'] }}
+          github-app-token: ${{ steps.app-token.outputs.token }}
           pull-request-event-action: ${{ github.event.action }}
           pull-request-event-label: ${{ github.event.label.name }}
