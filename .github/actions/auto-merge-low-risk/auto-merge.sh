@@ -39,7 +39,7 @@ if [[ -z "$repo" || -z "$pr" || -z "$label" || -z "$merge_method" || -z "$requir
 fi
 
 # Dependabot-triggered runs cannot access repository secrets, so the caller
-# workflow resolves an empty github-token in that case. Every later gh call
+# workflow resolves an empty App token in that case. Every later gh call
 # would fail outright rather than reporting a review-gate result, so skip
 # gracefully here instead of erroring the whole job.
 if [[ -z "${GITHUB_TOKEN:-}" && -z "${GH_TOKEN:-}" ]]; then
