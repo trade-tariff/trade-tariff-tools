@@ -71,7 +71,7 @@ jobs:
           repository: trade-tariff/trade-tariff-e2e-tests
           ref: ${{ inputs.ref }}
 
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         with:
           cache: 'yarn'
 
