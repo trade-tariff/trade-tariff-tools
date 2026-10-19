@@ -137,16 +137,34 @@ Interactive script to execute commands in AWS ECS tasks. Uses `fzf` for interact
 
 # Filter explicitly if a job name exists in more than one environment in the account
 ./bin/ecs run --environment staging --yes --no-tail backend-database-replication
+
+# Fuzzy-select and dispatch a workflow in trade-tariff/trade-tariff-tools
+./bin/ecs dispatch
+
+# Dispatch a workflow from a specific branch or tag
+./bin/ecs dispatch --ref main
 ```
 
 `ecs run` discovers scheduled jobs from the AWS account represented by your
 current credentials. Use `--environment` only as a filter when that account has
 more than one matching environment.
 
+`ecs dispatch` lists active workflows that support `workflow_dispatch` in
+`trade-tariff/trade-tariff-tools`, regardless of your current directory. Select a
+workflow with `fzf`, then confirm the workflow and ref. GitHub CLI prompts for
+workflow inputs. The default ref is the repository's default branch.
+
+This command requires `gh`, `jq`, and `fzf`. Authenticate `gh` with an account
+that has permission to dispatch workflows. AWS credentials and Session Manager
+Plugin are not required for this command.
+
+![Offline workflow dispatch example with stubbed GitHub responses](.github/assets/ecs-dispatch.gif)
+
 **Features:**
 
 - Interactive selection of clusters, services, and tasks using `fzf`
 - Starts scheduled EventBridge-backed ECS jobs on demand with `ecs run`
+- Dispatches GitHub workflows with fuzzy selection and confirmation using `ecs dispatch`
 - Discovers scheduled jobs from the current AWS account credentials
 - Resolves the latest active task definition before starting scheduled jobs
 - Lists every job (`admin-job`, `backend-job`, `dev-hub-job`, `identity-job`, ...) next to the ECS services

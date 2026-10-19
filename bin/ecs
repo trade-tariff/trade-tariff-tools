@@ -23,6 +23,8 @@ SUBCOMMANDS:
     logs --help     Show logs subcommand help
     run             Run a scheduled ECS job on demand
     run --help      Show run subcommand help
+    dispatch        Select and run a workflow in trade-tariff/trade-tariff-tools
+    dispatch --help Show dispatch subcommand help
 
 OPTIONS:
     -h, --help      Show this help message and exit
@@ -40,6 +42,8 @@ EXAMPLES:
     $SCRIPT_NAME logs --since 30m --filter ERROR               # Tail error logs from last 30m
     $SCRIPT_NAME run                                           # Run a scheduled job on demand
     $SCRIPT_NAME run --no-tail                                 # Start a job without tailing logs
+    $SCRIPT_NAME dispatch                                      # Select and dispatch a GitHub workflow
+    $SCRIPT_NAME dispatch --ref main                           # Dispatch from a branch or tag
 
 SPECIAL BEHAVIOR:
     - Job tasks (task definition families named '<name>-job-<account-id>', such as
@@ -56,6 +60,8 @@ PREREQUISITES:
     - AWS CLI configured with valid credentials
     - jq installed for JSON parsing
     - fzf installed for interactive selection
+    - For dispatch: gh authenticated with workflow access, jq and fzf only;
+      AWS credentials and Session Manager Plugin are not required
 EOF
 }
 
@@ -880,7 +886,115 @@ run_main() {
     tail_task_logs "$cluster" "$task_arn" "$environment" "$container"
 }
 
+dispatch_print_usage() {
+    cat <<EOF
+Usage: $SCRIPT_NAME dispatch [OPTIONS]
+
+Fuzzy-select an active workflow that supports workflow_dispatch in
+trade-tariff/trade-tariff-tools. Confirm before dispatching. GitHub CLI
+prompts for workflow inputs. No AWS credentials are required.
+
+OPTIONS:
+    -h, --help      Show this help message and exit
+    -r, --ref       Branch or tag to run (default: repository default branch)
+
+PREREQUISITES:
+    gh authenticated with permission to dispatch workflows, jq and fzf
+
+OUTPUTS:
+    GitHub CLI dispatch result
+
+EXIT CODES:
+    0               Success or cancellation
+    1               Dependency, discovery or dispatch failure
+    2               Usage error
+
+EXAMPLES:
+    $SCRIPT_NAME dispatch
+    $SCRIPT_NAME dispatch --ref main
+EOF
+}
+
+dispatch_main() {
+    local repo="trade-tariff/trade-tariff-tools"
+    local ref=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                dispatch_print_usage
+                return 0
+                ;;
+            -r|--ref)
+                [[ -n "${2:-}" && "${2:-}" != -* ]] || error_exit "--ref requires a branch or tag" 2
+                ref="$2"
+                shift 2
+                ;;
+            *)
+                error_exit "Unexpected argument: $1. See '$SCRIPT_NAME dispatch --help'" 2
+                ;;
+        esac
+    done
+
+    local dependency
+    for dependency in gh jq fzf; do
+        command -v "$dependency" >/dev/null || error_exit "Missing required dependency: $dependency"
+    done
+
+    if [[ -z "$ref" ]]; then
+        ref=$(gh repo view "$repo" --json defaultBranchRef --jq '.defaultBranchRef.name')
+        [[ -n "$ref" ]] || error_exit "Could not determine the default branch for $repo"
+    fi
+
+    echo "Discovering dispatch workflows in $repo at $ref..." >&2
+
+    local workflows rows
+    workflows=$(gh workflow list --repo "$repo" --limit 1000 --json id,name,path)
+    rows=$(printf '%s\n' "$workflows" | jq -r '.[] | [.id, .name, .path] | @tsv')
+
+    local id name path workflow_yaml choices=""
+    while IFS=$'\t' read -r id name path; do
+        [[ -n "$id" ]] || continue
+        workflow_yaml=$(gh workflow view "$id" --repo "$repo" --ref "$ref" --yaml)
+        # This repository declares dispatch events in multiline on: mappings.
+        if printf '%s\n' "$workflow_yaml" | grep -E '^[[:space:]]+workflow_dispatch[[:space:]]*:' >/dev/null; then
+            choices+="${id}"$'\t'"${name}"$'\t'"${path}"$'\n'
+        fi
+    done <<< "$rows"
+
+    [[ -n "$choices" ]] || error_exit "No active dispatch workflows found in $repo at $ref"
+
+    local selected selection_status
+    if selected=$(printf '%s' "$choices" | fzf --height 40% --prompt "Select a Workflow: " \
+        --no-info --delimiter $'\t' --with-nth 2,3); then
+        [[ -n "$selected" ]] || return 0
+    else
+        selection_status=$?
+        case "$selection_status" in
+            1|130) return 0 ;;
+            *) return "$selection_status" ;;
+        esac
+    fi
+    IFS=$'\t' read -r id name path <<< "$selected"
+
+    printf '\nRepository: %s\nWorkflow: %s (%s)\nRef: %s\n' "$repo" "$name" "$path" "$ref" >&2
+    printf 'Continue to workflow inputs and dispatch? [y/N] ' >&2
+    local confirm
+    if ! read -r confirm || [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Workflow dispatch cancelled." >&2
+        return 0
+    fi
+
+    gh workflow run "$id" --repo "$repo" --ref "$ref"
+}
+
 main() {
+    if [[ "${1:-}" == "dispatch" ]]; then
+        shift
+        dispatch_main "$@"
+        return
+    fi
+
     if [[ "${1:-}" == "logs" ]]; then
         shift
         logs_main "$@"
