@@ -23,6 +23,7 @@
           pkgs.awscli2
           pkgs.jq
           pkgs.fzf
+          pkgs.gh
           pkgs.ssm-session-manager-plugin
         ];
         ecs = pkgs.stdenv.mkDerivation {
