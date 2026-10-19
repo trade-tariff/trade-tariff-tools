@@ -30,7 +30,7 @@ JSON
     fi
     ;;
   "workflow view")
-    if [[ "${TEST_GH_FAILURE:-}" == view ]]; then
+    if [[ "${TEST_GH_FAILURE:-}" == view || "${TEST_MISSING_WORKFLOW_ID:-}" == "$3" ]]; then
       echo "Cannot read workflow" >&2
       exit 1
     fi
@@ -118,6 +118,19 @@ teardown() {
   assert_contains "$output" "Ref: release-branch"
 }
 
+@test "ecs dispatch skips workflows missing from the selected ref" {
+  run env TEST_MISSING_WORKFLOW_ID=11 TEST_SELECT_ID=44 "$repo_root/bin/ecs" dispatch --ref release-branch <<< y
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Skipping workflow 'Start Development Services'"
+  choices="$(cat "$TEST_CAPTURE_DIR/workflow-choices.txt")"
+  assert_not_contains "$choices" "Start Development Services"
+  assert_contains "$choices" "Rotate ECS Task Definitions"
+  calls="$(cat "$TEST_CAPTURE_DIR/gh-calls.txt")"
+  assert_contains "$calls" "workflow view 44 --repo trade-tariff/trade-tariff-tools --ref release-branch --yaml"
+  assert_contains "$calls" "workflow run 44 --repo trade-tariff/trade-tariff-tools --ref release-branch"
+}
+
 @test "ecs dispatch leaves stdin available for GitHub workflow input prompts" {
   run env TEST_SELECT_ID=44 TEST_PROMPT_INPUT=true "$repo_root/bin/ecs" dispatch <<< $'y\n4'
 
@@ -165,12 +178,14 @@ teardown() {
   [ ! -e "$TEST_CAPTURE_DIR/dispatch-args.txt" ]
 }
 
-@test "ecs dispatch stops when a workflow cannot be read" {
+@test "ecs dispatch fails when no workflows can be read" {
   run env TEST_GH_FAILURE=view "$repo_root/bin/ecs" dispatch <<< y
 
   [ "$status" -eq 1 ]
   assert_contains "$output" "Cannot read workflow"
+  assert_contains "$output" "No active dispatch workflows found"
   [ ! -e "$TEST_CAPTURE_DIR/dispatch-args.txt" ]
+  [ ! -e "$TEST_CAPTURE_DIR/fzf-args.txt" ]
 }
 
 @test "ecs dispatch reports GitHub dispatch failures" {

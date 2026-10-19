@@ -955,7 +955,10 @@ dispatch_main() {
     local id name path workflow_yaml choices=""
     while IFS=$'\t' read -r id name path; do
         [[ -n "$id" ]] || continue
-        workflow_yaml=$(gh workflow view "$id" --repo "$repo" --ref "$ref" --yaml)
+        if ! workflow_yaml=$(gh workflow view "$id" --repo "$repo" --ref "$ref" --yaml); then
+            echo "Skipping workflow '$name' ($path): cannot read at ref '$ref'." >&2
+            continue
+        fi
         # This repository declares dispatch events in multiline on: mappings.
         if printf '%s\n' "$workflow_yaml" | grep -E '^[[:space:]]+workflow_dispatch[[:space:]]*:' >/dev/null; then
             choices+="${id}"$'\t'"${name}"$'\t'"${path}"$'\n'
