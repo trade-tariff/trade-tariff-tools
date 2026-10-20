@@ -19,7 +19,7 @@ run_script() {
     ENVIRONMENT="staging" \
     FPO_TEST_RESULT="${FPO_TEST_RESULT:-skipped}" \
     TARIFF_TEST_RESULT="${TARIFF_TEST_RESULT:-skipped}" \
-    TEST_FLAVOUR="${TEST_FLAVOUR:-fpo}" \
+    TEST_FLAVOUR="${TEST_FLAVOUR-fpo}" \
     GITHUB_OUTPUT="$GITHUB_OUTPUT" \
     "$repo_root/scripts/deploy-result.sh"
 }
@@ -31,6 +31,46 @@ run_script() {
   output_content="$(cat "$GITHUB_OUTPUT")"
   assert_contains "$output_content" "result=failure"
   assert_contains "$output_content" "summary=Deploy to staging failed during build"
+}
+
+@test "build failure takes precedence when deployment and both tests fail" {
+  BUILD_RESULT="failure" DEPLOY_RESULT="failure" FPO_TEST_RESULT="failure" TARIFF_TEST_RESULT="failure" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  [ "$output_content" = "$(printf 'result=failure\nsummary=Deploy to staging failed during build')" ]
+}
+
+@test "successful tariff selection ignores an unselected FPO failure" {
+  TEST_FLAVOUR="tariff" TARIFF_TEST_RESULT="success" FPO_TEST_RESULT="failure" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  [ "$output_content" = "$(printf 'result=success\nsummary=Deploy to staging success')" ]
+}
+
+@test "failing FPO selection ignores an unselected tariff success" {
+  TEST_FLAVOUR="fpo" FPO_TEST_RESULT="failure" TARIFF_TEST_RESULT="success" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  [ "$output_content" = "$(printf 'result=failure\nsummary=Deploy to staging failure')" ]
+}
+
+@test "unrecognised test flavour uses the deployment result" {
+  TEST_FLAVOUR="unknown" DEPLOY_RESULT="success" FPO_TEST_RESULT="failure" TARIFF_TEST_RESULT="failure" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  [ "$output_content" = "$(printf 'result=success\nsummary=Deploy to staging success')" ]
+}
+
+@test "empty test flavour uses the deployment result" {
+  TEST_FLAVOUR="" DEPLOY_RESULT="success" FPO_TEST_RESULT="failure" TARIFF_TEST_RESULT="failure" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  [ "$output_content" = "$(printf 'result=success\nsummary=Deploy to staging success')" ]
 }
 
 @test "deployment failure takes precedence over a skipped test" {

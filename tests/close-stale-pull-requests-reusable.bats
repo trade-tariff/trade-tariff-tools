@@ -14,6 +14,12 @@ setup() {
 #!/usr/bin/env bash
 set -euo pipefail
 
+printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/gh-commands.txt"
+if [[ "${GH_FAIL_COMMAND:-}" == "$1 $2" ]]; then
+  echo "Simulated gh failure: $1 $2" >&2
+  exit 1
+fi
+
 if [[ "$1" == "pr" && "$2" == "list" ]]; then
   if [[ "$*" == *"headRefName"* ]]; then
     printf '%s\n' 'open-pr-branch'
@@ -166,6 +172,71 @@ teardown() {
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "Usage: delete-stale-branches.sh"
+}
+
+@test "close stale stops without closing pull requests when listing fails" {
+  run env GH_FAIL_COMMAND="pr list" REPO="trade-tariff/example" STALE_DAYS="14" KEEP_LABEL="keep" DRY_RUN="false" "$close_script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "Simulated gh failure: pr list"
+  assert_not_contains "$output" "Closed PR #"
+  assert_not_contains "$output" "No open pull requests."
+  assert_not_contains "$output" "Summary:"
+  gh_commands="$(cat "$tmpdir/gh-commands.txt")"
+  assert_not_contains "$gh_commands" "pr close"
+  [ ! -f "$tmpdir/gh-close-commands.txt" ]
+}
+
+@test "close stale returns failure without reporting a failed close as successful" {
+  run env GH_FAIL_COMMAND="pr close" REPO="trade-tariff/example" STALE_DAYS="14" KEEP_LABEL="keep" DRY_RUN="false" "$close_script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "Simulated gh failure: pr close"
+  assert_not_contains "$output" "Closed PR #"
+  assert_not_contains "$output" "Summary:"
+  gh_commands="$(cat "$tmpdir/gh-commands.txt")"
+  assert_contains "$gh_commands" "pr close 10 --repo trade-tariff/example"
+}
+
+@test "delete stale branches stops without deleting branches when default branch lookup fails" {
+  run env GH_FAIL_COMMAND="repo view" REPO="trade-tariff/example" STALE_DAYS="14" DRY_RUN="false" "$branches_script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "Simulated gh failure: repo view"
+  assert_not_contains "$output" "Deleted branch"
+  assert_not_contains "$output" "Summary:"
+  gh_commands="$(cat "$tmpdir/gh-commands.txt")"
+  assert_not_contains "$gh_commands" "api --method DELETE"
+  [ ! -f "$tmpdir/gh-delete-commands.txt" ]
+}
+
+@test "delete stale branches returns failure without reporting a failed deletion as successful" {
+  run env GH_FAIL_COMMAND="api --method" REPO="trade-tariff/example" STALE_DAYS="14" DRY_RUN="false" "$branches_script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "Simulated gh failure: api --method"
+  assert_not_contains "$output" "Deleted branch"
+  assert_not_contains "$output" "Summary:"
+  gh_commands="$(cat "$tmpdir/gh-commands.txt")"
+  assert_contains "$gh_commands" "api --method DELETE repos/trade-tariff/example/git/refs/heads/stale-branch"
+}
+
+@test "close stale rejects unknown arguments before calling gh" {
+  run env REPO="trade-tariff/example" STALE_DAYS="14" KEEP_LABEL="keep" DRY_RUN="false" "$close_script" --unknown
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Unknown argument: --unknown"
+  assert_contains "$output" "Usage: close-stale-pull-requests.sh"
+  [ ! -f "$tmpdir/gh-commands.txt" ]
+}
+
+@test "delete stale branches rejects unknown arguments before calling gh" {
+  run env REPO="trade-tariff/example" STALE_DAYS="14" DRY_RUN="false" "$branches_script" --unknown
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Unknown argument: --unknown"
+  assert_contains "$output" "Usage: delete-stale-branches.sh"
+  [ ! -f "$tmpdir/gh-commands.txt" ]
 }
 
 @test "reusable workflow delegates to the close-stale-pull-requests action" {
