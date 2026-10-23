@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+
+[[ "$TRACE" ]] && set -o xtrace
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o noclobber
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/healthcheck [options] [development|staging|production|all]
+
+Check the public healthcheck endpoints of every Trade Tariff service and print
+a table of the results. The backend checks also report Postgres, Redis,
+OpenSearch and Sidekiq for the UK and XI services.
+
+The command sends only public HTTP requests. It does not need AWS credentials.
+
+Arguments:
+  environment     development, staging, production or all (default: production)
+
+Options:
+  -t, --timeout SECONDS   Maximum time for each request (default: 10)
+  -h, --help              Show this help
+
+Environment:
+  FPO_API_KEY     Optional. An FPO search API key for the checked environment.
+                  If it is not set, the fpo-search check is skipped.
+  NO_COLOR        Optional. Disable coloured status output.
+
+Outputs:
+  A table with ENV, SERVICE, STATUS, HTTP, TIME and DETAILS columns.
+  STATUS is OK, FAIL or SKIP.
+
+Exit codes:
+  0  All checks are OK or skipped
+  1  One or more checks failed, or a required tool is missing
+  2  Usage error
+USAGE
+}
+
+environments=()
+timeout=10
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -t|--timeout)
+      if [[ "$#" -lt 2 || ! "$2" =~ ^[0-9]+$ || "$2" -lt 1 ]]; then
+        echo "--timeout needs a positive whole number of seconds" >&2
+        exit 2
+      fi
+      timeout="$2"
+      shift 2
+      ;;
+    development|staging|production)
+      environments+=("$1")
+      shift
+      ;;
+    all)
+      environments+=(development staging production)
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "${#environments[@]}" -eq 0 ]]; then
+  environments=(production)
+fi
+
+for tool in curl jq; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "Missing required command: $tool" >&2
+    exit 1
+  fi
+done
+
+workdir="$(mktemp -d)"
+trap 'rm -rf "$workdir"' EXIT
+
+# The apex host for each environment. Other services use a subdomain of it,
+# for example admin.staging.trade-tariff.service.gov.uk.
+domain_for() {
+  case "$1" in
+    production) echo "trade-tariff.service.gov.uk" ;;
+    staging) echo "staging.trade-tariff.service.gov.uk" ;;
+    development) echo "dev.trade-tariff.service.gov.uk" ;;
+  esac
+}
+
+# Print one check per line: SERVICE|KIND|URL
+# KIND tells evaluate() how to read the response.
+checks_for() {
+  local domain="$1"
+  local www="$domain"
+
+  [[ "$domain" == "trade-tariff.service.gov.uk" ]] && www="www.$domain"
+
+  cat <<CHECKS
+frontend|sha|https://$www/healthcheck
+backend-uk|backend|https://$www/uk/api/healthcheck
+backend-xi|backend|https://$www/xi/api/healthcheck
+admin|sha|https://admin.$domain/healthcheck
+hub|sha|https://hub.$domain/healthcheck
+identity|sha|https://id.$domain/healthcheck
+mcp|http|https://mcp.$domain/healthcheckz
+flagsmith|http|https://flags.$domain/health
+flagsmith-edge|http|https://flags-edge.$domain/proxy/health
+fpo-search|fpo|https://search.$domain/fpo-code-search
+CHECKS
+}
+
+# Run one request. Write the body, headers and "HTTP_CODE TIME" to files.
+# The curl exit code is written too, so a network error is visible.
+request() {
+  local kind="$1" url="$2" out="$3"
+  local args=(--silent --show-error --max-time "$timeout"
+    --output "$out.body" --dump-header "$out.headers"
+    --write-out '%{http_code} %{time_total}')
+
+  if [[ "$kind" == "fpo" ]]; then
+    args+=(--request POST
+      --header "Content-Type: application/json"
+      --header "@$fpo_header_file"
+      --data '{"description":"plastic toothbrush","digits":6,"limit":1}')
+  fi
+
+  local rc=0
+  curl "${args[@]}" "$url" > "$out.meta" 2> "$out.err" || rc=$?
+  echo "$rc" > "$out.rc"
+}
+
+# Read the response files and print: STATUS|HTTP|TIME|DETAILS
+evaluate() {
+  local kind="$1" out="$2"
+  local rc http time body details x_cache sha message
+
+  rc="$(cat "$out.rc")"
+  read -r http time < "$out.meta" || true
+  http="${http:-000}"
+  time="$(printf '%.2fs' "${time:-0}")"
+
+  if [[ "$rc" -ne 0 ]]; then
+    details="unreachable (curl exit $rc: $(head -n 1 "$out.err" | sed 's/^curl: ([0-9]*) //'))"
+    echo "FAIL|$http|$time|$details"
+    return
+  fi
+
+  body="$(cat "$out.body")"
+
+  if [[ "$kind" == "backend" ]]; then
+    # The backend returns JSON with 503 when a dependency is down, so read
+    # the JSON for any status code.
+    if details="$(jq -er '
+        [ "postgres", "redis", "opensearch", "sidekiq" ]
+        | map(. as $k | "\($k)=" + (if $doc[$k] == true then "ok" else "FAIL" end))
+        | join(" ")
+      ' --argjson doc "$body" -n 2>/dev/null)"; then
+      details="$details sha=$(jq -r '.git_sha1 // "?"' <<< "$body")"
+      if [[ "$http" == "200" && "$(jq -r '.healthy' <<< "$body")" == "true" ]]; then
+        echo "OK|$http|$time|$details"
+      else
+        echo "FAIL|$http|$time|$details"
+      fi
+      return
+    fi
+  fi
+
+  if [[ "$http" =~ ^2 ]]; then
+    case "$kind" in
+      sha)
+        if sha="$(jq -er '.git_sha1' <<< "$body" 2>/dev/null)"; then
+          echo "OK|$http|$time|sha=$sha"
+        else
+          echo "FAIL|$http|$time|response has no git_sha1"
+        fi
+        ;;
+      backend)
+        echo "FAIL|$http|$time|response is not backend healthcheck JSON"
+        ;;
+      fpo)
+        if jq -e '.results | type == "array"' <<< "$body" >/dev/null 2>&1; then
+          echo "OK|$http|$time|search returned results"
+        else
+          echo "FAIL|$http|$time|response has no results list"
+        fi
+        ;;
+      *)
+        echo "OK|$http|$time|"
+        ;;
+    esac
+    return
+  fi
+
+  # Show the CloudFront x-cache header. "Hit from cloudfront" means
+  # CloudFront cached an error.
+  x_cache="$(tr -d '\r' < "$out.headers" | awk -F': ' 'tolower($1) == "x-cache" { v = $2 } END { print v }')"
+  details="HTTP $http"
+  [[ -n "$x_cache" ]] && details="$details (x-cache: $x_cache)"
+  if message="$(jq -er '.message | strings' <<< "$body" 2>/dev/null)"; then
+    details="$details: $message"
+  fi
+  echo "FAIL|$http|$time|$details"
+}
+
+run_check() {
+  local env="$1" service="$2" kind="$3" url="$4" out="$5"
+
+  if [[ "$kind" == "fpo" && -z "$fpo_header_file" ]]; then
+    echo "$env|$service|SKIP|-|-|set FPO_API_KEY to check" > "$out"
+    return
+  fi
+
+  request "$kind" "$url" "$out"
+  echo "$env|$service|$(evaluate "$kind" "$out")" > "$out"
+}
+
+# Put the FPO API key in a file in the private work directory and pass the
+# file to curl. Then the key is not in the curl arguments, so it is not in the
+# process list. printenv also keeps the key out of TRACE=1 output.
+fpo_header_file=""
+if printenv FPO_API_KEY | grep . >/dev/null; then
+  fpo_header_file="$workdir/fpo-header"
+  { printf 'X-Api-Key: '; printenv FPO_API_KEY; } > "$fpo_header_file"
+fi
+
+# Start every check in the background, so that a slow or down environment
+# does not make the whole run wait for each timeout in turn.
+index=0
+for env in "${environments[@]}"; do
+  domain="$(domain_for "$env")"
+  while IFS='|' read -r service kind url; do
+    index=$((index + 1))
+    run_check "$env" "$service" "$kind" "$url" "$workdir/$(printf '%03d' "$index")" &
+  done < <(checks_for "$domain")
+done
+wait
+
+ok_colour=""
+fail_colour=""
+skip_colour=""
+reset=""
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  ok_colour=$'\033[32m'
+  fail_colour=$'\033[31m'
+  skip_colour=$'\033[33m'
+  reset=$'\033[0m'
+fi
+
+failures=0
+printf '%-12s %-15s %-6s %-5s %-7s %s\n' ENV SERVICE STATUS HTTP TIME DETAILS
+for result in "$workdir"/[0-9][0-9][0-9]; do
+  IFS='|' read -r env service status http time details < "$result"
+
+  case "$status" in
+    OK) colour="$ok_colour" ;;
+    SKIP) colour="$skip_colour" ;;
+    *)
+      colour="$fail_colour"
+      failures=$((failures + 1))
+      ;;
+  esac
+
+  printf '%-12s %-15s %s%-6s%s %-5s %-7s %s\n' \
+    "$env" "$service" "$colour" "$status" "$reset" "$http" "$time" "$details"
+done
+
+echo
+if [[ "$failures" -gt 0 ]]; then
+  echo "$failures check(s) failed."
+  exit 1
+fi
+
+echo "All checks passed."
