@@ -24,9 +24,10 @@ Options:
   -h, --help              Show this help
 
 Environment:
-  FPO_API_KEY     Optional. An FPO search API key for the checked environment.
-                  If it is not set, the fpo-search check is skipped. The key
-                  is sent only when one environment is checked.
+  FPO_API_KEY_DEVELOPMENT, FPO_API_KEY_STAGING, FPO_API_KEY_PRODUCTION
+                  Optional. The FPO search API key for that environment. The
+                  command sends each key only to its own environment. If the
+                  key is not set, the fpo-search check is skipped.
   NO_COLOR        Optional. Disable coloured status output.
 
 Outputs:
@@ -122,7 +123,7 @@ CHECKS
 # Run one request. Write the body, headers and "HTTP_CODE TIME" to files.
 # The curl exit code is written too, so a network error is visible.
 request() {
-  local kind="$1" url="$2" out="$3"
+  local kind="$1" url="$2" out="$3" fpo_header_file="${4:-}"
   local args=(--silent --show-error --max-time "$timeout"
     --output "$out.body" --dump-header "$out.headers"
     --write-out '%{http_code} %{time_total}')
@@ -221,33 +222,35 @@ evaluate() {
 
 run_check() {
   local env="$1" service="$2" kind="$3" url="$4" out="$5"
+  local fpo_header_file="$workdir/fpo-header-$env"
 
-  if [[ "$kind" == "fpo" && -z "$fpo_header_file" ]]; then
-    echo "$env|$service|SKIP|-|-|$fpo_skip_reason" > "$out"
+  if [[ "$kind" == "fpo" && ! -f "$fpo_header_file" ]]; then
+    echo "$env|$service|SKIP|-|-|set $(fpo_key_name "$env") to check" > "$out"
     return
   fi
 
-  request "$kind" "$url" "$out"
+  request "$kind" "$url" "$out" "$fpo_header_file"
   echo "$env|$service|$(evaluate "$kind" "$out")" > "$out"
 }
 
-# Put the FPO API key in a file in the private work directory and pass the
-# file to curl. Then the key is not in the curl arguments, so it is not in the
-# process list. printenv also keeps the key out of TRACE=1 output.
+fpo_key_name() {
+  echo "FPO_API_KEY_$(tr '[:lower:]' '[:upper:]' <<< "$1")"
+}
+
+# An FPO API key works in one environment only, so each environment has its
+# own variable, for example FPO_API_KEY_STAGING. The command sends a key only
+# to the environment in its name.
 #
-# An FPO API key works in one environment only. Send it only when one
-# environment is checked, so that a production key never goes to development
-# or staging.
-fpo_header_file=""
-fpo_skip_reason="set FPO_API_KEY to check"
-if printenv FPO_API_KEY | grep . >/dev/null; then
-  if [[ "${#environments[@]}" -eq 1 ]]; then
-    fpo_header_file="$workdir/fpo-header"
-    { printf 'X-Api-Key: '; printenv FPO_API_KEY; } > "$fpo_header_file"
-  else
-    fpo_skip_reason="FPO_API_KEY is for one environment, run it per environment"
+# Put each key in a file in the private work directory and pass the file to
+# curl. Then the key is not in the curl arguments, so it is not in the process
+# list. printenv also keeps the key out of TRACE=1 output.
+for env in "${environments[@]}"; do
+  key_name="$(fpo_key_name "$env")"
+  [[ -f "$workdir/fpo-header-$env" ]] && continue
+  if printenv "$key_name" | grep . >/dev/null; then
+    { printf 'X-Api-Key: '; printenv "$key_name"; } > "$workdir/fpo-header-$env"
   fi
-fi
+done
 
 # Start every check in the background, so that a slow or down environment
 # does not make the whole run wait for each timeout in turn.

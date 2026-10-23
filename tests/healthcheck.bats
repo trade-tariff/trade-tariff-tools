@@ -55,7 +55,7 @@ STUB
   mkdir -p "$STUB_RESPONSES"
   : > "$STUB_RESPONSES/calls.txt"
   export STUB_RESPONSES
-  unset FPO_API_KEY
+  unset FPO_API_KEY FPO_API_KEY_DEVELOPMENT FPO_API_KEY_STAGING FPO_API_KEY_PRODUCTION
 }
 
 teardown() {
@@ -87,7 +87,7 @@ stub_healthy_production() {
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "Usage: bin/healthcheck"
-  assert_contains "$output" "FPO_API_KEY"
+  assert_contains "$output" "FPO_API_KEY_PRODUCTION"
 }
 
 @test "healthcheck rejects an unknown environment with a usage error" {
@@ -237,7 +237,7 @@ stub_healthy_production() {
 
   stub_response search.trade-tariff.service.gov.uk/fpo-code-search 403 '{"message":"Forbidden"}'
 
-  FPO_API_KEY=bad-key run "$repo_root/bin/healthcheck" production
+  FPO_API_KEY_PRODUCTION=bad-key run "$repo_root/bin/healthcheck" production
   [ "$status" -eq 1 ]
   assert_contains "$output" "fpo-search      FAIL   403"
   assert_contains "$output" "HTTP 403: Forbidden"
@@ -259,7 +259,7 @@ stub_healthy_production() {
   stub_healthy_production
   stub_response search.trade-tariff.service.gov.uk/fpo-code-search 200 '{"results":[{"code":"960321","score":1.0}]}'
 
-  FPO_API_KEY=secret-key-123 TRACE=1 run "$repo_root/bin/healthcheck" production
+  FPO_API_KEY_PRODUCTION=secret-key-123 TRACE=1 run "$repo_root/bin/healthcheck" production
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "fpo-search      OK     200"
@@ -268,22 +268,51 @@ stub_healthy_production() {
   assert_contains "$(cat "$STUB_RESPONSES/headers-sent.txt")" "X-Api-Key: secret-key-123"
 }
 
-@test "healthcheck skips fpo search when FPO_API_KEY is empty" {
+@test "healthcheck skips fpo search when the environment key is empty" {
   stub_healthy_production
 
-  FPO_API_KEY= run "$repo_root/bin/healthcheck" production
+  FPO_API_KEY_PRODUCTION= run "$repo_root/bin/healthcheck" production
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "fpo-search      SKIP"
 }
 
-@test "healthcheck does not send the FPO API key when it checks more than one environment" {
-  FPO_API_KEY=secret-key-123 run "$repo_root/bin/healthcheck" all
+@test "healthcheck sends each FPO API key only to its own environment" {
+  stub_response search.staging.trade-tariff.service.gov.uk/fpo-code-search 200 '{"results":[{"code":"960321","score":1.0}]}'
 
-  assert_contains "$output" "development  fpo-search      SKIP"
+  FPO_API_KEY_STAGING=staging-key run "$repo_root/bin/healthcheck" all
+
+  assert_contains "$output" "staging      fpo-search      OK     200"
+  assert_contains "$output" "development  fpo-search      SKIP   -     -       set FPO_API_KEY_DEVELOPMENT to check"
+  assert_contains "$output" "production   fpo-search      SKIP   -     -       set FPO_API_KEY_PRODUCTION to check"
+
+  calls="$(cat "$STUB_RESPONSES/calls.txt")"
+  assert_contains "$calls" "https://search.staging.trade-tariff.service.gov.uk/fpo-code-search"
+  assert_not_contains "$calls" "https://search.dev.trade-tariff.service.gov.uk"
+  assert_not_contains "$calls" "https://search.trade-tariff.service.gov.uk"
+  [ "$(cat "$STUB_RESPONSES/headers-sent.txt")" = "X-Api-Key: staging-key" ]
+}
+
+@test "healthcheck does not send a production FPO API key to staging" {
+  FPO_API_KEY_PRODUCTION=production-key run "$repo_root/bin/healthcheck" staging
+
   assert_contains "$output" "staging      fpo-search      SKIP"
-  assert_contains "$output" "production   fpo-search      SKIP"
-  assert_contains "$output" "FPO_API_KEY is for one environment, run it per environment"
   assert_not_contains "$(cat "$STUB_RESPONSES/calls.txt")" "search."
   [ ! -f "$STUB_RESPONSES/headers-sent.txt" ]
+}
+
+@test "healthcheck ignores the old FPO_API_KEY variable" {
+  FPO_API_KEY=unbound-key run "$repo_root/bin/healthcheck" production
+
+  assert_contains "$output" "production   fpo-search      SKIP   -     -       set FPO_API_KEY_PRODUCTION to check"
+  [ ! -f "$STUB_RESPONSES/headers-sent.txt" ]
+}
+
+@test "healthcheck accepts an environment twice when its FPO API key is set" {
+  stub_response search.staging.trade-tariff.service.gov.uk/fpo-code-search 200 '{"results":[{"code":"960321","score":1.0}]}'
+
+  FPO_API_KEY_STAGING=staging-key run "$repo_root/bin/healthcheck" all staging
+
+  assert_contains "$output" "staging      fpo-search      OK     200"
+  assert_not_contains "$output" "cannot overwrite"
 }
