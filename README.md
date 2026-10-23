@@ -254,4 +254,6 @@ It checks the frontend, backend UK and XI, admin, hub, identity, MCP, Flagsmith,
 FPO_API_KEY=<key> ./bin/healthcheck production   # also checks FPO search
 ```
 
+An FPO API key works in one environment only. The command sends `FPO_API_KEY` only when you check one environment. With `all`, it skips FPO search.
+
 The command exits with 1 if any check fails. A failed row shows the CloudFront `x-cache` header when there is one. `Hit from cloudfront` means CloudFront cached an error.

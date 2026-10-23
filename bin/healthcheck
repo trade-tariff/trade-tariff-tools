@@ -25,7 +25,8 @@ Options:
 
 Environment:
   FPO_API_KEY     Optional. An FPO search API key for the checked environment.
-                  If it is not set, the fpo-search check is skipped.
+                  If it is not set, the fpo-search check is skipped. The key
+                  is sent only when one environment is checked.
   NO_COLOR        Optional. Disable coloured status output.
 
 Outputs:
@@ -141,7 +142,7 @@ request() {
 # Read the response files and print: STATUS|HTTP|TIME|DETAILS
 evaluate() {
   local kind="$1" out="$2"
-  local rc http time body details x_cache sha message
+  local rc http time body details x_cache cache_note sha message
 
   rc="$(cat "$out.rc")"
   read -r http time < "$out.meta" || true
@@ -155,6 +156,12 @@ evaluate() {
   fi
 
   body="$(cat "$out.body")"
+
+  # Add the CloudFront x-cache header to every failed row. "Hit from
+  # cloudfront" means CloudFront cached the response.
+  x_cache="$(tr -d '\r' < "$out.headers" | awk -F': ' 'tolower($1) == "x-cache" { v = $2 } END { print v }')"
+  cache_note=""
+  [[ -n "$x_cache" ]] && cache_note=" (x-cache: $x_cache)"
 
   if [[ "$kind" == "backend" ]]; then
     # The backend returns JSON with 503 when a dependency is down, so read
@@ -171,7 +178,7 @@ evaluate() {
       if [[ "$http" == "200" && "$(jq -r '.healthy' <<< "$body")" == "true" ]]; then
         echo "OK|$http|$time|$details"
       else
-        echo "FAIL|$http|$time|$details"
+        echo "FAIL|$http|$time|$details$cache_note"
       fi
       return
     fi
@@ -183,17 +190,17 @@ evaluate() {
         if sha="$(jq -er '.git_sha1' <<< "$body" 2>/dev/null)"; then
           echo "OK|$http|$time|sha=$sha"
         else
-          echo "FAIL|$http|$time|response has no git_sha1"
+          echo "FAIL|$http|$time|response has no git_sha1$cache_note"
         fi
         ;;
       backend)
-        echo "FAIL|$http|$time|response is not backend healthcheck JSON"
+        echo "FAIL|$http|$time|response is not backend healthcheck JSON$cache_note"
         ;;
       fpo)
         if jq -e '.results | type == "array"' <<< "$body" >/dev/null 2>&1; then
           echo "OK|$http|$time|search returned results"
         else
-          echo "FAIL|$http|$time|response has no results list"
+          echo "FAIL|$http|$time|response has no results list$cache_note"
         fi
         ;;
       *)
@@ -203,24 +210,20 @@ evaluate() {
     return
   fi
 
-  # Show the CloudFront x-cache header. "Hit from cloudfront" means
-  # CloudFront cached an error.
-  x_cache="$(tr -d '\r' < "$out.headers" | awk -F': ' 'tolower($1) == "x-cache" { v = $2 } END { print v }')"
   details="HTTP $http"
-  [[ -n "$x_cache" ]] && details="$details (x-cache: $x_cache)"
   # Show the error text. API Gateway uses "message", the backend uses
   # "errors[].detail" and Rails uses "error".
   if message="$(jq -er 'first(.message?, .errors?[0]?.detail?, .error? | strings)' <<< "$body" 2>/dev/null)"; then
     details="$details: $message"
   fi
-  echo "FAIL|$http|$time|$details"
+  echo "FAIL|$http|$time|$details$cache_note"
 }
 
 run_check() {
   local env="$1" service="$2" kind="$3" url="$4" out="$5"
 
   if [[ "$kind" == "fpo" && -z "$fpo_header_file" ]]; then
-    echo "$env|$service|SKIP|-|-|set FPO_API_KEY to check" > "$out"
+    echo "$env|$service|SKIP|-|-|$fpo_skip_reason" > "$out"
     return
   fi
 
@@ -231,10 +234,19 @@ run_check() {
 # Put the FPO API key in a file in the private work directory and pass the
 # file to curl. Then the key is not in the curl arguments, so it is not in the
 # process list. printenv also keeps the key out of TRACE=1 output.
+#
+# An FPO API key works in one environment only. Send it only when one
+# environment is checked, so that a production key never goes to development
+# or staging.
 fpo_header_file=""
+fpo_skip_reason="set FPO_API_KEY to check"
 if printenv FPO_API_KEY | grep . >/dev/null; then
-  fpo_header_file="$workdir/fpo-header"
-  { printf 'X-Api-Key: '; printenv FPO_API_KEY; } > "$fpo_header_file"
+  if [[ "${#environments[@]}" -eq 1 ]]; then
+    fpo_header_file="$workdir/fpo-header"
+    { printf 'X-Api-Key: '; printenv FPO_API_KEY; } > "$fpo_header_file"
+  else
+    fpo_skip_reason="FPO_API_KEY is for one environment, run it per environment"
+  fi
 fi
 
 # Start every check in the background, so that a slow or down environment

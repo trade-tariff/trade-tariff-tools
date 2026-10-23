@@ -147,6 +147,29 @@ stub_healthy_production() {
   assert_contains "$output" "HTTP 503 (x-cache: Hit from cloudfront)"
 }
 
+@test "healthcheck shows the x-cache header for a failed backend healthcheck" {
+  stub_healthy_production
+  stub_response www.trade-tariff.service.gov.uk/uk/api/healthcheck 503 \
+    '{"git_sha1":"abc1234","sidekiq":true,"postgres":false,"redis":true,"opensearch":true,"healthy":false}'
+  printf 'HTTP/2 503\r\nx-cache: Hit from cloudfront\r\n' > "$STUB_RESPONSES/www.trade-tariff.service.gov.uk/uk/api/healthcheck/headers"
+
+  run "$repo_root/bin/healthcheck" production
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "postgres=FAIL redis=ok opensearch=ok sidekiq=ok sha=abc1234 (x-cache: Hit from cloudfront)"
+}
+
+@test "healthcheck shows the x-cache header for a 200 response that fails" {
+  stub_healthy_production
+  stub_response admin.trade-tariff.service.gov.uk/healthcheck 200 '<html>maintenance</html>'
+  printf 'HTTP/2 200\r\nx-cache: Hit from cloudfront\r\n' > "$STUB_RESPONSES/admin.trade-tariff.service.gov.uk/healthcheck/headers"
+
+  run "$repo_root/bin/healthcheck" production
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "response has no git_sha1 (x-cache: Hit from cloudfront)"
+}
+
 @test "healthcheck reports an unreachable service" {
   stub_healthy_production
   mkdir -p "$STUB_RESPONSES/hub.trade-tariff.service.gov.uk/healthcheck"
@@ -252,4 +275,15 @@ stub_healthy_production() {
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "fpo-search      SKIP"
+}
+
+@test "healthcheck does not send the FPO API key when it checks more than one environment" {
+  FPO_API_KEY=secret-key-123 run "$repo_root/bin/healthcheck" all
+
+  assert_contains "$output" "development  fpo-search      SKIP"
+  assert_contains "$output" "staging      fpo-search      SKIP"
+  assert_contains "$output" "production   fpo-search      SKIP"
+  assert_contains "$output" "FPO_API_KEY is for one environment, run it per environment"
+  assert_not_contains "$(cat "$STUB_RESPONSES/calls.txt")" "search."
+  [ ! -f "$STUB_RESPONSES/headers-sent.txt" ]
 }
