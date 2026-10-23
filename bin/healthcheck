@@ -158,12 +158,15 @@ evaluate() {
 
   if [[ "$kind" == "backend" ]]; then
     # The backend returns JSON with 503 when a dependency is down, so read
-    # the JSON for any status code.
+    # the JSON for any status code. Other JSON, such as an error response,
+    # has no "healthy" key, so it goes to the error handling below.
     if details="$(jq -er '
-        [ "postgres", "redis", "opensearch", "sidekiq" ]
+        select(type == "object" and has("healthy"))
+        | . as $doc
+        | [ "postgres", "redis", "opensearch", "sidekiq" ]
         | map(. as $k | "\($k)=" + (if $doc[$k] == true then "ok" else "FAIL" end))
         | join(" ")
-      ' --argjson doc "$body" -n 2>/dev/null)"; then
+      ' <<< "$body" 2>/dev/null)"; then
       details="$details sha=$(jq -r '.git_sha1 // "?"' <<< "$body")"
       if [[ "$http" == "200" && "$(jq -r '.healthy' <<< "$body")" == "true" ]]; then
         echo "OK|$http|$time|$details"
@@ -205,7 +208,9 @@ evaluate() {
   x_cache="$(tr -d '\r' < "$out.headers" | awk -F': ' 'tolower($1) == "x-cache" { v = $2 } END { print v }')"
   details="HTTP $http"
   [[ -n "$x_cache" ]] && details="$details (x-cache: $x_cache)"
-  if message="$(jq -er '.message | strings' <<< "$body" 2>/dev/null)"; then
+  # Show the error text. API Gateway uses "message", the backend uses
+  # "errors[].detail" and Rails uses "error".
+  if message="$(jq -er 'first(.message?, .errors?[0]?.detail?, .error? | strings)' <<< "$body" 2>/dev/null)"; then
     details="$details: $message"
   fi
   echo "FAIL|$http|$time|$details"

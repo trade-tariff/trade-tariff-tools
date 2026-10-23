@@ -158,6 +158,31 @@ stub_healthy_production() {
   assert_contains "$output" "unreachable (curl exit 28: Operation timed out)"
 }
 
+@test "healthcheck does not report dependency failures for a backend JSON error" {
+  stub_healthy_production
+  stub_response www.trade-tariff.service.gov.uk/uk/api/healthcheck 404 '{"errors":[{"detail":"404 - Not Found"}]}'
+  stub_response www.trade-tariff.service.gov.uk/xi/api/healthcheck 500 '{"error":"Internal Server Error"}'
+
+  run "$repo_root/bin/healthcheck" production
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "backend-uk      FAIL   404"
+  assert_contains "$output" "HTTP 404: 404 - Not Found"
+  assert_contains "$output" "HTTP 500: Internal Server Error"
+  assert_not_contains "$output" "postgres=FAIL"
+}
+
+@test "healthcheck fails a backend 200 JSON response without a healthy field" {
+  stub_healthy_production
+  stub_response www.trade-tariff.service.gov.uk/uk/api/healthcheck 200 '{"git_sha1":"abc1234"}'
+
+  run "$repo_root/bin/healthcheck" production
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "response is not backend healthcheck JSON"
+  assert_not_contains "$output" "postgres=FAIL"
+}
+
 @test "healthcheck fails a backend 200 response that is not healthcheck JSON" {
   stub_healthy_production
   stub_response www.trade-tariff.service.gov.uk/uk/api/healthcheck 200 '<html>Service maintenance</html>'
