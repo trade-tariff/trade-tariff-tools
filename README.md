@@ -237,3 +237,23 @@ Deregisters old, unused ECS task definition revisions, keeping a specified numbe
 The `number_to_keep` argument is optional and defaults to 4. All revisions currently in use by services or running tasks are always preserved, regardless of this number.
 
 When AWS returns task definitions for a family prefix, the script only deregisters revisions whose exact family matches the family currently being rotated.
+
+### 6. `bin/healthcheck`
+
+Checks the public healthcheck endpoint of every Trade Tariff service and prints a table. Use it in the first minutes of an incident to see which service, and which backend dependency, is down. See the [Incident Triage Playbook](https://transformuk.atlassian.net/wiki/spaces/HO/pages/22703636484/Incident+Triage+Playbook).
+
+It checks the frontend, backend UK and XI, admin, hub, identity, MCP, Flagsmith, Flagsmith edge and FPO search. The backend rows show Postgres, Redis, OpenSearch and Sidekiq. It sends public HTTP requests only, so it does not need AWS credentials. It needs `curl` and `jq`.
+
+**Usage:**
+
+```bash
+./bin/healthcheck                 # production
+./bin/healthcheck staging
+./bin/healthcheck all             # development, staging and production
+./bin/healthcheck --timeout 5 production
+FPO_API_KEY_PRODUCTION=KEY ./bin/healthcheck production   # also checks FPO search
+```
+
+Replace `KEY` with the FPO search API key. An FPO API key works in one environment only, so each environment has its own variable: `FPO_API_KEY_DEVELOPMENT`, `FPO_API_KEY_STAGING` or `FPO_API_KEY_PRODUCTION`. The command sends each key only to its own environment. If an environment has no key, the command skips its FPO search check.
+
+The command exits with 1 if any check fails. A failed row shows the CloudFront `x-cache` header when there is one. `Hit from cloudfront` means CloudFront cached an error.
