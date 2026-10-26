@@ -10,6 +10,7 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       flake-utils,
       pre-commit-hooks,
@@ -45,6 +46,24 @@
             license = licenses.mit;
           };
         };
+        reviewBats = pkgs.bats.overrideAttrs (_: {
+          version = "1.10.0";
+          src = pkgs.fetchFromGitHub {
+            owner = "bats-core";
+            repo = "bats-core";
+            rev = "f7defb94362f2053a3e73d13086a167448ea9133";
+            hash = "sha256-gy4dyoKRlf2WFmH1/mSNwhVR3df92BgpT4TjTpV4FyQ=";
+          };
+        });
+
+        reviewEnvironment = ''
+          if [ "''${REVIEW_SANDBOX:-}" != 1 ] || [ "$PWD" != /workspace ]; then exit 64; fi
+          export TMPDIR=/workspace/.review/tmp PRE_COMMIT_HOME=/workspace/.review/pre-commit
+          export npm_config_ignore_scripts=true YARN_IGNORE_SCRIPTS=true YARN_OFFLINE=true YARN_CACHE_FOLDER="$TMPDIR/yarn-cache"
+          export CI=true AWS_EC2_METADATA_DISABLED=true
+          mkdir -p "$TMPDIR"
+        '';
+
         preCommitCheck = pre-commit-hooks.lib.${system}.run {
           src = ./.;
           configPath = ".pre-commit-config-nix.yaml";
@@ -127,6 +146,47 @@
       {
         packages.default = ecs;
         packages.ecs = ecs;
+        devShells.review = self.devShells.${system}.default.overrideAttrs (old: {
+          shellHook = "";
+          nativeBuildInputs = [
+            pkgs.gitMinimal
+            reviewBats
+            pkgs.nodejs_24
+            pkgs.yarn
+            pkgs.ruby
+            pkgs.curl
+            pkgs.jq
+            (pkgs.python3.withPackages (ps: [
+              ps.requests
+              ps.openpyxl
+            ]))
+            preCommitCheck.config.package
+            (pkgs.writeShellApplication {
+              name = "review-bootstrap";
+              text = reviewEnvironment + ''
+                printf 'yarn-offline-mirror "/deps/yarn-archives"\n' > "$TMPDIR/yarnrc"
+                yarn --use-yarnrc "$TMPDIR/yarnrc" install --offline --frozen-lockfile --ignore-scripts
+              '';
+            })
+            (pkgs.writeShellApplication {
+              name = "review-check";
+              text = reviewEnvironment + ''
+                status=0
+                pre-commit run --all-files --config ${preCommitCheck.config.configFile} || status=$?
+                for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do bash -n "$file" || status=$?; done
+                bats --tap --print-output-on-failure tests | tee "$TMPDIR/bats.log" || status=$?
+                if grep -E '# skip' "$TMPDIR/bats.log"; then status=1; fi
+                yarn test --runInBand --json --outputFile="$TMPDIR/unit.json" || status=$?
+                jq -e '.numTotalTests > 0 and .numFailedTests == 0 and .numPendingTests == 0 and .wasInterrupted == false' "$TMPDIR/unit.json" || status=$?
+                exit "$status"
+              '';
+            })
+          ]
+          ++ (old.nativeBuildInputs or [ ]);
+          TZDIR = "${pkgs.tzdata.outPath}/share/zoneinfo";
+          SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        });
+
         devShells.default = pkgs.mkShell {
           shellHook = ''
             ${preCommitCheck.shellHook}
