@@ -64,6 +64,93 @@
           mkdir -p "$TMPDIR"
         '';
 
+        reviewTools = import (builtins.fetchTree {
+          type = "github";
+          owner = "NixOS";
+          repo = "nixpkgs";
+          rev = "4a29d733e8a7d5b824c3d8c958a946a9867b3eb2";
+          narHash = "sha256-f+JACbTqzZ+G92DSnXOUGRhGANb8Blh7CoeYOeBF8/U=";
+        }) { inherit system; };
+        reviewSecretTools = import (builtins.fetchTree {
+          type = "github";
+          owner = "NixOS";
+          repo = "nixpkgs";
+          rev = "b86751bc4085f48661017fa226dee99fab6c651b";
+          narHash = "sha256-a8BYi3mzoJ/AcJP8UldOx8emoPRLeWqALZWu4ZvjPXw=";
+        }) { inherit system; };
+        reviewPreCommitConfig = pkgs.writeText "review-pre-commit.json" (
+          builtins.toJSON {
+            repos = [
+              {
+                repo = "local";
+                hooks = [
+                  {
+                    id = "trailing-whitespace";
+                    name = "trim trailing whitespace";
+                    language = "system";
+                    entry = "${reviewTools.python3Packages.pre-commit-hooks}/bin/trailing-whitespace-fixer";
+                    types = [ "text" ];
+                    stages = [
+                      "pre-commit"
+                      "pre-push"
+                      "manual"
+                    ];
+                  }
+                  {
+                    id = "end-of-file-fixer";
+                    name = "fix end of files";
+                    language = "system";
+                    entry = "${reviewTools.python3Packages.pre-commit-hooks}/bin/end-of-file-fixer";
+                    types = [ "text" ];
+                    stages = [
+                      "pre-commit"
+                      "pre-push"
+                      "manual"
+                    ];
+                  }
+                  {
+                    id = "check-yaml";
+                    name = "check yaml";
+                    language = "system";
+                    entry = "${reviewTools.python3Packages.pre-commit-hooks}/bin/check-yaml";
+                    types = [ "yaml" ];
+                  }
+                  {
+                    id = "check-merge-conflict";
+                    name = "check for merge conflicts";
+                    language = "system";
+                    entry = "${reviewTools.python3Packages.pre-commit-hooks}/bin/check-merge-conflict";
+                    types = [ "text" ];
+                  }
+                  {
+                    id = "shellcheck";
+                    name = "ShellCheck v0.11.0";
+                    language = "system";
+                    entry = "${reviewTools.shellcheck}/bin/shellcheck";
+                    types = [ "shell" ];
+                    args = [ "--severity=error" ];
+                  }
+                  {
+                    id = "actionlint-docker";
+                    name = "Lint GitHub Actions workflow files";
+                    language = "system";
+                    entry = "${reviewTools.actionlint}/bin/actionlint";
+                    types = [ "yaml" ];
+                    files = "^\\.github/workflows/";
+                  }
+                  {
+                    id = "trufflehog";
+                    name = "TruffleHog";
+                    language = "system";
+                    entry = "${reviewSecretTools.trufflehog}/bin/trufflehog git file://. --since-commit HEAD --results=verified --fail --trust-local-git-config";
+                    pass_filenames = false;
+                  }
+                ];
+              }
+            ];
+          }
+        );
+
         preCommitCheck = pre-commit-hooks.lib.${system}.run {
           src = ./.;
           configPath = ".pre-commit-config-nix.yaml";
@@ -160,7 +247,7 @@
               ps.requests
               ps.openpyxl
             ]))
-            preCommitCheck.config.package
+            reviewTools.pre-commit
             (pkgs.writeShellApplication {
               name = "review-bootstrap";
               text = reviewEnvironment + ''
@@ -172,7 +259,7 @@
               name = "review-check";
               text = reviewEnvironment + ''
                 status=0
-                pre-commit run --all-files --config ${preCommitCheck.config.configFile} || status=$?
+                pre-commit run --all-files --config ${reviewPreCommitConfig} || status=$?
                 for file in bin/* scripts/*.sh scripts/lib/*.sh .github/actions/*/*.sh tests/test_helper.bash; do bash -n "$file" || status=$?; done
                 bats --tap --print-output-on-failure tests | tee "$TMPDIR/bats.log" || status=$?
                 if grep -E '# skip' "$TMPDIR/bats.log"; then status=1; fi
