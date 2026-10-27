@@ -44,6 +44,8 @@ jobs:
     # gets the Actions secrets and handles Dependabot pull requests.
     if: >-
       (github.event_name == 'workflow_run' || github.actor != 'dependabot[bot]') &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.head_repository.full_name == github.repository) &&
       (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
       (github.event_name != 'pull_request_review' ||
       github.event.review.user.login == 'copilot' ||
@@ -77,38 +79,9 @@ jobs:
 
       - name: Resolve pull request number
         id: pr
+        uses: trade-tariff/trade-tariff-tools/.github/actions/resolve-auto-merge-pr@main
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-        run: |
-          set -euo pipefail
-
-          case "${{ github.event_name }}" in
-            pull_request|pull_request_review)
-              echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-              ;;
-            workflow_run)
-              if [[ "${{ github.event.workflow_run.conclusion }}" != "success" ]]; then
-                echo "number=" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              branch="$HEAD_BRANCH"
-              number="$(gh pr list \
-                --repo "${{ github.repository }}" \
-                --head "$branch" \
-                --state open \
-                --json number \
-                -q '.[0].number' || true)"
-              if [[ -z "$number" || "$number" == "null" ]]; then
-                echo "number=" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              echo "number=$number" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "number=" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
 
       - name: Auto-merge when requirements are met
         if: steps.pr.outputs.number != ''

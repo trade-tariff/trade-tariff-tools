@@ -58,6 +58,10 @@ fi
 
 if [[ "$1" == "api" ]]; then
   printf '%s\n' "$@" > "$GH_API_CAPTURE_FILE"
+  if [[ "$2" == "repos/trade-tariff/example/pulls/42" ]]; then
+    printf '%s\n' "${GH_HEAD_REPO-trade-tariff/example}"
+    exit "${GH_HEAD_REPO_STATUS:-0}"
+  fi
   exit "${GH_API_STATUS:-0}"
 fi
 
@@ -490,6 +494,69 @@ run_orchestration() {
     --label low-risk \
     --merge-method squash \
     --required-workflow ci.yml
+}
+
+@test "orchestration disarms fork PRs but never reviews approves or merges them" {
+  make_orchestration_harness
+  export GH_HEAD_REPO=outsider/example
+  export GH_REVIEW_REQUESTS_JSON='{"labels":[{"name":"low-risk"}],"headRefOid":"expected-head"}'
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" 'comes from a fork or unavailable repository (outsider/example); skipping auto-merge.'
+  [ "$(cat "$ORCHESTRATION_LOG")" = 'disable-auto-merge --repo trade-tariff/example --pr 42 --merge-method squash' ]
+  [ ! -e "$GH_MERGE_CAPTURE_FILE" ]
+}
+
+@test "orchestration rejects a fork even when Dependabot would otherwise skip review" {
+  make_orchestration_harness
+  export GH_HEAD_REPO=outsider/example
+  export DEPENDABOT_STATUS=0
+
+  run_orchestration
+
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
+  [ ! -e "$GH_MERGE_CAPTURE_FILE" ]
+}
+
+@test "orchestration fails closed when the head repository lookup fails" {
+  make_orchestration_harness
+  export GH_HEAD_REPO_STATUS=1
+
+  run_orchestration
+
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
+  [ ! -e "$GH_MERGE_CAPTURE_FILE" ]
+}
+
+@test "orchestration skips a deleted or missing head repository" {
+  make_orchestration_harness
+  for GH_HEAD_REPO in null ''; do
+    export GH_HEAD_REPO
+    rm -f "$ORCHESTRATION_LOG"
+    run_orchestration
+
+    [ "$status" -eq 0 ]
+    [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
+    [ ! -e "$GH_MERGE_CAPTURE_FILE" ]
+  done
+}
+
+@test "orchestration still disarms label removal without a head repository lookup" {
+  make_orchestration_harness
+  export GH_HEAD_REPO_STATUS=1
+
+  run "$harness/auto-merge.sh" \
+    --repo trade-tariff/example --pr 42 --label low-risk \
+    --merge-method squash --required-workflow ci.yml \
+    --event-action unlabeled --event-label low-risk
+
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$ORCHESTRATION_LOG")" -eq 1 ]
+  [ ! -e "$GH_API_CAPTURE_FILE" ]
 }
 
 @test "orchestration treats the enabling label as a literal string" {

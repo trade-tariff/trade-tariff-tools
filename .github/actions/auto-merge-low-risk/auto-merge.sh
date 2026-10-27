@@ -86,6 +86,13 @@ if [[ "$event_action" == "unlabeled" && "$event_label" == "$label" ]]; then
   exit 0
 fi
 
+# Check the actual PR on every entry point, after disarming legacy auto-merge.
+head_repo="$(gh api "repos/$repo/pulls/$pr" --jq '.head.repo.full_name')"
+if [[ "$head_repo" != "$repo" ]]; then
+  echo "PR #$pr comes from a fork or unavailable repository ($head_repo); skipping auto-merge."
+  exit 0
+fi
+
 labels="$(gh pr view "$pr" --repo "$repo" --json labels -q '.labels[].name')"
 if ! grep -Fqx "$label" <<< "$labels"; then
   echo "PR #$pr does not have the ${label} label; skipping."

@@ -1,0 +1,13 @@
+name: Resolve auto-merge pull request
+description: Resolve one internal pull request associated with an event or its exact CI commit.
+outputs:
+  number:
+    description: Eligible pull request number, or empty when no unique match exists.
+    value: ${{ steps.pr.outputs.number }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve pull request
+      id: pr
+      shell: bash
+      run: '"${{ github.action_path }}/resolve-pull-request.sh"'
