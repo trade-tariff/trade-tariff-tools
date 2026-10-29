@@ -45,14 +45,6 @@ runs:
     - name: Force unlock terraform state on cancellation
       if: cancelled()
       shell: bash
-      run: |
-        BUCKET=$(grep '^bucket' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
-        KEY=$(grep '^key' terraform/backends/${{ inputs.environment }}.tfbackend | awk -F'"' '{print $2}')
-        aws s3 cp "s3://${BUCKET}/${KEY}.tflock" /tmp/terraform.tflock || exit 0
-        # Unlock only a lock that this runner holds. A lock from another run stays.
-        if [[ "$(jq -r '.Who' /tmp/terraform.tflock)" != "$(whoami)@$(hostname)" ]]; then
-          echo "::notice::The state lock belongs to another run. It stays."
-          exit 0
-        fi
-        LOCK_ID=$(jq -r '.ID' /tmp/terraform.tflock)
-        cd terraform && terraform force-unlock -force "${LOCK_ID}"
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: '"${{ github.action_path }}/force-unlock-own-lock.sh"'
