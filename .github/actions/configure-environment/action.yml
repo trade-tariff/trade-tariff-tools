@@ -3,7 +3,7 @@ description: 'Derives shared AWS, ECS, and notification settings for a Tariff en
 
 inputs:
   environment:
-    description: 'The environment to configure: development, staging, or production.'
+    description: 'The environment to configure: development, staging, uat, or production.'
     required: true
   app-name:
     description: 'Optional deployed app name, for example tariff-backend or tariff-identity.'
@@ -62,6 +62,10 @@ runs:
             ;;
           staging)
             ACCOUNT_ID="451934005581"
+            SLACK_CHANNEL="deployments"
+            ;;
+          uat)
+            ACCOUNT_ID="352285845378"
             SLACK_CHANNEL="deployments"
             ;;
           production)
