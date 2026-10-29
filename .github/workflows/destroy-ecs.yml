@@ -1,0 +1,59 @@
+name: Destroy ECS
+
+# Removes the Terraform application stack of one app. The UAT stop job calls
+# this for each app before it destroys the shared layers (RFC 002 in
+# trade-tariff-platform-aws-terraform). Only uat is allowed.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to destroy. Only uat is allowed.
+        type: string
+        required: true
+      app-name:
+        description: The deployed app name, for example tariff-backend or tariff-identity
+        type: string
+        required: true
+      checkout-repo:
+        description: The application repository that has the terraform directory
+        type: string
+        required: true
+      checkout-ref:
+        description: The ref to checkout
+        type: string
+        default: main
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow only uat
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [[ "$ENVIRONMENT" != "uat" ]]; then
+            echo "::error::destroy-ecs runs only for uat, not ${ENVIRONMENT}."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: ${{ inputs.checkout-repo }}
+          ref: ${{ inputs.checkout-ref }}
+
+      - id: environment-config
+        uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
+        with:
+          app-name: ${{ inputs.app-name }}
+          environment: ${{ inputs.environment }}
+
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-destroy@main
+        with:
+          environment: ${{ inputs.environment }}
+          role-to-assume: ${{ steps.environment-config.outputs.deploy-role-arn }}

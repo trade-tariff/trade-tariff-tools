@@ -1,0 +1,50 @@
+name: 'Destroy Terraform'
+description: 'Run a terraform destroy command to remove the application stack.'
+
+inputs:
+  environment:
+    required: true
+    description: 'The environment to destroy.'
+  ref:
+    required: false
+    description: 'The docker_tag value. Destroy does not use the image, but the variable has no default.'
+    default: 'destroy'
+  role-to-assume:
+    description: 'The IAM role ARN to assume for AWS operations.'
+    required: true
+  region:
+    required: false
+    default: 'eu-west-2'
+runs:
+  using: 'composite'
+  steps:
+    - name: Allow only uat
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        if [[ "$ENVIRONMENT" != "uat" ]]; then
+          echo "::error::terraform-destroy runs only for uat, not ${ENVIRONMENT}."
+          exit 1
+        fi
+    - uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.region }}
+    - uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: 1.12
+    - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
+      shell: bash
+    - run: cd terraform && terraform destroy -var-file=config_${{ inputs.environment }}.tfvars -auto-approve -lock-timeout=10m
+      shell: bash
+      env:
+        TF_INPUT: 0
+        TF_IN_AUTOMATION: 1
+        TF_VAR_docker_tag: ${{ inputs.ref }}
+    - name: Force unlock terraform state on cancellation
+      if: cancelled()
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: '"${{ github.action_path }}/force-unlock-own-lock.sh"'

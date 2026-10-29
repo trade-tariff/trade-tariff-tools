@@ -69,6 +69,26 @@ run_configure_environment() {
   assert_contains "$outputs" "deploy-role-arn=arn:aws:iam::451934005581:role/GithubActions-Identity-ECS-Deployments-Role"
 }
 
+@test "configure-environment emits uat environment outputs" {
+  run env \
+    ENVIRONMENT="uat" \
+    APP_NAME="tariff-frontend" \
+    SERVICE_NAMES="" \
+    REGION="eu-west-2" \
+    GITHUB_OUTPUT="$output_file" \
+    bash "$script"
+
+  [ "$status" -eq 0 ]
+  outputs="$(cat "$output_file")"
+  assert_contains "$outputs" "account-id=352285845378"
+  assert_contains "$outputs" "cluster=trade-tariff-cluster-uat"
+  assert_contains "$outputs" "security-group-name=trade-tariff-ecs-security-group-uat"
+  assert_contains "$outputs" "log-group=platform-logs-uat"
+  assert_contains "$outputs" "slack-channel=deployments"
+  assert_contains "$outputs" "deploy-role-arn=arn:aws:iam::352285845378:role/GithubActions-ECS-Deployments-Role"
+  assert_contains "$outputs" "ecr-url=382373577178.dkr.ecr.eu-west-2.amazonaws.com/tariff-frontend-production"
+}
+
 @test "configure-environment rejects unknown environments" {
   run env \
     ENVIRONMENT="preview" \
