@@ -36,6 +36,11 @@ on:
         type: boolean
         default: false
         required: false
+      force-migrate:
+        description: Run the database migrations even when no migration file changed since the running image, for example after a database restore. Implies migrate
+        type: boolean
+        default: false
+        required: false
       notify:
         description: Whether to send notifications to Slack
         type: boolean
@@ -184,12 +189,13 @@ jobs:
           ref: ${{ needs.configure.outputs.actual_ref }}
           fetch-depth: 0
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
-        if: ${{ inputs.migrate }}
+        if: ${{ inputs.migrate || inputs.force-migrate }}
         with:
           app-name: ${{ inputs.app-name }}
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
-          previous-ref: ${{ needs.configure.outputs.previous_docker_tag }}
+          # Without a previous ref, db-migrate always runs the migrations.
+          previous-ref: ${{ !inputs.force-migrate && needs.configure.outputs.previous_docker_tag || '' }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-apply@main
         with:

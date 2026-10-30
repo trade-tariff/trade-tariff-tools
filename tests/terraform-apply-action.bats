@@ -55,3 +55,13 @@ teardown() {
   run grep -F 'vars: ${{ inputs.terraform-vars }}' "$repo_root/.github/workflows/deploy-ecs.yml"
   [ "$status" -eq 0 ]
 }
+
+@test "deploy-ecs runs the migrations without a previous ref when force-migrate is set" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F 'if: ${{ inputs.migrate || inputs.force-migrate }}' "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "previous-ref: \${{ !inputs.force-migrate && needs.configure.outputs.previous_docker_tag || '' }}" "$workflow"
+  [ "$status" -eq 0 ]
+}
