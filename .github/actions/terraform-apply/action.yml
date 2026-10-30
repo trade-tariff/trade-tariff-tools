@@ -19,6 +19,10 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
+  vars:
+    description: 'Terraform variables that replace the var file values, one name=value on each line.'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -31,10 +35,12 @@ runs:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
       shell: bash
-    - run: cd terraform && terraform apply -var-file=config_${{ inputs.environment }}.tfvars -auto-approve -lock-timeout=10m
+    - run: '"${{ github.action_path }}/apply.sh"'
       shell: bash
       env:
+        ENVIRONMENT: ${{ inputs.environment }}
         TF_VAR_docker_tag: ${{ inputs.ref }}
+        VARS: ${{ inputs.vars }}
     - name: Force unlock terraform state on cancellation
       if: cancelled()
       shell: bash
