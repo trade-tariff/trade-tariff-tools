@@ -10,31 +10,45 @@ setup() {
 printf '%s\n' "$@"
 STUB
   chmod +x "$workdir/bin/terraform"
-
-  ruby -ryaml -e '
-    step = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps").find { |s| s.fetch("run", "").include?("terraform apply") }
-    File.write(ARGV.fetch(1), step.fetch("run").gsub("${{ inputs.environment }}", "uat"))
-  ' "$repo_root/.github/actions/terraform-apply/action.yml" "$workdir/apply.sh"
+  apply="$repo_root/.github/actions/terraform-apply/apply.sh"
 }
 
 teardown() {
   rm -rf "$workdir"
 }
 
-@test "terraform-apply puts each var after the var file" {
+@test "apply.sh puts each var after the var file" {
   cd "$workdir"
-  VARS=$'start_without_tasks=true\n\nservice_count=0' PATH="$workdir/bin:$PATH" run bash -e -o pipefail apply.sh
+  ENVIRONMENT=uat VARS=$'start_without_tasks=true\n\nservice_count=0' PATH="$workdir/bin:$PATH" run "$apply"
 
   [ "$status" -eq 0 ]
   [ "$output" = "$(printf '%s\n' apply -var-file=config_uat.tfvars -var start_without_tasks=true -var service_count=0 -auto-approve -lock-timeout=10m)" ]
 }
 
-@test "terraform-apply adds no var without vars" {
+@test "apply.sh adds no var without vars" {
   cd "$workdir"
-  VARS="" PATH="$workdir/bin:$PATH" run bash -e -o pipefail apply.sh
+  ENVIRONMENT=uat PATH="$workdir/bin:$PATH" run "$apply"
 
   [ "$status" -eq 0 ]
   [ "$output" = "$(printf '%s\n' apply -var-file=config_uat.tfvars -auto-approve -lock-timeout=10m)" ]
+}
+
+@test "apply.sh requires ENVIRONMENT" {
+  cd "$workdir"
+  PATH="$workdir/bin:$PATH" run "$apply"
+
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Missing required environment variable: ENVIRONMENT"
+}
+
+@test "terraform-apply runs apply.sh with the environment and vars" {
+  action="$repo_root/.github/actions/terraform-apply/action.yml"
+
+  run grep -F "run: '\"\${{ github.action_path }}/apply.sh\"'" "$action"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'VARS: ${{ inputs.vars }}' "$action"
+  [ "$status" -eq 0 ]
 }
 
 @test "deploy-ecs passes terraform-vars to terraform-apply" {
