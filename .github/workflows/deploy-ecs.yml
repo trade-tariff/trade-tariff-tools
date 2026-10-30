@@ -41,6 +41,11 @@ on:
         type: boolean
         default: true
         required: false
+      terraform-vars:
+        description: Terraform variables that replace the var file values in the apply, one name=value on each line
+        type: string
+        default: ''
+        required: false
 
     secrets:
       slack-webhook:
@@ -191,6 +196,7 @@ jobs:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+          vars: ${{ inputs.terraform-vars }}
 
   tag:
     if: ${{ inputs.environment == 'production' }}
