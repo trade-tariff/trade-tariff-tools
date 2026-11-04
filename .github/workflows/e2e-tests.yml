@@ -28,7 +28,7 @@ on:
         default: false
         required: false
       skip-passwordless:
-        description: 'Skip the passwordless verification tests'
+        description: 'Skip tests that require passwordless login: admin, dev-hub, myott'
         type: boolean
         default: true
         required: false
