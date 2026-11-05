@@ -17,6 +17,11 @@ on:
         type: "string"
         default: "api,frontend"
         required: false
+      skip-passwordless:
+        description: "Skip passwordless verification in E2E tests."
+        type: "boolean"
+        default: true
+        required: false
       migrate:
         description: "Whether to run database migrations before deployment"
         type: "boolean"
@@ -42,7 +47,11 @@ jobs:
       fail-fast: false
     steps:
       - id: "parse-service-names"
-        run: "echo \"service-names=$(echo '${{ toJson(matrix.app.service-names) }}' | jq -r 'join(\" \")')\" >> \"$GITHUB_OUTPUT\""
+        env:
+          SERVICE_NAMES_JSON: "${{ toJson(matrix.app.service-names) }}"
+        run: |
+          service_names="$(jq -er '(. // []) | if type == "array" and all(.[]; type == "string" and test("^[A-Za-z0-9_-]+$")) then join(" ") else error("service-names must be an array of valid ECS service names") end' <<< "$SERVICE_NAMES_JSON")"
+          printf 'service-names=%s\n' "$service_names" >> "$GITHUB_OUTPUT"
 
       - if: "${{ steps.parse-service-names.outputs.service-names != '' }}"
         uses: "trade-tariff/trade-tariff-tools/.github/actions/start-services@main"
@@ -75,6 +84,7 @@ jobs:
     with:
       test-environment: "${{ inputs.environment }}"
       projects: "${{ inputs.test-projects }}"
+      skip-passwordless: "${{ inputs.skip-passwordless }}"
     secrets:
       basic_password: "${{ secrets.basic-password }}"
       waf_bypass_token: "${{ secrets.waf_bypass_token }}"

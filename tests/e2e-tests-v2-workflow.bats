@@ -57,12 +57,24 @@ setup() {
 @test "E2E workflow resolves the production account" {
   run ruby -ryaml -e '
     steps = YAML.load_file(ARGV.fetch(0)).fetch("jobs").fetch("test").fetch("steps")
-    script = steps.map { |step| step["run"].to_s }.find { |run| run.include?("ACCOUNT_ID=") }
-    abort "Account resolution step must exist" unless script
+    configure = steps.find { |step| step["name"] == "Configure environment" }
+    abort "Account resolution step must exist" unless configure
+    script = configure.fetch("run")
+    abort "Environment must be read from a quoted variable" unless script.include?(%q{case "$TEST_ENVIRONMENT" in})
+    abort "Invalid environments must be rejected" unless script.include?("Unsupported test environment:")
     abort "Development must resolve its account" unless script.include?(%q{ACCOUNT_ID="844815912454"})
     abort "Staging must resolve its account" unless script.include?(%q{ACCOUNT_ID="451934005581"})
     abort "Production must resolve its account" unless script.include?(%q{ACCOUNT_ID="382373577178"})
-    abort "Account id must reach later steps" unless script.include?("ACCOUNT_ID=${ACCOUNT_ID}")
+    abort "Account id must reach later steps" unless script.include?("ACCOUNT_ID=%s")
+    abort "Role ARN must use the resolved account" unless script.include?("$ACCOUNT_ID")
+    expected_env = {
+      "TEST_ENVIRONMENT" => "${{ inputs.test-environment }}",
+      "BASIC_PASSWORD" => "${{ secrets.basic_password }}",
+      "WAF_BYPASS_TOKEN" => "${{ secrets.waf_bypass_token }}",
+      "PUBLISH_METRICS" => "${{ inputs.publish-metrics }}"
+    }
+    abort "Environment values must be passed through env" unless configure.fetch("env") == expected_env
+    abort "Environment values must not be interpolated into Bash" if script.include?("${{")
   ' "$WORKFLOW_FILE"
 
   [ "$status" -eq 0 ]
@@ -71,10 +83,9 @@ setup() {
 @test "E2E workflow publishes metrics only when the caller opts in" {
   run ruby -ryaml -e '
     steps = YAML.load_file(ARGV.fetch(0)).fetch("jobs").fetch("test").fetch("steps")
-    script = steps.map { |step| step["run"].to_s }.find { |run| run.include?("PUBLISH_METRICS") }
-    abort "Metrics gate must exist" unless script
-    gate = %q{if [ "${{ inputs.publish-metrics }}" = "true" ]; then}
-    abort "Metrics must be gated on the publish-metrics input" unless script.include?(gate)
+    configure = steps.find { |step| step["name"] == "Configure environment" }
+    abort "Metrics configuration step must exist" unless configure
+    abort "Metrics must be gated on the environment value" unless configure.fetch("run").include?(%q{[[ "$PUBLISH_METRICS" == "true" ]]})
   ' "$WORKFLOW_FILE"
 
   [ "$status" -eq 0 ]

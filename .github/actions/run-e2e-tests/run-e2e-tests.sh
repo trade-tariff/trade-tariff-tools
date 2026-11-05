@@ -18,7 +18,8 @@ Arguments:
 Environment:
   PROJECTS                       (required) Comma-separated project names:
                                  api, admin, frontend, dev-hub, myott.
-  TEST_ENVIRONMENT               (required) Environment to test.
+  TEST_ENVIRONMENT               (required) Environment to test:
+                                 development, staging, production.
   SKIP_PASSWORDLESS_VERIFICATION (optional, default: true) true or false.
                                  Set false when passwordless verification is needed.
 
@@ -44,6 +45,11 @@ for required_name in PROJECTS TEST_ENVIRONMENT; do
     exit 2
   fi
 done
+
+case "$TEST_ENVIRONMENT" in
+  development|staging|production) ;;
+  *) echo "Unsupported test environment: $TEST_ENVIRONMENT" >&2; exit 2 ;;
+esac
 
 skip_passwordless="${SKIP_PASSWORDLESS_VERIFICATION-true}"
 case "$skip_passwordless" in

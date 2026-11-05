@@ -87,9 +87,14 @@ jobs:
           yarn playwright install --with-deps --only-shell chromium
 
       - name: "Configure environment"
+        env:
+          TEST_ENVIRONMENT: "${{ inputs.test-environment }}"
+          BASIC_PASSWORD: "${{ secrets.basic_password }}"
+          WAF_BYPASS_TOKEN: "${{ secrets.waf_bypass_token }}"
+          PUBLISH_METRICS: "${{ inputs.publish-metrics }}"
         run: |
           {
-            case "${{ inputs.test-environment }}" in
+            case "$TEST_ENVIRONMENT" in
               development)
                 ACCOUNT_ID="844815912454"
                 ;;
@@ -100,19 +105,32 @@ jobs:
                 ACCOUNT_ID="382373577178"
                 ;;
               *)
-                ACCOUNT_ID=""
+                echo "Unsupported test environment: $TEST_ENVIRONMENT" >&2
+                exit 2
                 ;;
             esac
-            echo "BASIC_PASSWORD=${{ secrets.basic_password }}"
-            echo "WAF_BYPASS_TOKEN=${{ secrets.waf_bypass_token }}"
-            echo "PLAYWRIGHT_ENV=${{ inputs.test-environment }}"
-            echo "CI=true"
-            if [ "${{ inputs.publish-metrics }}" = "true" ]; then
-              echo "PUBLISH_METRICS=true"
+            delimiter="$(openssl rand -hex 16)"
+            while [[ "$BASIC_PASSWORD$WAF_BYPASS_TOKEN$TEST_ENVIRONMENT" == *"$delimiter"* ]]; do
+              delimiter="$(openssl rand -hex 16)"
+            done
+            {
+              printf 'BASIC_PASSWORD<<%s\n' "$delimiter"
+              printf '%s\n' "$BASIC_PASSWORD"
+              printf '%s\n' "$delimiter"
+              printf 'WAF_BYPASS_TOKEN<<%s\n' "$delimiter"
+              printf '%s\n' "$WAF_BYPASS_TOKEN"
+              printf '%s\n' "$delimiter"
+              printf 'PLAYWRIGHT_ENV<<%s\n' "$delimiter"
+              printf '%s\n' "$TEST_ENVIRONMENT"
+              printf '%s\n' "$delimiter"
+              printf 'CI=true\n'
+            } >> "$GITHUB_ENV"
+            if [[ "$PUBLISH_METRICS" == "true" ]]; then
+              echo "PUBLISH_METRICS=true" >> "$GITHUB_ENV"
             fi
-            echo "ROLE_TO_ASSUME=arn:aws:iam::${ACCOUNT_ID}:role/GithubActions-E2E-Testing-Role"
-            echo "ACCOUNT_ID=${ACCOUNT_ID}"
-          } >> "$GITHUB_ENV"
+            printf 'ROLE_TO_ASSUME=arn:aws:iam::%s:role/GithubActions-E2E-Testing-Role\n' "$ACCOUNT_ID" >> "$GITHUB_ENV"
+            printf 'ACCOUNT_ID=%s\n' "$ACCOUNT_ID" >> "$GITHUB_ENV"
+          }
 
       - uses: "aws-actions/configure-aws-credentials@v6.3.0"
         with:

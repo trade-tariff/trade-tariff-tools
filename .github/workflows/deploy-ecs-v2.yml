@@ -17,6 +17,11 @@ on:
         type: "string"
         default: "api,frontend"
         required: false
+      skip-passwordless:
+        description: "Skip passwordless verification in E2E tests."
+        type: "boolean"
+        default: true
+        required: false
       build-args:
         description: "Additional space-separated build arguments for the Docker image"
         type: "string"
@@ -82,21 +87,28 @@ jobs:
       slack_channel: "${{ steps.config.outputs.slack_channel }}"
     steps:
       - id: "actual-ref"
+        env:
+          CHECKOUT_REPO: "${{ inputs.checkout-repo }}"
+          CHECKOUT_REF: "${{ inputs.checkout-ref }}"
+          DEFAULT_REPOSITORY: "${{ github.repository }}"
+          DEFAULT_REF: "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
         run: |
-          ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
+          ACTUAL_REPO="${CHECKOUT_REPO:-$DEFAULT_REPOSITORY}"
 
-          if [[ -n "${{ inputs.checkout-ref }}" ]]; then
-            ACTUAL_REF="${{ inputs.checkout-ref }}"
-          elif [[ "$ACTUAL_REPO" == "${{ github.repository }}" ]]; then
-            ACTUAL_REF="${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
+          if [[ -n "$CHECKOUT_REF" ]]; then
+            ACTUAL_REF="$CHECKOUT_REF"
+          elif [[ "$ACTUAL_REPO" == "$DEFAULT_REPOSITORY" ]]; then
+            ACTUAL_REF="$DEFAULT_REF"
           else
             ACTUAL_REF="main"
           fi
 
-          {
-            echo "actual_repo=${ACTUAL_REPO}"
-            echo "actual_ref=${ACTUAL_REF}"
-          } >> "$GITHUB_OUTPUT"
+          if [[ "$ACTUAL_REPO$ACTUAL_REF" == *$'\n'* || "$ACTUAL_REPO$ACTUAL_REF" == *$'\r'* ]]; then
+            echo "Repository and ref values must not contain line breaks" >&2
+            exit 2
+          fi
+
+          printf 'actual_repo=%s\nactual_ref=%s\n' "$ACTUAL_REPO" "$ACTUAL_REF" >> "$GITHUB_OUTPUT"
 
       - uses: "actions/checkout@v7.0.1"
         with:
@@ -223,6 +235,7 @@ jobs:
     with:
       test-environment: "${{ inputs.environment }}"
       projects: "${{ inputs.test-projects }}"
+      skip-passwordless: "${{ inputs.skip-passwordless }}"
     secrets:
       basic_password: "${{ secrets.basic-password }}"
       waf_bypass_token: "${{ secrets.waf_bypass_token }}"

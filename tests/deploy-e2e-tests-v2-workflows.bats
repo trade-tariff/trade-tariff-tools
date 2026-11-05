@@ -15,6 +15,8 @@ setup() {
       inputs = contract.fetch("inputs")
       input = inputs.fetch("test-projects")
       abort "#{path}: projects contract changed" unless input.fetch("default") == "api,frontend" && input.fetch("type") == "string" && input.fetch("required") == false
+      passwordless = inputs.fetch("skip-passwordless")
+      abort "#{path}: passwordless contract changed" unless passwordless.fetch("default") == true && passwordless.fetch("type") == "boolean" && passwordless.fetch("required") == false
       abort "#{path}: obsolete flavour input" if inputs.key?("test-flavour")
       %w[non_admin_bypass_password admin_bypass_password].each do |secret|
         abort "#{path}: obsolete FPO secret" if contract.fetch("secrets").key?(secret)
@@ -25,6 +27,7 @@ setup() {
       abort "#{path}: missing selection gate" unless e2e.fetch("if") == "${{ inputs.test-projects != #{quote}#{quote} }}"
       abort "#{path}: wrong E2E workflow" unless e2e.fetch("uses") == "trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests-v2.yml@main"
       abort "#{path}: projects not forwarded" unless e2e.dig("with", "projects") == "${{ inputs.test-projects }}"
+      abort "#{path}: passwordless preference not forwarded" unless e2e.dig("with", "skip-passwordless") == "${{ inputs.skip-passwordless }}"
       abort "#{path}: environment not forwarded" unless e2e.dig("with", "test-environment") == "${{ inputs.environment }}"
       abort "#{path}: password not forwarded" unless e2e.dig("secrets", "basic_password") == "${{ secrets.basic-password }}"
       abort "#{path}: WAF token not forwarded" unless e2e.dig("secrets", "waf_bypass_token") == "${{ secrets.waf_bypass_token }}"
@@ -35,6 +38,35 @@ setup() {
       references.each { |id| abort "#{path}: reference to missing job #{id}" unless jobs.key?(id) }
     end
   ' "$WORKFLOW_FILE" "$WORKFLOW_FILE_MULTI"
+
+  [ "$status" -eq 0 ] || fail "$output"
+}
+
+@test "single-app checkout inputs reach Bash through the environment" {
+  run ruby -ryaml -e '
+    workflow = YAML.load_file(ARGV.fetch(0))
+    step = workflow.fetch("jobs").fetch("configure").fetch("steps").find { |item| item["id"] == "actual-ref" }
+    abort "Checkout values must be passed through env" unless step.fetch("env") == {
+      "CHECKOUT_REPO" => "${{ inputs.checkout-repo }}",
+      "CHECKOUT_REF" => "${{ inputs.checkout-ref }}",
+      "DEFAULT_REPOSITORY" => "${{ github.repository }}",
+      "DEFAULT_REF" => "${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}"
+    }
+    abort "Checkout values must not be interpolated into Bash" if step.fetch("run").include?("${{")
+    abort "Checkout ref must be quoted in Bash" unless step.fetch("run").include?(%q{"$CHECKOUT_REF"})
+  ' "$WORKFLOW_FILE"
+
+  [ "$status" -eq 0 ] || fail "$output"
+}
+
+@test "multi-app service names reach jq through the environment" {
+  run ruby -ryaml -e '
+    workflow = YAML.load_file(ARGV.fetch(0))
+    step = workflow.fetch("jobs").fetch("start-all").fetch("steps").find { |item| item["id"] == "parse-service-names" }
+    abort "Service name JSON must be passed through env" unless step.dig("env", "SERVICE_NAMES_JSON") == "${{ toJson(matrix.app.service-names) }}"
+    abort "Service name JSON must not be interpolated into Bash" if step.fetch("run").include?("${{")
+    abort "Service names must be parsed from the quoted environment value" unless step.fetch("run").include?(%q{"$SERVICE_NAMES_JSON"})
+  ' "$WORKFLOW_FILE_MULTI"
 
   [ "$status" -eq 0 ] || fail "$output"
 }

@@ -14,7 +14,7 @@ setup() {
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$TEST_CAPTURE_DIR/make-args"
 printf '%s\n' "$SKIP_PASSWORDLESS_VERIFICATION" > "$TEST_CAPTURE_DIR/passwordless"
-pwd > "$TEST_CAPTURE_DIR/working-directory"
+pwd -P > "$TEST_CAPTURE_DIR/working-directory"
 exit "$MAKE_STATUS"
 STUB
   chmod +x "$stub_bin/make"
@@ -26,12 +26,13 @@ teardown() {
 
 @test "launcher passes selected projects and environment to Make in the suite directory" {
   cd "$tmpdir"
+  expected_working_directory="$(pwd -P)"
   run "$script"
 
   [ "$status" -eq 0 ]
   [ "$(cat "$tmpdir/make-args")" = "$(printf 'test\nenvironment=staging\nprojects=api,frontend')" ]
   [ "$(cat "$tmpdir/passwordless")" = true ]
-  [ "$(cat "$tmpdir/working-directory")" = "$(pwd -P)" ]
+  [ "$(cat "$tmpdir/working-directory")" = "$expected_working_directory" ]
 }
 
 @test "all projects honour both explicit passwordless settings" {
@@ -102,6 +103,24 @@ teardown() {
   [ "$status" -eq 2 ]
   assert_contains "$output" "SKIP_PASSWORDLESS_VERIFICATION must be true or false"
   [ ! -f "$tmpdir/make-args" ]
+}
+
+@test "launcher accepts only supported test environments" {
+  for environment in development staging production; do
+    TEST_ENVIRONMENT="$environment" run "$script"
+
+    [ "$status" -eq 0 ]
+    assert_contains "$(cat "$tmpdir/make-args")" "environment=$environment"
+  done
+
+  for environment in invalid 'staging; touch unexpected' '$(shell echo unexpected)'; do
+    rm -f "$tmpdir/make-args"
+    TEST_ENVIRONMENT="$environment" run "$script"
+
+    [ "$status" -eq 2 ]
+    assert_contains "$output" "Unsupported test environment:"
+    [ ! -f "$tmpdir/make-args" ]
+  done
 }
 
 @test "launcher propagates Make failures" {
