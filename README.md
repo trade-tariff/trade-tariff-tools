@@ -81,6 +81,39 @@ retain their own licences.
 
 ## Usage Guide
 
+### E2E workflow projects
+
+The reusable `deploy-ecs-projects.yml` and `deploy-multi-ecs-projects.yml`
+workflows accept `test-projects`. The reusable `e2e-projects-tests.yml` workflow
+accepts `projects`. These inputs default to `api,frontend`.
+
+These workflows are additive. The existing `deploy-ecs.yml`,
+`deploy-multi-ecs.yml`, `e2e-tests.yml` and `e2e-fpo-tests.yml` workflows are
+unchanged. They keep `test-flavour`, `skip-admin`, `skip-dev-hub` and
+`skip-myott`. Existing callers do not need to change.
+
+Use a comma-separated list of `api`, `admin`, `frontend`, `dev-hub`, and `myott`.
+Spaces around names are optional. For example, use `test-projects: 'api,myott'`
+to test the API and MyOTT after deployment.
+
+Set `test-projects: ''` to skip E2E tests during deployment. Multi-app deployment
+skips E2E tests for each app and runs the selected projects once after all apps
+deploy. A direct E2E workflow call rejects an empty `projects` value.
+
+The E2E workflow always honours `skip-passwordless`, which defaults to `true`,
+regardless of the selected projects. Set `skip-passwordless: false` when
+passwordless verification is needed, such as for passwordless journeys in
+`admin`, `dev-hub`, or `myott`. Callers must provide the environment access that
+the selected projects need.
+
+**Migration (optional):** To move to project selection, change the called
+workflow to its `-projects` equivalent. Replace `test-flavour: tariff` with
+`test-projects: 'api,frontend'`, or select the projects that the deployment
+needs. Replace `test-flavour: none` with `test-projects: ''`. Replace the E2E
+inputs `skip-admin`, `skip-dev-hub`, and `skip-myott` with an explicit
+`projects` list. The `-projects` workflows do not run the FPO E2E suite.
+Callers that need it keep using `deploy-ecs.yml` with `test-flavour: fpo`.
+
 ### 1. `bin/fetch-commodities`
 
 Fetches commodity codes and descriptions from the Trade Tariff service API and generates a markdown table.
