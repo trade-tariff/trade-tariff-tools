@@ -315,6 +315,16 @@ jobs:
             echo "rollback_message=" >> "$GITHUB_OUTPUT"
           fi
 
+      - id: superseded
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RESULT: ${{ steps.result.outputs.result }}
+          RUN_NUMBER: ${{ github.run_number }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: .trade-tariff-tools/scripts/deploy-run-superseded.sh
+
       - id: pr-info
         continue-on-error: true
         env:
@@ -346,6 +356,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
+        if: steps.superseded.outputs.superseded != 'true'
         with:
           webhook: ${{ secrets.slack-webhook }}
           # configure sets no channel when a run is cancelled before it finishes.
