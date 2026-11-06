@@ -113,6 +113,13 @@ payload_field() {
   [ "$(payload_field '.attachments[0].color')" = "" ]
 }
 
+@test "uses the default channel when the channel is empty" {
+  run_notify WEBHOOK="https://hooks.slack.test/abc" CHANNEL="" COLOR="good" MESSAGE="m"
+
+  [ "$status" -eq 0 ]
+  [ "$(payload_field '.channel')" = "deployments" ]
+}
+
 @test "uses defaults when optional inputs are unset" {
   run env -u CHANNEL -u USERNAME -u ICON_EMOJI -u COLOR \
     WEBHOOK="https://hooks.slack.test/abc" MESSAGE="m" \

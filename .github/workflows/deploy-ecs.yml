@@ -348,7 +348,8 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main
         with:
           webhook: ${{ secrets.slack-webhook }}
-          channel: ${{ needs.configure.outputs.slack_channel }}
+          # configure sets no channel when a run is cancelled before it finishes.
+          channel: ${{ needs.configure.outputs.slack_channel || (inputs.environment == 'production' && 'production-deployments' || 'deployments') }}
           color: ${{ steps.result.outputs.result }}
           title: "${{ github.workflow }}"
           message: "${{ steps.notify-message.outputs.message }}"
