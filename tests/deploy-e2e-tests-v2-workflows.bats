@@ -24,7 +24,8 @@ setup() {
       jobs = workflow.fetch("jobs")
       e2e = jobs.fetch("e2e-test")
       quote = "\x27"
-      abort "#{path}: missing selection gate" unless e2e.fetch("if") == "${{ inputs.test-projects != #{quote}#{quote} }}"
+      expected_gate = path.end_with?("deploy-multi-ecs-v2.yml") ? "${{ !cancelled() && needs.deploy-all.result == #{quote}success#{quote} && inputs.test-projects != #{quote}#{quote} }}" : "${{ inputs.test-projects != #{quote}#{quote} }}"
+      abort "#{path}: missing selection gate" unless e2e.fetch("if") == expected_gate
       abort "#{path}: wrong E2E workflow" unless e2e.fetch("uses") == "trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests-v2.yml@main"
       abort "#{path}: projects not forwarded" unless e2e.dig("with", "projects") == "${{ inputs.test-projects }}"
       abort "#{path}: passwordless preference not forwarded" unless e2e.dig("with", "skip-passwordless") == "${{ inputs.skip-passwordless }}"
@@ -104,27 +105,31 @@ setup() {
     abort "Deployment must wait for startup" unless jobs.dig("deploy-all", "needs") == "start-all" && jobs.dig("deploy-all", "if").include?("skipped")
     abort "Aggregate E2E must follow the matrix" unless jobs.dig("e2e-test", "needs") == "deploy-all"
     notify = jobs.fetch("notify-completion")
-    abort "Notification must await deployment and E2E" unless notify.fetch("needs").sort == %w[deploy-all e2e-test]
+    abort "Notification must await startup, deployment and E2E" unless notify.fetch("needs").sort == %w[deploy-all e2e-test start-all]
     step = notify.fetch("steps").find { |item| item["id"] == "result" }
     expression = step.fetch("env").fetch("RESULT").delete_prefix("${{").delete_suffix("}}").strip
     # These expressions use the subset shared by Ruby and GitHub: string
     # comparisons and short-circuit boolean operators with nonempty job results.
     cases = [
-      ["success", "api,frontend", "success", "success"],
-      ["success", "admin", "failure", "failure"],
-      ["success", "", "skipped", "success"],
-      ["success", "myott", "skipped", "skipped"],
-      ["success", "dev-hub", "cancelled", "cancelled"],
-      ["failure", "api", "skipped", "failure"],
-      ["cancelled", "api", "skipped", "cancelled"],
-      ["skipped", "", "skipped", "skipped"]
+      ["skipped", "success", "api,frontend", "success", "success"],
+      ["skipped", "success", "admin", "failure", "failure"],
+      ["skipped", "success", "", "skipped", "success"],
+      ["skipped", "success", "myott", "skipped", "skipped"],
+      ["skipped", "success", "dev-hub", "cancelled", "cancelled"],
+      ["skipped", "failure", "api", "skipped", "failure"],
+      ["skipped", "cancelled", "api", "skipped", "cancelled"],
+      ["skipped", "skipped", "", "skipped", "skipped"],
+      ["failure", "skipped", "api", "skipped", "failure"],
+      ["cancelled", "skipped", "api", "skipped", "cancelled"],
+      ["success", "success", "api", "success", "success"]
     ]
-    cases.each do |deploy, projects, e2e, expected|
-      source = expression.gsub("needs.deploy-all.result", deploy.inspect)
+    cases.each do |startup, deploy, projects, e2e, expected|
+      source = expression.gsub("needs.start-all.result", startup.inspect)
+        .gsub("needs.deploy-all.result", deploy.inspect)
         .gsub("inputs.test-projects", projects.inspect)
         .gsub("needs.e2e-test.result", e2e.inspect)
       actual = eval(source)
-      abort "Wrong notification result for #{[deploy, projects, e2e]}: #{actual}" unless actual == expected
+      abort "Wrong notification result for #{[startup, deploy, projects, e2e]}: #{actual}" unless actual == expected
     end
     abort "Result must pass through env" unless step.fetch("run") == %q{echo "result=$RESULT" >> "$GITHUB_OUTPUT"}
   ' "$WORKFLOW_FILE_MULTI"

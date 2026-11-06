@@ -80,7 +80,7 @@ jobs:
       basic-password: "${{ secrets.basic-password }}"
 
   e2e-test:
-    if: "${{ inputs.test-projects != '' }}"
+    if: "${{ !cancelled() && needs.deploy-all.result == 'success' && inputs.test-projects != '' }}"
     uses: "trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests-v2.yml@main"
     needs: "deploy-all"
     with:
@@ -94,13 +94,14 @@ jobs:
   notify-completion:
     if: "always()"
     needs:
+      - "start-all"
       - "deploy-all"
       - "e2e-test"
     runs-on: "ubuntu-latest"
     steps:
       - id: "result"
         env:
-          RESULT: "${{ needs.deploy-all.result != 'success' && needs.deploy-all.result || (inputs.test-projects != '' && needs.e2e-test.result || needs.deploy-all.result) }}"
+          RESULT: "${{ (needs.start-all.result == 'failure' || needs.start-all.result == 'cancelled') && needs.start-all.result || needs.deploy-all.result != 'success' && needs.deploy-all.result || (inputs.test-projects != '' && needs.e2e-test.result || needs.deploy-all.result) }}"
         run: "echo \"result=$RESULT\" >> \"$GITHUB_OUTPUT\""
       - uses: "trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main"
         with:
