@@ -319,3 +319,44 @@ STUB
   run grep -F "echo 'NOTIFY_EOF'" "$workflow"
   [ "$status" -eq 0 ]
 }
+
+@test "deploy-ecs superseded step runs the shared script with its environment" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F "run: .trade-tariff-tools/scripts/deploy-run-superseded.sh" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "GH_TOKEN: \${{ github.token }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "RESULT: \${{ steps.result.outputs.result }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "RUN_NUMBER: \${{ github.run_number }}" "$workflow"
+  [ "$status" -eq 0 ]
+
+  run grep -F "WORKFLOW_REF: \${{ github.workflow_ref }}" "$workflow"
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy-ecs does not notify for a superseded run" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F -A1 "uses: trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main" "$workflow"
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "if: steps.superseded.outputs.superseded != 'true'"
+}
+
+@test "deploy-ecs chooses a deployment channel when configure sets none" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -F "channel: \${{ needs.configure.outputs.slack_channel || (inputs.environment == 'production' && 'production-deployments' || 'deployments') }}" "$workflow"
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy-ecs does not request actions permission that callers do not grant" {
+  workflow="$repo_root/.github/workflows/deploy-ecs.yml"
+
+  run grep -E "^[[:space:]]+actions:[[:space:]]+(read|write)" "$workflow"
+  [ "$status" -eq 1 ]
+}

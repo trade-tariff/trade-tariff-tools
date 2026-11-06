@@ -315,6 +315,8 @@ jobs:
             echo "rollback_message=" >> "$GITHUB_OUTPUT"
           fi
 
+      # Do not add actions: read for this lookup. Callers do not grant it, so the
+      # run would fail at startup. Public repositories do not need it.
       - id: superseded
         continue-on-error: true
         env:
