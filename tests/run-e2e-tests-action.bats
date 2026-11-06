@@ -35,29 +35,48 @@ teardown() {
   [ "$(cat "$tmpdir/working-directory")" = "$expected_working_directory" ]
 }
 
-@test "all projects honour both explicit passwordless settings" {
+@test "all projects run when passwordless verification is enabled for them" {
   for project in api frontend admin dev-hub myott; do
-    for skip in true false; do
-      PROJECTS="$project" SKIP_PASSWORDLESS_VERIFICATION="$skip" run "$script"
+    PROJECTS="$project" SKIP_PASSWORDLESS_VERIFICATION=false run "$script"
 
-      [ "$status" -eq 0 ]
-      [ "$(cat "$tmpdir/passwordless")" = "$skip" ]
-      assert_contains "$(cat "$tmpdir/make-args")" "projects=$project"
-    done
+    [ "$status" -eq 0 ]
+    [ "$(cat "$tmpdir/passwordless")" = false ]
+    assert_contains "$(cat "$tmpdir/make-args")" "projects=$project"
   done
 }
 
-@test "mixed and reordered selections preserve the passwordless setting and normalise spaces" {
-  for projects in 'api, admin ,frontend' 'dev-hub,api' 'frontend,myott' ' myott , api , admin '; do
-    PROJECTS="$projects" run "$script"
+@test "passwordless projects are filtered out with a warning when verification is skipped" {
+  PROJECTS="api, admin ,frontend,myott" run "$script"
 
-    [ "$status" -eq 0 ]
-    [ "$(cat "$tmpdir/passwordless")" = true ]
-  done
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Skipping admin"
+  assert_contains "$output" "Skipping myott"
+  [ "$(cat "$tmpdir/make-args")" = "$(printf 'test\nenvironment=staging\nprojects=api,frontend')" ]
+}
+
+@test "passwordless projects are filtered out in production" {
+  TEST_ENVIRONMENT=production SKIP_PASSWORDLESS_VERIFICATION=false PROJECTS="dev-hub,api" run "$script"
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$tmpdir/make-args")" = "$(printf 'test\nenvironment=production\nprojects=api')" ]
+}
+
+@test "launcher skips Make when no selected project is enabled" {
+  PROJECTS="admin,dev-hub" run "$script"
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Skipping E2E tests"
+  [ ! -f "$tmpdir/make-args" ]
+}
+
+@test "mixed and reordered selections keep their order when verification is enabled" {
+  SKIP_PASSWORDLESS_VERIFICATION=false PROJECTS=' myott , api , admin ' run "$script"
+
+  [ "$status" -eq 0 ]
   [ "$(cat "$tmpdir/make-args")" = "$(printf 'test\nenvironment=staging\nprojects=myott,api,admin')" ]
 }
 
-@test "non-passwordless projects preserve an explicit false flag" {
+@test "launcher preserves an explicit false flag" {
   SKIP_PASSWORDLESS_VERIFICATION=false run "$script"
 
   [ "$status" -eq 0 ]
@@ -65,7 +84,7 @@ teardown() {
 }
 
 @test "launcher defaults to skipping passwordless when the flag is unset" {
-  PROJECTS=admin run env -u SKIP_PASSWORDLESS_VERIFICATION "$script"
+  PROJECTS=api run env -u SKIP_PASSWORDLESS_VERIFICATION "$script"
 
   [ "$status" -eq 0 ]
   [ "$(cat "$tmpdir/passwordless")" = true ]

@@ -101,6 +101,7 @@ setup() {
   run ruby -ryaml -e '
     jobs = YAML.load_file(ARGV.fetch(0)).fetch("jobs")
     abort "Per-app E2E must be disabled explicitly" unless jobs.dig("deploy-all", "with", "test-projects") == ""
+    abort "Deployment must wait for startup" unless jobs.dig("deploy-all", "needs") == "start-all" && jobs.dig("deploy-all", "if").include?("skipped")
     abort "Aggregate E2E must follow the matrix" unless jobs.dig("e2e-test", "needs") == "deploy-all"
     notify = jobs.fetch("notify-completion")
     abort "Notification must await deployment and E2E" unless notify.fetch("needs").sort == %w[deploy-all e2e-test]

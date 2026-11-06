@@ -83,8 +83,8 @@ retain their own licences.
 
 ### E2E workflow projects
 
-The reusable `deploy-ecs-projects.yml` and `deploy-multi-ecs-projects.yml`
-workflows accept `test-projects`. The reusable `e2e-projects-tests.yml` workflow
+The reusable `deploy-ecs-v2.yml` and `deploy-multi-ecs-v2.yml`
+workflows accept `test-projects`. The reusable `e2e-tests-v2.yml` workflow
 accepts `projects`. These inputs default to `api,frontend`.
 
 These workflows are additive. The existing `deploy-ecs.yml`,
@@ -100,6 +100,10 @@ Set `test-projects: ''` to skip E2E tests during deployment. Multi-app deploymen
 skips E2E tests for each app and runs the selected projects once after all apps
 deploy. A direct E2E workflow call rejects an empty `projects` value.
 
+The E2E suite does not enable `admin`, `dev-hub`, or `myott` when
+`skip-passwordless` is `true`, or in production. The launcher removes these
+projects with a warning. If none remain, it skips the E2E tests.
+
 The E2E workflow always honours `skip-passwordless`, which defaults to `true`,
 regardless of the selected projects. Set `skip-passwordless: false` when
 passwordless verification is needed, such as for passwordless journeys in
@@ -107,11 +111,11 @@ passwordless verification is needed, such as for passwordless journeys in
 the selected projects need.
 
 **Migration (optional):** To move to project selection, change the called
-workflow to its `-projects` equivalent. Replace `test-flavour: tariff` with
+workflow to its `-v2` equivalent. Replace `test-flavour: tariff` with
 `test-projects: 'api,frontend'`, or select the projects that the deployment
 needs. Replace `test-flavour: none` with `test-projects: ''`. Replace the E2E
 inputs `skip-admin`, `skip-dev-hub`, and `skip-myott` with an explicit
-`projects` list. The `-projects` workflows do not run the FPO E2E suite.
+`projects` list. The `-v2` workflows do not run the FPO E2E suite.
 Callers that need it keep using `deploy-ecs.yml` with `test-flavour: fpo`.
 
 ### 1. `bin/fetch-commodities`

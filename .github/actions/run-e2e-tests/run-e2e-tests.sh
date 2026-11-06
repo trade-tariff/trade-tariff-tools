@@ -23,6 +23,11 @@ Environment:
   SKIP_PASSWORDLESS_VERIFICATION (optional, default: true) true or false.
                                  Set false when passwordless verification is needed.
 
+The E2E suite does not enable admin, dev-hub or myott when
+SKIP_PASSWORDLESS_VERIFICATION is true, or in production. The script removes
+these projects with a warning. If no project remains, it prints a notice and
+exits 0 without running Make.
+
 Outputs:
   Test output on stdout and stderr. No GitHub outputs.
 
@@ -73,6 +78,24 @@ while [[ -n "$remaining" ]]; do
   selected_projects+=("$project")
 done
 
-printf -v normalised_projects '%s,' "${selected_projects[@]}"
+enabled_projects=()
+for project in "${selected_projects[@]}"; do
+  case "$project" in
+    admin|dev-hub|myott)
+      if [[ "$skip_passwordless" == true || "$TEST_ENVIRONMENT" == production ]]; then
+        echo "Skipping $project because the E2E suite does not enable it for this run" >&2
+        continue
+      fi
+      ;;
+  esac
+  enabled_projects+=("$project")
+done
+
+if [[ ${#enabled_projects[@]} -eq 0 ]]; then
+  echo "::notice:: No selected E2E projects are enabled for this run. Skipping E2E tests."
+  exit 0
+fi
+
+printf -v normalised_projects '%s,' "${enabled_projects[@]}"
 export SKIP_PASSWORDLESS_VERIFICATION="$skip_passwordless"
 make test "environment=$TEST_ENVIRONMENT" "projects=${normalised_projects%,}"
