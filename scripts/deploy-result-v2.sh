@@ -46,6 +46,11 @@ for required_name in BUILD_RESULT DEPLOY_RESULT ENVIRONMENT; do
   fi
 done
 
+if [[ "$ENVIRONMENT" == *[[:cntrl:]]* ]]; then
+  echo "Environment contains control characters: ENVIRONMENT" >&2
+  exit 2
+fi
+
 if [[ "${TEST_PROJECTS+x}" != x ]]; then
   echo "Missing required environment variable: TEST_PROJECTS" >&2
   exit 2
@@ -73,6 +78,6 @@ else
 fi
 
 {
-  echo "result=${result}"
-  echo "summary=${summary}"
+  printf 'result=%s\n' "$result"
+  printf 'summary<<DEPLOY_SUMMARY_EOF\n%s\nDEPLOY_SUMMARY_EOF\n' "$summary"
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"

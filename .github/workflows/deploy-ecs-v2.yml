@@ -130,6 +130,9 @@ jobs:
         env:
           APP_NAME: "${{ inputs.app-name }}"
           CLUSTER: "${{ steps.environment-config.outputs.cluster }}"
+          ECR_URL: "${{ steps.environment-config.outputs.ecr-url }}"
+          IAM_ROLE_ARN: "${{ steps.environment-config.outputs.deploy-role-arn }}"
+          SLACK_CHANNEL: "${{ steps.environment-config.outputs.slack-channel }}"
         run: |
           PREVIOUS_DOCKER_TAG=""
           # Derive the ECS service name from the app name. Services follow the
@@ -138,10 +141,14 @@ jobs:
           # (e.g. tariff-backend -> backend-uk). We pick the first matching
           # service; all services of one app run the same image tag.
           REPO_NAME="${APP_NAME#tariff-}"
+          if [[ -z "$APP_NAME" || -z "$REPO_NAME" || "$APP_NAME" == *[[:space:]]* ]]; then
+            echo "app-name must be a non-empty single token" >&2
+            exit 1
+          fi
           SERVICES=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns' --output text)
           for SERVICE_ARN in $SERVICES; do
             SERVICE_NAME=$(basename "$SERVICE_ARN")
-            if [[ "$SERVICE_NAME" == ${APP_NAME}* || "$SERVICE_NAME" == ${REPO_NAME}* ]]; then
+            if [[ "$SERVICE_NAME" == "$APP_NAME"* || "$SERVICE_NAME" == "$REPO_NAME"* ]]; then
               TASK_DEF=$(aws ecs describe-services \
                 --cluster "$CLUSTER" \
                 --services "$SERVICE_NAME" \
@@ -155,13 +162,20 @@ jobs:
               break
             fi
           done
+          RUBY_VERSION="$(cat .ruby-version)"
+          for OUTPUT_NAME in ECR_URL IAM_ROLE_ARN PREVIOUS_DOCKER_TAG RUBY_VERSION SLACK_CHANNEL; do
+            if [[ "${!OUTPUT_NAME}" == *[[:cntrl:]]* ]]; then
+              echo "$OUTPUT_NAME contains control characters" >&2
+              exit 1
+            fi
+          done
           {
-            echo "ecr_url=${{ steps.environment-config.outputs.ecr-url }}"
-            echo "iam_role_arn=${{ steps.environment-config.outputs.deploy-role-arn }}"
-            echo "previous_docker_tag=${PREVIOUS_DOCKER_TAG}"
-            echo "ruby_version=$(cat .ruby-version)"
-            echo "slack_channel=${{ steps.environment-config.outputs.slack-channel }}"
-            echo "docker_tag=$(git rev-parse --short HEAD)"
+            printf 'ecr_url=%s\n' "$ECR_URL"
+            printf 'iam_role_arn=%s\n' "$IAM_ROLE_ARN"
+            printf 'previous_docker_tag=%s\n' "$PREVIOUS_DOCKER_TAG"
+            printf 'ruby_version=%s\n' "$RUBY_VERSION"
+            printf 'slack_channel=%s\n' "$SLACK_CHANNEL"
+            printf 'docker_tag=%s\n' "$(git rev-parse --short HEAD)"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -348,4 +362,6 @@ jobs:
           color: "${{ steps.result.outputs.result }}"
           title: "${{ github.workflow }}"
           message: "${{ steps.notify-message.outputs.message }}"
-      - run: "if [[ \"${{ steps.result.outputs.result }}\" != \"success\" ]]; then exit 1; fi"
+      - env:
+          RESULT: "${{ steps.result.outputs.result }}"
+        run: 'if [[ "$RESULT" != "success" ]]; then exit 1; fi'

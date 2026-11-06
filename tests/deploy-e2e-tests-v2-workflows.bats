@@ -98,6 +98,44 @@ setup() {
   [ "$status" -eq 0 ] || fail "$output"
 }
 
+@test "single-app service matching validates app names and quotes prefixes" {
+  run ruby -ryaml -e '
+    workflow = YAML.load_file(ARGV.fetch(0))
+    config = workflow.fetch("jobs").fetch("configure").fetch("steps").find { |item| item["id"] == "config" }
+    expected_env = {
+      "APP_NAME" => "${{ inputs.app-name }}",
+      "CLUSTER" => "${{ steps.environment-config.outputs.cluster }}",
+      "ECR_URL" => "${{ steps.environment-config.outputs.ecr-url }}",
+      "IAM_ROLE_ARN" => "${{ steps.environment-config.outputs.deploy-role-arn }}",
+      "SLACK_CHANNEL" => "${{ steps.environment-config.outputs.slack-channel }}"
+    }
+    abort "Config values must pass through env" unless config.fetch("env") == expected_env
+    source = config.fetch("run")
+    abort "Config values must not be inserted into Bash source" if source.include?("${{")
+    abort "app-name must be a nonempty single token" unless source.include?(%q{[[ -z "$APP_NAME" || -z "$REPO_NAME" || "$APP_NAME" == *[[:space:]]* ]]})
+    abort "service prefixes must be quoted" unless source.include?(%q{[[ "$SERVICE_NAME" == "$APP_NAME"* || "$SERVICE_NAME" == "$REPO_NAME"* ]]})
+    abort "ruby-version must be checked for control characters" unless source.include?(%q{if [[ "${!OUTPUT_NAME}" == *[[:cntrl:]]* ]]; then})
+    %w[ecr_url iam_role_arn previous_docker_tag ruby_version slack_channel docker_tag].each do |name|
+      abort "#{name} must use a fixed printf format" unless source.include?("printf '#{name}=%s\\n'")
+    end
+  ' "$WORKFLOW_FILE"
+
+  [ "$status" -eq 0 ] || fail "$output"
+}
+
+@test "single-app notification checks the result through a quoted environment value" {
+  run ruby -ryaml -e '
+    workflow = YAML.load_file(ARGV.fetch(0))
+    steps = workflow.fetch("jobs").fetch("notify").fetch("steps")
+    step = steps.last
+    abort "Result must pass through env" unless step.fetch("env") == { "RESULT" => "${{ steps.result.outputs.result }}" }
+    abort "Result must not be inserted into Bash source" if step.fetch("run").include?("${{")
+    abort "Result must be compared as quoted data" unless step.fetch("run") == %q{if [[ "$RESULT" != "success" ]]; then exit 1; fi}
+  ' "$WORKFLOW_FILE"
+
+  [ "$status" -eq 0 ] || fail "$output"
+}
+
 @test "multi-app deployment runs E2E once after the matrix and preserves result precedence" {
   run ruby -ryaml -e '
     jobs = YAML.load_file(ARGV.fetch(0)).fetch("jobs")
