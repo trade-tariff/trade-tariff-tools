@@ -1,0 +1,112 @@
+---
+name: "Deploy Multiple Apps to ECS v2"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "The environment to deploy to"
+        type: "string"
+        required: true
+      apps:
+        description: "JSON array of apps to deploy (e.g. '[{\"name\":\"tariff-frontend\",\"repo\":\"trade-tariff/trade-tariff-frontend\",\"ref\":\"main\"},{\"name\":\"tariff-backend\",\"repo\":\"trade-tariff/trade-tariff-backend\"}]')"
+        type: "string"
+        required: true
+      test-projects:
+        description: "Comma-separated E2E projects: api, admin, frontend, dev-hub, myott. An empty value skips E2E tests."
+        type: "string"
+        default: "api,frontend"
+        required: false
+      skip-passwordless:
+        description: "Skip passwordless verification in E2E tests."
+        type: "boolean"
+        default: true
+        required: false
+      migrate:
+        description: "Whether to run database migrations before deployment"
+        type: "boolean"
+        default: false
+        required: false
+
+    secrets:
+      slack-webhook:
+        required: true
+      basic-password:
+        required: false
+      waf_bypass_token:
+        description: "Secret token sent in X-WAF-Bypass header to bypass WAF bot control"
+        required: false
+
+jobs:
+  start-all:
+    if: "${{ inputs.environment == 'development' }}"
+    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        app: "${{ fromJson(inputs.apps) }}"
+      fail-fast: false
+    steps:
+      - id: "parse-service-names"
+        env:
+          SERVICE_NAMES_JSON: "${{ toJson(matrix.app.service-names) }}"
+        run: |
+          service_names="$(jq -er '(. // []) | if type == "array" and all(.[]; type == "string" and test("^[A-Za-z0-9_-]+$")) then join(" ") else error("service-names must be an array of valid ECS service names") end' <<< "$SERVICE_NAMES_JSON")"
+          printf 'service-names=%s\n' "$service_names" >> "$GITHUB_OUTPUT"
+
+      - if: "${{ steps.parse-service-names.outputs.service-names != '' }}"
+        uses: "trade-tariff/trade-tariff-tools/.github/actions/start-services@main"
+        with:
+          service-names: "${{ steps.parse-service-names.outputs.service-names }}"
+          environment: "development"
+
+  deploy-all:
+    needs: "start-all"
+    if: "${{ !cancelled() && (needs.start-all.result == 'success' || needs.start-all.result == 'skipped') }}"
+    strategy:
+      matrix:
+        app: "${{ fromJson(inputs.apps) }}"
+      fail-fast: false
+    uses: "trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs-v2.yml@main"
+    with:
+      app-name: "${{ matrix.app.name }}"
+      checkout-ref: "${{ matrix.app.ref }}"
+      checkout-repo: "${{ matrix.app.repo }}"
+      environment: "${{ inputs.environment }}"
+      migrate: "${{ inputs.migrate && toJson(matrix.app.migrate) == 'true' }}"
+      notify: false
+      test-projects: ""
+    secrets:
+      slack-webhook: "${{ secrets.slack-webhook }}"
+      basic-password: "${{ secrets.basic-password }}"
+
+  e2e-test:
+    if: "${{ !cancelled() && needs.deploy-all.result == 'success' && inputs.test-projects != '' }}"
+    uses: "trade-tariff/trade-tariff-tools/.github/workflows/e2e-tests-v2.yml@main"
+    needs: "deploy-all"
+    with:
+      test-environment: "${{ inputs.environment }}"
+      projects: "${{ inputs.test-projects }}"
+      skip-passwordless: "${{ inputs.skip-passwordless }}"
+    secrets:
+      basic_password: "${{ secrets.basic-password }}"
+      waf_bypass_token: "${{ secrets.waf_bypass_token }}"
+
+  notify-completion:
+    if: "always()"
+    needs:
+      - "start-all"
+      - "deploy-all"
+      - "e2e-test"
+    runs-on: "ubuntu-latest"
+    steps:
+      - id: "result"
+        env:
+          RESULT: "${{ (needs.start-all.result == 'failure' || needs.start-all.result == 'cancelled') && needs.start-all.result || needs.deploy-all.result != 'success' && needs.deploy-all.result || (inputs.test-projects != '' && needs.e2e-test.result || needs.deploy-all.result) }}"
+        run: "echo \"result=$RESULT\" >> \"$GITHUB_OUTPUT\""
+      - uses: "trade-tariff/trade-tariff-tools/.github/actions/slack-notify@main"
+        with:
+          webhook: "${{ secrets.slack-webhook }}"
+          channel: "deployments"
+          color: "${{ steps.result.outputs.result }}"
+          title: "${{ github.workflow }}"
+          message: "Deploy to ${{ inputs.environment }} ${{ steps.result.outputs.result }}"

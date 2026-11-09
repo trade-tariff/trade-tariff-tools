@@ -1,5 +1,5 @@
 name: Update importmap dependencies
-description: Run thoughtbot/importmap-update to open dependabot style PRs for outdated importmap packages 
+description: Run thoughtbot/importmap-update to open dependabot style PRs for outdated importmap packages
 
 inputs:
   github-token:

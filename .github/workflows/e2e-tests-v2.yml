@@ -1,0 +1,151 @@
+---
+name: "E2E Tests v2"
+
+on:
+  workflow_call:
+    inputs:
+      test-environment:
+        description: "The e2e-test environment to run against"
+        type: "string"
+        required: true
+      ref:
+        description: "The e2e-test repo reference to run with"
+        type: "string"
+        default: "main"
+        required: false
+      projects:
+        description: "Nonempty comma-separated list of Playwright projects: api, admin, frontend, dev-hub, myott"
+        type: "string"
+        default: "api,frontend"
+        required: false
+      skip-passwordless:
+        description: "Skip passwordless verification. Set false when verification is needed."
+        type: "boolean"
+        default: true
+        required: false
+      publish-metrics:
+        description: "Publish end-to-end journey metrics to CloudWatch. Production only. The caller must grant id-token: write, and its OIDC subject must be trusted by the production GithubActions-E2E-Testing-Role."
+        type: "boolean"
+        default: false
+        required: false
+      region:
+        description: "AWS region to use when assuming IAM role"
+        type: "string"
+        default: "eu-west-2"
+        required: false
+    secrets:
+      basic_password:
+        description: "The basic auth password"
+        required: false
+      waf_bypass_token:
+        description: "Secret token sent in X-WAF-Bypass header to bypass WAF bot control"
+        required: false
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v7.0.1"
+        with:
+          repository: "trade-tariff/trade-tariff-e2e-tests"
+          ref: "${{ inputs.ref }}"
+
+      - uses: "actions/setup-node@v7.1.0"
+        with:
+          cache: "yarn"
+
+      - run: "yarn install"
+
+      # Skip `--with-deps` on the normal path: it runs `apt-get update` across
+      # every APT source on the runner, incl. the pre-installed dl.google.com
+      # repo this suite doesn't use, whose flaky mirror has failed scheduled
+      # runs on "Hash Sum mismatch". ubuntu-24.04 already ships Chromium's libs.
+      - name: "Cache Playwright browsers"
+        uses: "actions/cache@v6.1.0"
+        with:
+          path: "~/.cache/ms-playwright"
+          key: "playwright-${{ runner.os }}-${{ hashFiles('yarn.lock') }}"
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: "Install Playwright browser (Chromium shell)"
+        id: "browser"
+        continue-on-error: true
+        run: |
+          for attempt in 1 2 3; do
+            yarn playwright install --only-shell chromium && exit 0
+            echo "Attempt $attempt failed; retrying in 30s..." && sleep 30
+          done
+          exit 1
+
+      - name: "Fallback - scrub unused APT sources, install deps + browser"
+        if: "steps.browser.outcome == 'failure'"
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/*google* /etc/apt/sources.list.d/*microsoft*
+          sudo apt-get update
+          yarn playwright install --with-deps --only-shell chromium
+
+      - name: "Configure environment"
+        env:
+          TEST_ENVIRONMENT: "${{ inputs.test-environment }}"
+          BASIC_PASSWORD: "${{ secrets.basic_password }}"
+          WAF_BYPASS_TOKEN: "${{ secrets.waf_bypass_token }}"
+          PUBLISH_METRICS: "${{ inputs.publish-metrics }}"
+        run: |
+          {
+            case "$TEST_ENVIRONMENT" in
+              development)
+                ACCOUNT_ID="844815912454"
+                ;;
+              staging)
+                ACCOUNT_ID="451934005581"
+                ;;
+              production)
+                ACCOUNT_ID="382373577178"
+                ;;
+              *)
+                echo "Unsupported test environment: $TEST_ENVIRONMENT" >&2
+                exit 2
+                ;;
+            esac
+            delimiter="$(openssl rand -hex 16)"
+            while [[ "$BASIC_PASSWORD$WAF_BYPASS_TOKEN$TEST_ENVIRONMENT" == *"$delimiter"* ]]; do
+              delimiter="$(openssl rand -hex 16)"
+            done
+            {
+              printf 'BASIC_PASSWORD<<%s\n' "$delimiter"
+              printf '%s\n' "$BASIC_PASSWORD"
+              printf '%s\n' "$delimiter"
+              printf 'WAF_BYPASS_TOKEN<<%s\n' "$delimiter"
+              printf '%s\n' "$WAF_BYPASS_TOKEN"
+              printf '%s\n' "$delimiter"
+              printf 'PLAYWRIGHT_ENV<<%s\n' "$delimiter"
+              printf '%s\n' "$TEST_ENVIRONMENT"
+              printf '%s\n' "$delimiter"
+              printf 'CI=true\n'
+            } >> "$GITHUB_ENV"
+            if [[ "$PUBLISH_METRICS" == "true" ]]; then
+              echo "PUBLISH_METRICS=true" >> "$GITHUB_ENV"
+            fi
+            printf 'ROLE_TO_ASSUME=arn:aws:iam::%s:role/GithubActions-E2E-Testing-Role\n' "$ACCOUNT_ID" >> "$GITHUB_ENV"
+            printf 'ACCOUNT_ID=%s\n' "$ACCOUNT_ID" >> "$GITHUB_ENV"
+          }
+
+      - uses: "aws-actions/configure-aws-credentials@v6.3.0"
+        with:
+          role-to-assume: "${{ env.ROLE_TO_ASSUME }}"
+          aws-region: "${{ inputs.region }}"
+        # Development and staging need AWS for the S3 and Cognito journeys. Only
+        # the e2e-tests repo can assume the production role, so production
+        # callers must opt in with publish-metrics.
+        if: "${{ env.ACCOUNT_ID != '' && (inputs.test-environment != 'production' || inputs.publish-metrics) }}"
+
+      - name: "Run E2E test suite"
+        uses: "trade-tariff/trade-tariff-tools/.github/actions/run-e2e-tests@main"
+        with:
+          test-environment: "${{ inputs.test-environment }}"
+          projects: "${{ inputs.projects }}"
+          skip-passwordless: "${{ inputs.skip-passwordless }}"
+        env:
+          DOTENV_CONFIG_QUIET: true

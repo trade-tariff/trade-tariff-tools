@@ -1,0 +1,30 @@
+---
+name: "Run E2E tests"
+description: "Run E2E test suite using specified Playwright projects. See E2E repo for documentation"
+
+inputs:
+  projects:
+    description: "Nonempty comma-separated list. One or many of: api, admin, frontend, dev-hub, myott"
+    type: "string"
+    default: "api,frontend"
+    required: false
+  test-environment:
+    description: "The environment to test, one of: `development`, `staging`, `production`"
+    type: "string"
+    required: true
+  skip-passwordless:
+    description: "Skip passwordless verification. Set false when verification is needed."
+    type: "string"
+    default: "true"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Run selected projects"
+      shell: "bash"
+      env:
+        PROJECTS: "${{ inputs.projects }}"
+        TEST_ENVIRONMENT: "${{ inputs.test-environment }}"
+        SKIP_PASSWORDLESS_VERIFICATION: "${{ inputs.skip-passwordless }}"
+      run: "\"${{ github.action_path }}/run-e2e-tests.sh\""
