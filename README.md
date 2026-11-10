@@ -126,8 +126,10 @@ You need to be an owner of the `trade-tariff` GitHub organisation.
 
 3. In GitHub, open the organisation **Settings > Rules > Rulesets** and choose
    **New ruleset > New branch ruleset**.
-4. Name it `Require Jira ticket`. Set **Enforcement status** to **Evaluate**.
-5. Under **Target repositories**, pick the Rails repositories: `trade-tariff-backend`,
+4. Name it `Require Jira ticket`. Set **Enforcement status** to **Active**. The
+   check blocks merges from the moment you save, so do step 5 as written.
+5. Under **Target repositories**, first pick only `trade-tariff-github-testing`.
+   Add the Rails repositories in step 9: `trade-tariff-backend`,
    `trade-tariff-frontend`, `trade-tariff-admin`, `trade-tariff-dev-hub`, `identity`
    and `mcp`.
    Do not target the Terraform repositories (`trade-tariff-platform-aws-terraform`,
@@ -140,12 +142,15 @@ You need to be an owner of the `trade-tariff` GitHub organisation.
 7. Turn on **Require workflows to pass before merging**. Add
    `trade-tariff/trade-tariff-tools`, the path `.github/workflows/require-ticket.yml`,
    and the ref `refs/heads/main`.
-8. Save the ruleset. In **Evaluate** mode, results show under **Insights** and
-   nothing blocks a merge.
-9. Open a test pull request in `trade-tariff-github-testing`, or a repository with
-   an `app/` folder. Check that the workflow runs and that the result is right
-   with a ticket, without one, and with the `no-ticket` label.
-10. After a week or two, set **Enforcement status** to **Active**.
+8. Save the ruleset. Open a test pull request in `trade-tariff-github-testing`.
+   Add an `app/` folder to the repository first if it has none. Check the result
+   in three cases: with a ticket (passes), without one (fails and blocks the merge),
+   and with the `no-ticket` label (passes). If that repository uses a merge
+   queue, also check that a queued PR still merges.
+9. Edit the ruleset and add the Rails repositories listed in step 5.
+10. Tell the team the check is on. A pull request that is already open has no
+    result yet. Its author must push a commit, or use **Re-run all jobs**, before
+    the check reports. Until then the ruleset blocks the merge.
 
 ### Roll back
 
