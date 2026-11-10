@@ -98,8 +98,10 @@ files for a PR. If the list is shorter than the PR, the job cannot tell whether
 the check. Without either, it fails instead of exempting the PR.
 
 A ruleset runs the workflow only when a PR is opened, updated or reopened. After
-you add a ticket or the `no-ticket` label, use **Re-run all jobs** on the check,
-or push a commit. The re-run reads the new description and labels.
+you add a ticket or the `no-ticket` label to a PR that has already had a run, use
+**Re-run all jobs** on the check, or push a commit. The re-run reads the new
+description and labels. A PR that has never had a run has nothing to re-run. Push a
+commit, or close and reopen the PR.
 
 Ticket keys are `HMRC-123`, `AI-123` or `HOTT-123`. To change the prefixes, edit
 `TICKET_PREFIXES` in the workflow. The check ignores HTML comments, so the
@@ -129,7 +131,7 @@ You need to be an owner of the `trade-tariff` GitHub organisation.
 4. Name it `Require Jira ticket`. Set **Enforcement status** to **Active**. The
    check blocks merges from the moment you save, so do step 5 as written.
 5. Under **Target repositories**, first pick only `trade-tariff-github-testing`.
-   Add the Rails repositories in step 9: `trade-tariff-backend`,
+   Add the Rails repositories in step 10: `trade-tariff-backend`,
    `trade-tariff-frontend`, `trade-tariff-admin`, `trade-tariff-dev-hub`, `identity`
    and `mcp`.
    Do not target the Terraform repositories (`trade-tariff-platform-aws-terraform`,
@@ -142,15 +144,23 @@ You need to be an owner of the `trade-tariff` GitHub organisation.
 7. Turn on **Require workflows to pass before merging**. Add
    `trade-tariff/trade-tariff-tools`, the path `.github/workflows/require-ticket.yml`,
    and the ref `refs/heads/main`.
-8. Save the ruleset. Open a test pull request in `trade-tariff-github-testing`.
-   Add an `app/` folder to the repository first if it has none. Check the result
-   in three cases: with a ticket (passes), without one (fails and blocks the merge),
-   and with the `no-ticket` label (passes). If that repository uses a merge
-   queue, also check that a queued PR still merges.
-9. Edit the ruleset and add the Rails repositories listed in step 5.
-10. Tell the team the check is on. A pull request that is already open has no
-    result yet. Its author must push a commit, or use **Re-run all jobs**, before
-    the check reports. Until then the ruleset blocks the merge.
+8. Before you save, make sure `trade-tariff-github-testing` has an `app/` folder
+   on its default branch. The check reads the base branch, so a PR that adds
+   `app/` for the first time is exempt and would not test the failure case. If the
+   folder is missing, add `app/.keep` to the default branch first.
+9. Save the ruleset. Then open three test pull requests that each change a file
+   under `app/`:
+   - With a ticket such as `HMRC-1` in the description. The check must pass.
+   - With no ticket. The check must fail, and the merge must be blocked.
+   - With no ticket and the `no-ticket` label. The check must pass.
+
+   Confirm that the check name shows as a required check on each PR. If the
+   repository uses a merge queue, also check that a queued PR still merges.
+10. Edit the ruleset and add the Rails repositories listed in step 5.
+11. Tell the team the check is on. A pull request that is already open has no
+    run of this workflow. There is no **Re-run all jobs** to use. The author must
+    push a commit, or close and reopen the PR, before the check reports. Until
+    then the ruleset blocks the merge.
 
 ### Roll back
 
