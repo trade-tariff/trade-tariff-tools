@@ -13,31 +13,42 @@ setup() {
     steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("require-ticket").fetch("steps")
     puts steps.find { |step| step["name"] == "Check for a Jira ticket" }.fetch("run")
   ' "$workflow" > "$check_script"
+  work_dir="$(mktemp -d)"
 
   export HAS_APP_DIR=true
   export TICKET_PREFIXES="HMRC|AI|HOTT"
-  export PR_AUTHOR=alice
-  export PR_LABELS=""
-  export CHANGED_FILES="app/models/a.rb"
-  export PR_BODY=""
+  export HAS_NO_TICKET_LABEL=false
+  export PR_BODY_FILE="${work_dir}/body.txt"
+  export PR_AUTHOR_FILE="${work_dir}/author.txt"
+  export CHANGED_FILES_FILE="${work_dir}/files.txt"
+  set_author alice
+  set_files "app/models/a.rb"
+  set_body ""
 }
 
 teardown() {
-  rm -f "$check_script"
+  rm -rf "$check_script" "$work_dir"
 }
 
+set_body() { printf '%s' "$1" > "$PR_BODY_FILE"; }
+set_author() { printf '%s\n' "$1" > "$PR_AUTHOR_FILE"; }
+set_files() { printf '%s\n' "$1" > "$CHANGED_FILES_FILE"; }
+
 @test "passes when an app change names a ticket" {
-  PR_BODY=$'## Ticket:\nHMRC-2818' run bash "$check_script"
+  set_body $'## Ticket:\nHMRC-2818'
+  run bash "$check_script"
   [ "$status" -eq 0 ]
 }
 
 @test "accepts the AI prefix" {
-  PR_BODY="[AI-1498] thing" run bash "$check_script"
+  set_body "[AI-1498] thing"
+  run bash "$check_script"
   [ "$status" -eq 0 ]
 }
 
 @test "fails when an app change has no ticket" {
-  PR_BODY="no ticket here" run bash "$check_script"
+  set_body "no ticket here"
+  run bash "$check_script"
   [ "$status" -eq 1 ]
   assert_contains "$output" "has no Jira ticket"
 }
@@ -48,45 +59,47 @@ teardown() {
 }
 
 @test "ignores the template placeholder comment" {
-  PR_BODY=$'## Ticket:\n<!-- Link to the Jira ticket, e.g. HMRC-1234 -->' run bash "$check_script"
+  set_body $'## Ticket:\n<!-- Link to the Jira ticket, e.g. HMRC-1234 -->'
+  run bash "$check_script"
   [ "$status" -eq 1 ]
 }
 
 @test "ignores a ticket that is only inside a comment" {
-  PR_BODY="<!-- HMRC-1 -->" run bash "$check_script"
+  set_body "<!-- HMRC-1 -->"
+  run bash "$check_script"
   [ "$status" -eq 1 ]
 }
 
 @test "rejects N/A, unknown prefixes and lowercase keys" {
   for body in "N/A" "ABC-123" "hmrc-123"; do
-    PR_BODY="$body" run bash "$check_script"
+    set_body "$body"
+  run bash "$check_script"
     [ "$status" -eq 1 ]
   done
 }
 
 @test "exempts Dependabot" {
-  PR_AUTHOR="dependabot[bot]" run bash "$check_script"
+  set_author "dependabot[bot]"
+  run bash "$check_script"
   [ "$status" -eq 0 ]
   assert_contains "$output" "Dependabot"
 }
 
 @test "exempts the no-ticket label" {
-  PR_LABELS="bug,no-ticket" run bash "$check_script"
+  HAS_NO_TICKET_LABEL=true run bash "$check_script"
   [ "$status" -eq 0 ]
 }
 
-@test "does not exempt a label that only contains no-ticket" {
-  PR_LABELS="no-ticket-needed" run bash "$check_script"
-  [ "$status" -eq 1 ]
-}
 
 @test "exempts changes that do not touch app/" {
-  CHANGED_FILES=$'Gemfile\nGemfile.lock\ndocs/app/readme.md' run bash "$check_script"
+  set_files $'Gemfile\nGemfile.lock\ndocs/app/readme.md'
+  run bash "$check_script"
   [ "$status" -eq 0 ]
 }
 
 @test "fails when app/ is one of several changed paths" {
-  CHANGED_FILES=$'Gemfile\napp/x.rb' run bash "$check_script"
+  set_files $'Gemfile\napp/x.rb'
+  run bash "$check_script"
   [ "$status" -eq 1 ]
 }
 
@@ -94,4 +107,11 @@ teardown() {
   HAS_APP_DIR=false run bash "$check_script"
   [ "$status" -eq 0 ]
   assert_contains "$output" "no app/ folder"
+}
+
+@test "fails when a file is moved out of app/" {
+  # The files API lists the old path of a rename on its own line.
+  set_files $'lib/a.rb\napp/models/a.rb'
+  run bash "$check_script"
+  [ "$status" -eq 1 ]
 }

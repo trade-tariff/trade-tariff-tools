@@ -86,6 +86,15 @@ The check passes without a ticket when any of these is true:
 - No changed file is under `app/`.
 - The base branch has no `app/` folder.
 
+The check reads the description, labels and changed files from the GitHub API,
+not from the event payload. It counts both sides of a rename, so moving a file out
+of `app/` still needs a ticket. If the API fails, the job fails. It never exempts
+a change because of an error.
+
+A ruleset runs the workflow only when a PR is opened, updated or reopened. After
+you add a ticket or the `no-ticket` label, use **Re-run all jobs** on the check,
+or push a commit. The re-run reads the new description and labels.
+
 Ticket keys are `HMRC-123`, `AI-123` or `HOTT-123`. To change the prefixes, edit
 `TICKET_PREFIXES` in the workflow. The check ignores HTML comments, so the
 placeholder text in the pull request template does not count as a ticket.
@@ -115,6 +124,12 @@ You need to be an owner of the `trade-tariff` GitHub organisation.
 5. Under **Target repositories**, pick the Rails repositories: `trade-tariff-backend`,
    `trade-tariff-frontend`, `trade-tariff-admin`, `trade-tariff-dev-hub`, `identity`
    and `mcp`.
+   Do not target the Terraform repositories (`trade-tariff-platform-aws-terraform`,
+   `trade-tariff-platform-terraform-aws-accounts`,
+   `trade-tariff-platform-terraform-modules`, `trade-tariff-team` and
+   `trade-tariff-flagsmith`). They have no `app/` folder, so the check would only
+   add a job that exits at once. If you target repositories by pattern, exclude
+   `*terraform*`, `trade-tariff-team` and `trade-tariff-flagsmith`.
 6. Under **Target branches**, choose **Include default branch**.
 7. Turn on **Require workflows to pass before merging**. Add
    `trade-tariff/trade-tariff-tools`, the path `.github/workflows/require-ticket.yml`,
