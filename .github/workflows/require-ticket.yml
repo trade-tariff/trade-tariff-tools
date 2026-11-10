@@ -7,9 +7,14 @@ name: Require Jira ticket
 # A ruleset runs this workflow only when a PR is opened, updated or reopened, and
 # ignores the `types` below. The job reads the PR from the API, not from the event
 # payload, so "Re-run all jobs" sees a new description or label.
+#
+# In a merge queue the event is `merge_group`. It has no pull request payload, and the
+# PR already passed this check to enter the queue, so the job passes at once.
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -19,8 +24,13 @@ jobs:
   require-ticket:
     runs-on: ubuntu-latest
     steps:
+      - name: Skip in the merge queue
+        if: github.event_name == 'merge_group'
+        run: echo "Exempt - the PR passed this check before it entered the merge queue."
+
       - name: Read the current pull request
         id: pr
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -38,10 +48,21 @@ jobs:
           # Compare whole label names. A label may contain a comma.
           has_label="$(jq -r '(.labels | map(.name) | index("no-ticket")) != null' "${RUNNER_TEMP}/pr.json")"
 
+          # The files API returns at most 3000 files. If it returns fewer than the
+          # PR changed, a file under app/ could be missing, so fail instead of passing.
+          # Count the entries before the rename expansion below.
+          gh api --paginate "repos/${REPOSITORY}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | {filename, previous_filename}' > "${RUNNER_TEMP}/pr-files.ndjson"
+          listed_count="$(wc -l < "${RUNNER_TEMP}/pr-files.ndjson" | tr -d ' ')"
+          expected_count="$(jq -r '.changed_files' "${RUNNER_TEMP}/pr.json")"
+          if [[ "${listed_count}" != "${expected_count}" ]]; then
+            echo "::error::The files API listed ${listed_count} of ${expected_count} changed files, so the check cannot tell if app/ changed."
+            exit 1
+          fi
+
           # A rename lists the new path in `filename` and the old one in
           # `previous_filename`. Keep both, so moving a file out of app/ counts.
-          gh api --paginate "repos/${REPOSITORY}/pulls/${PR_NUMBER}/files" \
-            --jq '.[] | .filename, (.previous_filename // empty)' > "${RUNNER_TEMP}/pr-files.txt"
+          jq -r '.filename, (.previous_filename // empty)' "${RUNNER_TEMP}/pr-files.ndjson" > "${RUNNER_TEMP}/pr-files.txt"
 
           # Only a 404 means "no app/ folder". Any other error fails the job, so an
           # outage or rate limit cannot exempt a change.
@@ -60,6 +81,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Check for a Jira ticket
+        if: github.event_name == 'pull_request'
         env:
           PR_BODY_FILE: ${{ runner.temp }}/pr-body.txt
           PR_AUTHOR_FILE: ${{ runner.temp }}/pr-author.txt

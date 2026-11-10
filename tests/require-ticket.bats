@@ -115,3 +115,15 @@ set_files() { printf '%s\n' "$1" > "$CHANGED_FILES_FILE"; }
   run bash "$check_script"
   [ "$status" -eq 1 ]
 }
+
+@test "runs in the merge queue and skips the checks there" {
+  run ruby -ryaml -e '
+    workflow = YAML.load_file(ARGV[0])
+    triggers = workflow["on"] || workflow[true]
+    abort "no merge_group trigger" unless triggers.key?("merge_group")
+    steps = workflow.fetch("jobs").fetch("require-ticket").fetch("steps")
+    guarded = steps.select { |step| step["if"] == "github.event_name == \u0027pull_request\u0027" }
+    abort "PR steps must skip merge_group" unless guarded.size == 2
+  ' "$workflow"
+  [ "$status" -eq 0 ]
+}

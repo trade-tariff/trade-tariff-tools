@@ -91,6 +91,12 @@ not from the event payload. It counts both sides of a rename, so moving a file o
 of `app/` still needs a ticket. If the API fails, the job fails. It never exempts
 a change because of an error.
 
+In a merge queue the event is `merge_group`. The job passes at once there, because
+the PR passed the check to enter the queue. The check fails, rather than passes, if
+the files API lists fewer files than the PR changed. GitHub lists at most 3,000
+files, so a very large PR needs the `no-ticket` label or a ticket plus a re-run
+that you review by hand.
+
 A ruleset runs the workflow only when a PR is opened, updated or reopened. After
 you add a ticket or the `no-ticket` label, use **Re-run all jobs** on the check,
 or push a commit. The re-run reads the new description and labels.
