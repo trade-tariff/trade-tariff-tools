@@ -73,6 +73,104 @@ scripts and `shellcheck` for static analysis. See [AGENTS.md](AGENTS.md) and
 AWS access is not needed just to review documentation. Do not run the operational
 examples below as smoke tests against a shared account.
 
+## Require a Jira ticket
+
+`.github/workflows/require-ticket.yml` fails a pull request that changes files
+under `app/` when the description names no Jira ticket. It is built to run as an
+organisation-required workflow, so no repository needs its own copy.
+
+The check passes without a ticket when any of these is true:
+
+- The author is `dependabot[bot]`.
+- The pull request has the `no-ticket` label.
+- No changed file is under `app/`.
+- The base branch has no `app/` folder.
+
+The check reads the description, labels and changed files from the GitHub API,
+not from the event payload. It counts both sides of a rename, so moving a file out
+of `app/` still needs a ticket. If the API fails, the job fails. It never exempts
+a change because of an error.
+
+In a merge queue the event is `merge_group`. The job passes at once there, because
+the PR passed the check to enter the queue. GitHub lists at most 3,000
+files for a PR. If the list is shorter than the PR, the job cannot tell whether
+`app/` changed. A ticket in the description or the `no-ticket` label still passes
+the check. Without either, it fails instead of exempting the PR.
+
+A ruleset runs the workflow only when a PR is opened, updated or reopened. After
+you add a ticket or the `no-ticket` label to a PR that has already had a run, use
+**Re-run all jobs** on the check, or push a commit. The re-run reads the new
+description and labels. A PR that has never had a run has nothing to re-run. Push a
+commit, or close and reopen the PR.
+
+Ticket keys are `HMRC-123`, `AI-123` or `HOTT-123`. To change the prefixes, edit
+`TICKET_PREFIXES` in the workflow. The check ignores HTML comments, so the
+placeholder text in the pull request template does not count as a ticket.
+
+The workflow has no `paths:` filter on purpose. A required check that a filter
+skips stays pending and blocks the merge. The script decides inside the job.
+The script is inline because an org-required workflow cannot check out this
+repository. `tests/require-ticket.bats` extracts it from the workflow and runs it.
+
+### Deploy it
+
+You need to be an owner of the `trade-tariff` GitHub organisation.
+
+1. Merge the pull request that adds the workflow to `main`. A ruleset runs the
+   workflow from the branch you choose, so `main` is the right one.
+2. Create the `no-ticket` label in every repository the ruleset targets. A ruleset
+   does not create labels.
+
+   ```bash
+   gh label create no-ticket --repo trade-tariff/<repo> \
+     --description "PR needs no Jira ticket" --color ededed
+   ```
+
+3. In GitHub, open the organisation **Settings > Rules > Rulesets** and choose
+   **New ruleset > New branch ruleset**.
+4. Name it `Require Jira ticket`. Set **Enforcement status** to **Active**. The
+   check blocks merges from the moment you save, so do step 5 as written.
+5. Under **Target repositories**, first pick only `trade-tariff-github-testing`.
+   Add the Rails repositories in step 10: `trade-tariff-backend`,
+   `trade-tariff-frontend`, `trade-tariff-admin`, `trade-tariff-dev-hub`, `identity`
+   and `mcp`.
+   Do not target the Terraform repositories (`trade-tariff-platform-aws-terraform`,
+   `trade-tariff-platform-terraform-aws-accounts`,
+   `trade-tariff-platform-terraform-modules`, `trade-tariff-team` and
+   `trade-tariff-flagsmith`). They have no `app/` folder, so the check would only
+   add a job that exits at once. If you target repositories by pattern, exclude
+   `*terraform*`, `trade-tariff-team` and `trade-tariff-flagsmith`.
+6. Under **Target branches**, choose **Include default branch**.
+7. Turn on **Require workflows to pass before merging**. Add
+   `trade-tariff/trade-tariff-tools`, the path `.github/workflows/require-ticket.yml`,
+   and the ref `refs/heads/main`.
+8. Before you save, make sure `trade-tariff-github-testing` has an `app/` folder
+   on its default branch. The check reads the base branch, so a PR that adds
+   `app/` for the first time is exempt and would not test the failure case. If the
+   folder is missing, add `app/.keep` to the default branch first.
+9. Save the ruleset. Then open test pull requests that each change a file
+   under `app/`:
+   - With a ticket such as `HMRC-1` in the description. The check must pass.
+   - With no ticket. The check must fail, and the merge must be blocked.
+   - With no ticket and the `no-ticket` label. The check must pass.
+   - Edit the failing PR: add a ticket to the description. Note whether the check
+     re-runs by itself. If not, use **Re-run all jobs**. It must then pass. This
+     shows whether a ruleset reacts to description and label edits, which this
+     README assumes it does not.
+
+   Confirm that the check name shows as a required check on each PR. If the
+   repository uses a merge queue, also check that a queued PR still merges.
+10. Edit the ruleset and add the Rails repositories listed in step 5.
+11. Tell the team the check is on. A pull request that is already open has no
+    run of this workflow. There is no **Re-run all jobs** to use. The author must
+    push a commit, or close and reopen the PR, before the check reports. Until
+    then the ruleset blocks the merge.
+
+### Roll back
+
+Set the ruleset to **Disabled**, or delete it. Nothing else depends on the
+workflow, so no repository needs a change.
+
 ## Licence
 
 The code and associated documentation use the [MIT licence](LICENCE.md), with

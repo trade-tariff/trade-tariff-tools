@@ -1,0 +1,140 @@
+name: Require Jira ticket
+
+# Org-required workflow (see "Require a Jira ticket" in the README). It must run
+# on every PR, so there is no `paths:` filter. A filtered, skipped required check
+# stays pending and blocks the merge.
+#
+# A ruleset runs this workflow only when a PR is opened, updated or reopened, and
+# ignores the `types` below. The job reads the PR from the API, not from the event
+# payload, so "Re-run all jobs" sees a new description or label.
+#
+# In a merge queue the event is `merge_group`. It has no pull request payload, and the
+# PR already passed this check to enter the queue, so the job passes at once.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  require-ticket:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip in the merge queue
+        if: github.event_name == 'merge_group'
+        run: echo "Exempt - the PR passed this check before it entered the merge queue."
+
+      - name: Read the current pull request
+        id: pr
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Body and labels come from the API, because the event payload is
+          # frozen at the time the event fired.
+          gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" > "${RUNNER_TEMP}/pr.json"
+          jq -r '.body // ""' "${RUNNER_TEMP}/pr.json" > "${RUNNER_TEMP}/pr-body.txt"
+          jq -r '.user.login' "${RUNNER_TEMP}/pr.json" > "${RUNNER_TEMP}/pr-author.txt"
+
+          # Compare whole label names. A label may contain a comma.
+          has_label="$(jq -r '(.labels | map(.name) | index("no-ticket")) != null' "${RUNNER_TEMP}/pr.json")"
+
+          # The files API returns at most 3000 files. If it returns fewer than the PR
+          # changed, a file under app/ could be missing. Record that, and let the
+          # check step decide. A ticket or the label still passes. Count the entries
+          # before the rename expansion below.
+          gh api --paginate "repos/${REPOSITORY}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | {filename, previous_filename}' > "${RUNNER_TEMP}/pr-files.ndjson"
+          listed_count="$(wc -l < "${RUNNER_TEMP}/pr-files.ndjson" | tr -d ' ')"
+          expected_count="$(jq -r '.changed_files' "${RUNNER_TEMP}/pr.json")"
+          if [[ "${listed_count}" == "${expected_count}" ]]; then
+            file_list_complete=true
+          else
+            file_list_complete=false
+          fi
+
+          # A rename lists the new path in `filename` and the old one in
+          # `previous_filename`. Keep both, so moving a file out of app/ counts.
+          jq -r '.filename, (.previous_filename // empty)' "${RUNNER_TEMP}/pr-files.ndjson" > "${RUNNER_TEMP}/pr-files.txt"
+
+          # Only a 404 means "no app/ folder". Any other error fails the job, so an
+          # outage or rate limit cannot exempt a change.
+          if listing_output="$(gh api "repos/${REPOSITORY}/contents/app?ref=${BASE_SHA}" 2>&1)"; then
+            has_app_dir=true
+          elif grep -q 'HTTP 404' <<<"${listing_output}"; then
+            has_app_dir=false
+          else
+            echo "::error::Could not check for an app/ folder: ${listing_output}"
+            exit 1
+          fi
+
+          {
+            echo "has_no_ticket_label=${has_label}"
+            echo "has_app_dir=${has_app_dir}"
+            echo "file_list_complete=${file_list_complete}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Check for a Jira ticket
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY_FILE: ${{ runner.temp }}/pr-body.txt
+          PR_AUTHOR_FILE: ${{ runner.temp }}/pr-author.txt
+          CHANGED_FILES_FILE: ${{ runner.temp }}/pr-files.txt
+          HAS_NO_TICKET_LABEL: ${{ steps.pr.outputs.has_no_ticket_label }}
+          HAS_APP_DIR: ${{ steps.pr.outputs.has_app_dir }}
+          FILE_LIST_COMPLETE: ${{ steps.pr.outputs.file_list_complete }}
+          TICKET_PREFIXES: HMRC|AI|HOTT
+        run: |
+          # Fails when a PR changes files under app/ but names no Jira ticket.
+          # Exit 0 = pass or exempt. Exit 1 = blocked.
+          set -euo pipefail
+
+          if [[ "${HAS_APP_DIR}" != "true" ]]; then
+            echo "Exempt: repository has no app/ folder."
+            exit 0
+          fi
+
+          if [[ "$(cat "${PR_AUTHOR_FILE}")" == "dependabot[bot]" ]]; then
+            echo "Exempt: PR is from Dependabot."
+            exit 0
+          fi
+
+          if [[ "${HAS_NO_TICKET_LABEL}" == "true" ]]; then
+            echo "Exempt: PR has the no-ticket label."
+            exit 0
+          fi
+
+          # Remove HTML comments first, so the template placeholder text cannot match.
+          # An unterminated comment hides the rest of the text on GitHub, so strip to the end.
+          body_without_comments="$(perl -0pe 's/<!--.*?(?:-->|\z)//gs' "${PR_BODY_FILE}")"
+
+          if grep -qE "\b(${TICKET_PREFIXES})-[0-9]+\b" <<<"${body_without_comments}"; then
+            echo "Pass: ticket found in PR description."
+            exit 0
+          fi
+
+          # No ticket. Now the changed files decide. A truncated list could hide an
+          # app/ change, so fail instead of exempting.
+          if [[ "${FILE_LIST_COMPLETE}" != "true" ]]; then
+            echo "::error::The files API listed fewer files than the PR changed, so the check cannot tell if app/ changed."
+            echo "Add a Jira ticket to the description, or ask for the no-ticket label."
+            exit 1
+          fi
+
+          if ! grep -qE '^app/' "${CHANGED_FILES_FILE}"; then
+            echo "Exempt: no files under app/ changed."
+            exit 0
+          fi
+
+          echo "::error::This PR changes app/ but the description has no Jira ticket (${TICKET_PREFIXES}-123)."
+          echo "Add the ticket to the '## Ticket:' section, or ask for the no-ticket label."
+          exit 1
