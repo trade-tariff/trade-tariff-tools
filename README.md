@@ -73,6 +73,64 @@ scripts and `shellcheck` for static analysis. See [AGENTS.md](AGENTS.md) and
 AWS access is not needed just to review documentation. Do not run the operational
 examples below as smoke tests against a shared account.
 
+## Require a Jira ticket
+
+`.github/workflows/require-ticket.yml` fails a pull request that changes files
+under `app/` when the description names no Jira ticket. It is built to run as an
+organisation-required workflow, so no repository needs its own copy.
+
+The check passes without a ticket when any of these is true:
+
+- The author is `dependabot[bot]`.
+- The pull request has the `no-ticket` label.
+- No changed file is under `app/`.
+- The base branch has no `app/` folder.
+
+Ticket keys are `HMRC-123`, `AI-123` or `HOTT-123`. To change the prefixes, edit
+`TICKET_PREFIXES` in the workflow. The check ignores HTML comments, so the
+placeholder text in the pull request template does not count as a ticket.
+
+The workflow has no `paths:` filter on purpose. A required check that a filter
+skips stays pending and blocks the merge. The script decides inside the job.
+The script is inline because an org-required workflow cannot check out this
+repository. `tests/require-ticket.bats` extracts it from the workflow and runs it.
+
+### Deploy it
+
+You need to be an owner of the `trade-tariff` GitHub organisation.
+
+1. Merge the pull request that adds the workflow to `main`. A ruleset runs the
+   workflow from the branch you choose, so `main` is the right one.
+2. Create the `no-ticket` label in every repository the ruleset targets. A ruleset
+   does not create labels.
+
+   ```bash
+   gh label create no-ticket --repo trade-tariff/<repo> \
+     --description "PR needs no Jira ticket" --color ededed
+   ```
+
+3. In GitHub, open the organisation **Settings > Rules > Rulesets** and choose
+   **New ruleset > New branch ruleset**.
+4. Name it `Require Jira ticket`. Set **Enforcement status** to **Evaluate**.
+5. Under **Target repositories**, pick the Rails repositories: `trade-tariff-backend`,
+   `trade-tariff-frontend`, `trade-tariff-admin`, `trade-tariff-dev-hub`, `identity`
+   and `mcp`.
+6. Under **Target branches**, choose **Include default branch**.
+7. Turn on **Require workflows to pass before merging**. Add
+   `trade-tariff/trade-tariff-tools`, the path `.github/workflows/require-ticket.yml`,
+   and the ref `refs/heads/main`.
+8. Save the ruleset. In **Evaluate** mode, results show under **Insights** and
+   nothing blocks a merge.
+9. Open a test pull request in `trade-tariff-github-testing`, or a repository with
+   an `app/` folder. Check that the workflow runs and that the result is right
+   with a ticket, without one, and with the `no-ticket` label.
+10. After a week or two, set **Enforcement status** to **Active**.
+
+### Roll back
+
+Set the ruleset to **Disabled**, or delete it. Nothing else depends on the
+workflow, so no repository needs a change.
+
 ## Licence
 
 The code and associated documentation use the [MIT licence](LICENCE.md), with

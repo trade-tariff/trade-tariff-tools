@@ -1,0 +1,84 @@
+name: Require Jira ticket
+
+# Org-required workflow (see docs/spikes/ticket-check). It must run on every PR,
+# so there is no `paths:` filter. A filtered, skipped required check blocks merges.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  require-ticket:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List changed files
+        id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo 'list<<EOF_FILES'
+            gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename'
+            echo 'EOF_FILES'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Look for an app/ folder on the base branch
+        id: appdir
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/contents/app?ref=${{ github.event.pull_request.base.sha }}" --silent 2>/dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for a Jira ticket
+        env:
+          HAS_APP_DIR: ${{ steps.appdir.outputs.present }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          CHANGED_FILES: ${{ steps.files.outputs.list }}
+          TICKET_PREFIXES: HMRC|AI|HOTT
+        run: |
+          # Fails when a PR changes files under app/ but names no Jira ticket.
+          # Inputs (environment): PR_BODY, PR_AUTHOR, PR_LABELS (comma-separated),
+          # CHANGED_FILES (comma-separated), TICKET_PREFIXES (e.g. "HMRC|AI|HOTT").
+          # Exit 0 = pass or exempt. Exit 1 = blocked.
+          set -euo pipefail
+
+          if [[ "${HAS_APP_DIR}" != "true" ]]; then
+            echo "Exempt: repository has no app/ folder."
+            exit 0
+          fi
+
+          if [[ "${PR_AUTHOR}" == "dependabot[bot]" ]]; then
+            echo "Exempt: PR is from Dependabot."
+            exit 0
+          fi
+
+          if tr "," "\n" <<<"${PR_LABELS}" | grep -qxF "no-ticket"; then
+            echo "Exempt: PR has the no-ticket label."
+            exit 0
+          fi
+
+          if ! grep -qE '^app/' <<<"${CHANGED_FILES}"; then
+            echo "Exempt: no files under app/ changed."
+            exit 0
+          fi
+
+          # Remove HTML comments first, so the template placeholder text cannot match.
+          body_without_comments="$(perl -0pe 's/<!--.*?-->//gs' <<<"${PR_BODY}")"
+
+          if grep -qE "\b(${TICKET_PREFIXES})-[0-9]+\b" <<<"${body_without_comments}"; then
+            echo "Pass: ticket found in PR description."
+            exit 0
+          fi
+
+          echo "::error::This PR changes app/ but the description has no Jira ticket (${TICKET_PREFIXES}-123)."
+          echo "Add the ticket to the '## Ticket:' section, or ask for the no-ticket label."
+          exit 1
