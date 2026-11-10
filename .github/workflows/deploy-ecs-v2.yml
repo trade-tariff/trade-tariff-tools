@@ -62,6 +62,12 @@ on:
       slack-webhook:
         description: "The Slack webhook URL to send notifications to"
         required: true
+      modules-app-id:
+        description: "GitHub App ID that can read the private Terraform modules repo"
+        required: false
+      modules-app-private-key:
+        description: "Private key of that GitHub App"
+        required: false
       basic-password:
         description: "The basic auth password"
         required: false
@@ -191,6 +197,8 @@ jobs:
           environment: "${{ inputs.environment }}"
           ref: "${{ needs.configure.outputs.docker_tag }}"
           role-to-assume: "${{ needs.configure.outputs.iam_role_arn }}"
+          modules-app-id: "${{ secrets.modules-app-id }}"
+          modules-app-private-key: "${{ secrets.modules-app-private-key }}"
       - uses: "trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main"
         with:
           build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.24 ${{ inputs.build-args }}"
@@ -224,6 +232,8 @@ jobs:
           ref: "${{ needs.configure.outputs.docker_tag }}"
           role-to-assume: "${{ needs.configure.outputs.iam_role_arn }}"
           vars: "${{ inputs.terraform-vars }}"
+          modules-app-id: "${{ secrets.modules-app-id }}"
+          modules-app-private-key: "${{ secrets.modules-app-private-key }}"
 
   tag:
     if: "${{ inputs.environment == 'production' }}"
@@ -277,6 +287,8 @@ jobs:
           environment: "${{ inputs.environment }}"
           previous-ref: "${{ needs.configure.outputs.previous_docker_tag }}"
           role-to-assume: "${{ needs.configure.outputs.iam_role_arn }}"
+          modules-app-id: "${{ secrets.modules-app-id }}"
+          modules-app-private-key: "${{ secrets.modules-app-private-key }}"
 
   notify:
     if: "${{ always() && inputs.notify }}"

@@ -19,6 +19,14 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
+  modules-app-id:
+    description: 'GitHub App ID that can read the private Terraform modules repo. Leave empty to skip.'
+    required: false
+    default: ''
+  modules-app-private-key:
+    description: 'Private key of that GitHub App. Leave empty to skip.'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -30,6 +38,10 @@ runs:
     - uses: hashicorp/setup-terraform@v4
       with:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
+    - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main
+      with:
+        app-id: ${{ inputs.modules-app-id }}
+        private-key: ${{ inputs.modules-app-private-key }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
       shell: bash
     - name: Roll back to previous image tag
