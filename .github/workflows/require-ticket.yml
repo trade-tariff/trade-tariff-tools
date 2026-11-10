@@ -48,16 +48,18 @@ jobs:
           # Compare whole label names. A label may contain a comma.
           has_label="$(jq -r '(.labels | map(.name) | index("no-ticket")) != null' "${RUNNER_TEMP}/pr.json")"
 
-          # The files API returns at most 3000 files. If it returns fewer than the
-          # PR changed, a file under app/ could be missing, so fail instead of passing.
-          # Count the entries before the rename expansion below.
+          # The files API returns at most 3000 files. If it returns fewer than the PR
+          # changed, a file under app/ could be missing. Record that, and let the
+          # check step decide. A ticket or the label still passes. Count the entries
+          # before the rename expansion below.
           gh api --paginate "repos/${REPOSITORY}/pulls/${PR_NUMBER}/files" \
             --jq '.[] | {filename, previous_filename}' > "${RUNNER_TEMP}/pr-files.ndjson"
           listed_count="$(wc -l < "${RUNNER_TEMP}/pr-files.ndjson" | tr -d ' ')"
           expected_count="$(jq -r '.changed_files' "${RUNNER_TEMP}/pr.json")"
-          if [[ "${listed_count}" != "${expected_count}" ]]; then
-            echo "::error::The files API listed ${listed_count} of ${expected_count} changed files, so the check cannot tell if app/ changed."
-            exit 1
+          if [[ "${listed_count}" == "${expected_count}" ]]; then
+            file_list_complete=true
+          else
+            file_list_complete=false
           fi
 
           # A rename lists the new path in `filename` and the old one in
@@ -78,6 +80,7 @@ jobs:
           {
             echo "has_no_ticket_label=${has_label}"
             echo "has_app_dir=${has_app_dir}"
+            echo "file_list_complete=${file_list_complete}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Check for a Jira ticket
@@ -88,6 +91,7 @@ jobs:
           CHANGED_FILES_FILE: ${{ runner.temp }}/pr-files.txt
           HAS_NO_TICKET_LABEL: ${{ steps.pr.outputs.has_no_ticket_label }}
           HAS_APP_DIR: ${{ steps.pr.outputs.has_app_dir }}
+          FILE_LIST_COMPLETE: ${{ steps.pr.outputs.file_list_complete }}
           TICKET_PREFIXES: HMRC|AI|HOTT
         run: |
           # Fails when a PR changes files under app/ but names no Jira ticket.
@@ -109,16 +113,24 @@ jobs:
             exit 0
           fi
 
-          if ! grep -qE '^app/' "${CHANGED_FILES_FILE}"; then
-            echo "Exempt: no files under app/ changed."
-            exit 0
-          fi
-
           # Remove HTML comments first, so the template placeholder text cannot match.
           body_without_comments="$(perl -0pe 's/<!--.*?-->//gs' "${PR_BODY_FILE}")"
 
           if grep -qE "\b(${TICKET_PREFIXES})-[0-9]+\b" <<<"${body_without_comments}"; then
             echo "Pass: ticket found in PR description."
+            exit 0
+          fi
+
+          # No ticket. Now the changed files decide. A truncated list could hide an
+          # app/ change, so fail instead of exempting.
+          if [[ "${FILE_LIST_COMPLETE}" != "true" ]]; then
+            echo "::error::The files API listed fewer files than the PR changed, so the check cannot tell if app/ changed."
+            echo "Add a Jira ticket to the description, or ask for the no-ticket label."
+            exit 1
+          fi
+
+          if ! grep -qE '^app/' "${CHANGED_FILES_FILE}"; then
+            echo "Exempt: no files under app/ changed."
             exit 0
           fi
 

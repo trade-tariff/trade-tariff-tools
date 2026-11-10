@@ -92,10 +92,10 @@ of `app/` still needs a ticket. If the API fails, the job fails. It never exempt
 a change because of an error.
 
 In a merge queue the event is `merge_group`. The job passes at once there, because
-the PR passed the check to enter the queue. The check fails, rather than passes, if
-the files API lists fewer files than the PR changed. GitHub lists at most 3,000
-files, so a very large PR needs the `no-ticket` label or a ticket plus a re-run
-that you review by hand.
+the PR passed the check to enter the queue. GitHub lists at most 3,000
+files for a PR. If the list is shorter than the PR, the job cannot tell whether
+`app/` changed. A ticket in the description or the `no-ticket` label still passes
+the check. Without either, it fails instead of exempting the PR.
 
 A ruleset runs the workflow only when a PR is opened, updated or reopened. After
 you add a ticket or the `no-ticket` label, use **Re-run all jobs** on the check,
