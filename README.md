@@ -148,11 +148,15 @@ You need to be an owner of the `trade-tariff` GitHub organisation.
    on its default branch. The check reads the base branch, so a PR that adds
    `app/` for the first time is exempt and would not test the failure case. If the
    folder is missing, add `app/.keep` to the default branch first.
-9. Save the ruleset. Then open three test pull requests that each change a file
+9. Save the ruleset. Then open test pull requests that each change a file
    under `app/`:
    - With a ticket such as `HMRC-1` in the description. The check must pass.
    - With no ticket. The check must fail, and the merge must be blocked.
    - With no ticket and the `no-ticket` label. The check must pass.
+   - Edit the failing PR: add a ticket to the description. Note whether the check
+     re-runs by itself. If not, use **Re-run all jobs**. It must then pass. This
+     shows whether a ruleset reacts to description and label edits, which this
+     README assumes it does not.
 
    Confirm that the check name shows as a required check on each PR. If the
    repository uses a merge queue, also check that a queued PR still merges.
