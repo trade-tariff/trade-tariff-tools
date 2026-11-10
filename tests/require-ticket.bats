@@ -242,3 +242,21 @@ run_read_step() {
   [ "$status" -eq 1 ]
   assert_contains "$output" "Could not check for an app/ folder"
 }
+
+@test "ignores a ticket hidden after an unterminated comment" {
+  set_body $'## Ticket:\n<!-- HMRC-1234'
+  run bash "$check_script"
+  [ "$status" -eq 1 ]
+}
+
+@test "accepts a ticket written before an unterminated comment" {
+  set_body $'HMRC-1234\n<!-- notes'
+  run bash "$check_script"
+  [ "$status" -eq 0 ]
+}
+
+@test "accepts a ticket written after a closed comment" {
+  set_body $'<!-- note -->\nHMRC-1234'
+  run bash "$check_script"
+  [ "$status" -eq 0 ]
+}

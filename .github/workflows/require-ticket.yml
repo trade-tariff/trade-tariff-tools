@@ -114,7 +114,8 @@ jobs:
           fi
 
           # Remove HTML comments first, so the template placeholder text cannot match.
-          body_without_comments="$(perl -0pe 's/<!--.*?-->//gs' "${PR_BODY_FILE}")"
+          # An unterminated comment hides the rest of the text on GitHub, so strip to the end.
+          body_without_comments="$(perl -0pe 's/<!--.*?(?:-->|\z)//gs' "${PR_BODY_FILE}")"
 
           if grep -qE "\b(${TICKET_PREFIXES})-[0-9]+\b" <<<"${body_without_comments}"; then
             echo "Pass: ticket found in PR description."
