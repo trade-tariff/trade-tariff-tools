@@ -218,6 +218,10 @@ jobs:
           ref: "${{ needs.configure.outputs.actual_ref }}"
           fetch-depth: 0
       # db-migrate runs terraform init, so git needs the token first.
+      # terraform-apply logs in again on its own, so deploys without migrations
+      # also work. The second login is on purpose. It adds a second token and the
+      # same git rewrite rule. Git uses the first rule and both tokens expire
+      # when the job ends.
       - uses: "trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main"
         if: "${{ inputs.migrate || inputs.force-migrate }}"
         with:
