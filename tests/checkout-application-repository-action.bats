@@ -82,6 +82,8 @@ setup() {
   [ "$output" -eq 1 ]
   run grep -c -F 'secrets.checkout-app-id' "$file"
   [ "$output" -eq 1 ]
+  run grep -c -F 'secrets.checkout-app-private-key' "$file"
+  [ "$output" -eq 1 ]
 }
 
 @test "the workflows keep the tools self-checkout on the default token" {
