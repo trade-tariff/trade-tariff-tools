@@ -33,6 +33,18 @@ on:
       waf_bypass_token:
         description: 'Secret token sent in X-WAF-Bypass header to bypass WAF bot control'
         required: false
+      modules-app-id:
+        description: GitHub App ID that can read the private Terraform modules repo
+        required: false
+      modules-app-private-key:
+        description: Private key of that GitHub App
+        required: false
+      checkout-app-id:
+        description: GitHub App ID that can read the application repos when they are private
+        required: false
+      checkout-app-private-key:
+        description: Private key of that GitHub App
+        required: false
 
 jobs:
   start-all:
@@ -69,6 +81,10 @@ jobs:
     secrets:
       slack-webhook: ${{ secrets.slack-webhook }}
       basic-password: ${{ secrets.basic-password }}
+      modules-app-id: ${{ secrets.modules-app-id }}
+      modules-app-private-key: ${{ secrets.modules-app-private-key }}
+      checkout-app-id: ${{ secrets.checkout-app-id }}
+      checkout-app-private-key: ${{ secrets.checkout-app-private-key }}
 
   e2e-test-tariff:
     if: ${{ inputs.test-flavour == 'tariff' }}

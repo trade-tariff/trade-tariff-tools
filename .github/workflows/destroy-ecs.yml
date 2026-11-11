@@ -31,6 +31,12 @@ on:
       modules-app-private-key:
         description: Private key of that GitHub App
         required: false
+      checkout-app-id:
+        description: GitHub App ID that can read the application repo when it is private
+        required: false
+      checkout-app-private-key:
+        description: Private key of that GitHub App
+        required: false
 
 permissions:
   contents: read
@@ -49,10 +55,12 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v7.0.1
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/checkout-application-repository@main
         with:
           repository: ${{ inputs.checkout-repo }}
           ref: ${{ inputs.checkout-ref }}
+          app-id: ${{ secrets.checkout-app-id }}
+          private-key: ${{ secrets.checkout-app-private-key }}
 
       - id: environment-config
         uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
