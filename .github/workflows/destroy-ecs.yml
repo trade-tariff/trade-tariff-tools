@@ -24,6 +24,13 @@ on:
         type: string
         default: main
         required: false
+    secrets:
+      modules-app-id:
+        description: GitHub App ID that can read the private Terraform modules repo
+        required: false
+      modules-app-private-key:
+        description: Private key of that GitHub App
+        required: false
 
 permissions:
   contents: read
@@ -57,3 +64,5 @@ jobs:
         with:
           environment: ${{ inputs.environment }}
           role-to-assume: ${{ steps.environment-config.outputs.deploy-role-arn }}
+          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-app-private-key: ${{ secrets.modules-app-private-key }}

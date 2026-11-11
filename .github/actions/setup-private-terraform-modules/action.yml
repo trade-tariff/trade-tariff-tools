@@ -1,0 +1,39 @@
+name: 'Setup private Terraform modules'
+description: 'Lets git read the private trade-tariff-platform-terraform-modules repo over HTTPS, so terraform init can download modules. Does nothing when no app credentials are given.'
+
+inputs:
+  app-id:
+    description: 'The GitHub App ID of an app that can read the Terraform modules repo. Leave empty to skip.'
+    required: false
+    default: ''
+  private-key:
+    description: 'The private key of that GitHub App. Leave empty to skip.'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    # The token can only read the one modules repo. The action masks it and
+    # revokes it when the job ends.
+    - name: Mint a read-only token for the Terraform modules repo
+      id: token
+      if: ${{ inputs.app-id != '' && inputs.private-key != '' }}
+      uses: actions/create-github-app-token@v3.3.0
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: trade-tariff
+        repositories: trade-tariff-platform-terraform-modules
+        permission-contents: read
+
+    # Only URLs for the modules repo are rewritten, so the token is never sent
+    # to any other repo or host.
+    - name: Let git use the token for the Terraform modules repo
+      if: ${{ steps.token.outputs.token != '' }}
+      shell: bash
+      env:
+        TOKEN: ${{ steps.token.outputs.token }}
+      run: |
+        repo_url="https://github.com/trade-tariff/trade-tariff-platform-terraform-modules"
+        git config --global "url.https://x-access-token:${TOKEN}@github.com/trade-tariff/trade-tariff-platform-terraform-modules.insteadOf" "${repo_url}"
