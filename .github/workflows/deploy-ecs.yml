@@ -196,6 +196,12 @@ jobs:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
           fetch-depth: 0
+      # db-migrate runs terraform init, so git needs the token first.
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main
+        if: ${{ inputs.migrate || inputs.force-migrate }}
+        with:
+          app-id: ${{ secrets.modules-app-id }}
+          private-key: ${{ secrets.modules-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate || inputs.force-migrate }}
         with:
