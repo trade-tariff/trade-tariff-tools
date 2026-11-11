@@ -56,7 +56,7 @@ setup() {
   rm -f "$script" "$outputs"
 }
 
-@test "deploy-ecs and deploy-ecs-v2 never use the default token for an app repo" {
+@test "deploy-ecs, deploy-ecs-v2 and destroy-ecs never use the default token for an app repo" {
   local name file
   for name in deploy-ecs deploy-ecs-v2 destroy-ecs; do
     file="$workflows/$name.yml"

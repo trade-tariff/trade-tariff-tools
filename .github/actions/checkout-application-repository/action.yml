@@ -6,7 +6,7 @@ inputs:
     description: 'The repository to check out, as owner/name.'
     required: true
   ref:
-    description: 'The git ref to check out. Leave empty to use the default of actions/checkout. For the calling repository that is the ref or commit that triggered the workflow, which can be a feature branch or a pull request merge commit. For another repository it is that repository's default branch.'
+    description: 'The git ref to check out. Leave empty to use the default of actions/checkout. For the calling repository, the default is the ref or commit that started the workflow. This can be a feature branch or a pull request merge commit. For another repository, the default is the default branch of that repository.'
     required: false
     default: ''
   fetch-depth:
