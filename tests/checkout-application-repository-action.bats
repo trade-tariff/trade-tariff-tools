@@ -71,9 +71,11 @@ setup() {
     file="$workflows/$name.yml"
     run grep -c -F "$new_action" "$file"
     [ "$output" -eq 6 ]
-    run grep -c -F 'secrets.checkout-app-id' "$file"
+    # Count only the action inputs. The secrets that go to the e2e job start
+    # with checkout-app-, so these patterns skip them.
+    run grep -c -E '^[[:space:]]+app-id: .*secrets\.checkout-app-id' "$file"
     [ "$output" -eq 6 ]
-    run grep -c -F 'secrets.checkout-app-private-key' "$file"
+    run grep -c -E '^[[:space:]]+private-key: .*secrets\.checkout-app-private-key' "$file"
     [ "$output" -eq 6 ]
   done
 

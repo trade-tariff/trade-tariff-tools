@@ -95,6 +95,8 @@ jobs:
     secrets:
       basic_password: ${{ secrets.basic-password }}
       waf_bypass_token: ${{ secrets.waf_bypass_token }}
+      checkout-app-id: ${{ secrets.checkout-app-id }}
+      checkout-app-private-key: ${{ secrets.checkout-app-private-key }}
 
   e2e-test-fpo:
     if: ${{ inputs.test-flavour == 'fpo' }}
