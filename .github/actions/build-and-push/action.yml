@@ -28,6 +28,7 @@ runs:
       run: |
         REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
         REGISTRY_ID=$(echo "${{ inputs.ecr-url }}" | cut -d'.' -f1)
+        echo "registry-id=$REGISTRY_ID" >> "$GITHUB_OUTPUT"
         REF=${{ inputs.ref }}
         IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
 
@@ -44,27 +45,11 @@ runs:
         fi
       shell: bash
 
-    - name: Install the ECR credential helper
+    - name: Log in to Amazon ECR
       if: steps.check-image.outputs.exists == 'false'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y amazon-ecr-credential-helper
-      shell: bash
-
-    - name: Configure Docker to use ECR helper
-      if: steps.check-image.outputs.exists == 'false'
-      run: |
-        mkdir -p ~/.docker
-        REGISTRY_HOST=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f1)
-        echo "Using registry host: $REGISTRY_HOST"
-        cat > ~/.docker/config.json <<EOF
-        {
-          "credHelpers": {
-            "$REGISTRY_HOST": "ecr-login"
-          }
-        }
-        EOF
-      shell: bash
+      uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+      with:
+        registries: ${{ steps.check-image.outputs.registry-id }}
 
     - name: Extract build arguments
       if: steps.check-image.outputs.exists == 'false'

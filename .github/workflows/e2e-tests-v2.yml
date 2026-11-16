@@ -68,7 +68,8 @@ jobs:
       # Skip `--with-deps` on the normal path: it runs `apt-get update` across
       # every APT source on the runner, incl. the pre-installed dl.google.com
       # repo this suite doesn't use, whose flaky mirror has failed scheduled
-      # runs on "Hash Sum mismatch". ubuntu-24.04 already ships Chromium's libs.
+      # runs on "Hash Sum mismatch". The ubuntu-latest image ships Chromium's
+      # libraries (verified on Ubuntu 26.04). Keep the fallback for image changes.
       - name: "Cache Playwright browsers"
         uses: "actions/cache@v6.1.0"
         with:
