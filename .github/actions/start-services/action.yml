@@ -16,7 +16,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - id: config
       uses: trade-tariff/trade-tariff-tools/.github/actions/configure-environment@main
       with:
