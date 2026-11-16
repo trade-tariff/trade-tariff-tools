@@ -34,7 +34,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v3.3.0
         with:
-          app-id: ${{ secrets.TRADE_TARIFF_PR_BOT_GITHUB_APP_ID }}
+          client-id: ${{ secrets.TRADE_TARIFF_PR_BOT_GITHUB_APP_ID }}
           private-key: ${{ secrets.TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY }}
           owner: trade-tariff
           repositories: |

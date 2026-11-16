@@ -68,7 +68,7 @@ jobs:
         if: env.PR_BOT_APP_CONFIGURED == 'true'
         uses: actions/create-github-app-token@v3.3.0
         with:
-          app-id: ${{ secrets['pr-bot-app-id'] }}
+          client-id: ${{ secrets['pr-bot-app-id'] }}
           private-key: ${{ secrets['pr-bot-app-private-key'] }}
           permission-actions: read
           permission-checks: read

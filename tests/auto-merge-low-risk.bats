@@ -691,7 +691,7 @@ EOF
   run grep -F 'uses: actions/create-github-app-token@v' "$workflow"
   [ "$status" -eq 0 ]
 
-  run grep -F "app-id: \${{ secrets['pr-bot-app-id'] }}" "$workflow"
+  run grep -F "client-id: \${{ secrets['pr-bot-app-id'] }}" "$workflow"
   [ "$status" -eq 0 ]
 
   run grep -F "private-key: \${{ secrets['pr-bot-app-private-key'] }}" "$workflow"
