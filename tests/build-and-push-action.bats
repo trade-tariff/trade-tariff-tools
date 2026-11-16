@@ -94,6 +94,51 @@ image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production:7852
   assert_not_contains "$aws_args" "$(printf -- '--region\neu-west-2')"
 }
 
+@test "build-and-push logs in to the target ECR registry without APT or a credential helper" {
+  run ruby -ryaml -e '
+    steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
+    login = steps.find { |step| step.fetch("uses", "").start_with?("aws-actions/amazon-ecr-login@") }
+    abort "ECR login must exist" unless login
+    abort "ECR login must use an immutable commit" unless login.fetch("uses").match?(/@[0-9a-f]{40}$/)
+    abort "Existing images must skip login" unless login.fetch("if") == "steps.check-image.outputs.exists == #{39.chr}false#{39.chr}"
+    abort "Login must target the image registry account" unless login.dig("with", "registries") == "${{ steps.check-image.outputs.registry-id }}"
+    credentials = steps.index { |step| step.fetch("uses", "").start_with?("aws-actions/configure-aws-credentials@") }
+    check = steps.index { |step| step["id"] == "check-image" }
+    build = steps.index { |step| step["id"] == "build-image" }
+    abort "Login must follow credentials and the image check, before building" unless credentials < check && check < steps.index(login) && steps.index(login) < build
+    scripts = steps.map { |step| step.fetch("run", "") }.join("\n")
+    abort "ECR login must not depend on APT or overwrite Docker configuration" if scripts.match?(/apt-get|credHelpers|config\.json/)
+  ' "$repo_root/.github/actions/build-and-push/action.yml"
+
+  [ "$status" -eq 0 ]
+}
+
+@test "image check exposes the target registry for new and existing cross-account images" {
+  check_script="$(ruby -ryaml -e '
+    steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
+    script = steps.find { |step| step["id"] == "check-image" }.fetch("run")
+    { "ecr-url" => "123456789012.dkr.ecr.eu-west-1.amazonaws.com/tariff-admin-production", "ref" => "7852bee", "region" => "eu-west-1" }.each do |key, value|
+      script = script.gsub("${{ inputs.#{key} }}", value)
+    end
+    puts script
+  ' "$repo_root/.github/actions/build-and-push/action.yml")"
+
+  for aws_exit in 0 254; do
+    export GITHUB_OUTPUT="$tmpdir/output-$aws_exit"
+    run env AWS_EXIT="$aws_exit" bash -c "$check_script"
+
+    [ "$status" -eq 0 ]
+    assert_contains "$(cat "$GITHUB_OUTPUT")" "registry-id=123456789012"
+    if [ "$aws_exit" -eq 0 ]; then
+      assert_contains "$(cat "$GITHUB_OUTPUT")" "exists=true"
+    else
+      assert_contains "$(cat "$GITHUB_OUTPUT")" "exists=false"
+    fi
+    assert_contains "$(cat "$tmpdir/aws-args.txt")" "$(printf -- '--region\neu-west-1')"
+    assert_contains "$(cat "$tmpdir/aws-args.txt")" "$(printf -- '--registry-id\n123456789012')"
+  done
+}
+
 @test "build-and-push action delegates the push to the script" {
   action="$repo_root/.github/actions/build-and-push/action.yml"
 
