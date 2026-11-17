@@ -119,3 +119,28 @@ setup() {
     done
   done
 }
+
+@test "a private key without a client ID fails before the token step" {
+  run grep -Fx "      if: \${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
+  [ "$status" -eq 0 ]
+  run grep -F '::error::A private key was given but the client ID is empty.' "$action"
+  [ "$status" -eq 0 ]
+}
+
+@test "the workflows warn when a caller passes a deprecated app ID secret" {
+  local name
+  for name in deploy-ecs deploy-ecs-v2 destroy-ecs e2e-tests e2e-tests-v2; do
+    run grep -F 'DEPRECATED_SECRETS_SET: ' "$workflows/$name.yml"
+    [ "$status" -eq 0 ] || fail "$name does not check the deprecated secrets"
+    run grep -F '::warning::checkout-app-id' "$workflows/$name.yml"
+    [ "$status" -eq 0 ] || fail "$name does not warn about checkout-app-id"
+  done
+}
+
+@test "the multi-app workflows forward the deprecated IDs only to the deploy workflow" {
+  local name
+  for name in deploy-multi-ecs deploy-multi-ecs-v2; do
+    run grep -c -E '^      (checkout|modules)-app-id: ' "$workflows/$name.yml"
+    [ "$output" -eq 2 ] || fail "$name forwards the deprecated IDs $output times"
+  done
+}

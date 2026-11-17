@@ -98,6 +98,14 @@ jobs:
       ruby_version: "${{ steps.config.outputs.ruby_version }}"
       slack_channel: "${{ steps.config.outputs.slack_channel }}"
     steps:
+      - name: "Warn about deprecated app ID secrets"
+        env:
+          DEPRECATED_SECRETS_SET: "${{ secrets.checkout-app-id != '' || secrets.modules-app-id != '' }}"
+        run: |
+          if [[ "$DEPRECATED_SECRETS_SET" == "true" ]]; then
+            echo "::warning::checkout-app-id and modules-app-id are deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove them from the caller."
+          fi
+
       - id: "actual-ref"
         env:
           CHECKOUT_REPO: "${{ inputs.checkout-repo }}"

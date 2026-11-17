@@ -61,6 +61,14 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
+      - name: Warn about deprecated app ID secrets
+        env:
+          DEPRECATED_SECRETS_SET: ${{ secrets.checkout-app-id != '' }}
+        run: |
+          if [[ "$DEPRECATED_SECRETS_SET" == "true" ]]; then
+            echo "::warning::checkout-app-id is deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from the caller."
+          fi
+
       - uses: trade-tariff/trade-tariff-tools/.github/actions/checkout-application-repository@main
         with:
           repository: trade-tariff/trade-tariff-e2e-tests

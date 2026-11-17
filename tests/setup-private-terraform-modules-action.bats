@@ -137,3 +137,8 @@ first_line_of() {
   run grep -F 'modules-app-private-key: ${{ secrets.modules-app-private-key }}' "$file"
   [ "$status" -eq 0 ]
 }
+
+@test "a private key without a client ID fails before the token step" {
+  run grep -Fx "      if: \${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' }}" "$action"
+  [ "$status" -eq 0 ]
+}

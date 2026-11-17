@@ -81,7 +81,9 @@ jobs:
     secrets:
       slack-webhook: ${{ secrets.slack-webhook }}
       basic-password: ${{ secrets.basic-password }}
+      modules-app-id: ${{ secrets.modules-app-id }}
       modules-app-private-key: ${{ secrets.modules-app-private-key }}
+      checkout-app-id: ${{ secrets.checkout-app-id }}
       checkout-app-private-key: ${{ secrets.checkout-app-private-key }}
 
   e2e-test-tariff:

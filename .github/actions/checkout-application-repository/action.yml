@@ -41,6 +41,11 @@ runs:
           echo "name=${REPOSITORY#*/}"
         } >> "$GITHUB_OUTPUT"
 
+    - name: Check the client ID
+      if: ${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' && inputs.repository != github.repository }}
+      shell: bash
+      run: echo "::error::A private key was given but the client ID is empty. Check that the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable is visible to this repository." && exit 1
+
     # The calling repo can always read itself, so it needs no app token. The
     # token can only read the one repo. The action masks it and revokes it when
     # the job ends.
