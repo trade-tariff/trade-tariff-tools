@@ -21,7 +21,11 @@ setup() {
   work_dir="$(mktemp -d)"
 
   export HAS_APP_DIR=true
-  export TICKET_PREFIXES="HMRC|AI|HOTT"
+  TICKET_PREFIXES="$(ruby -ryaml -e '
+    steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("require-ticket").fetch("steps")
+    puts steps.find { |step| step["name"] == "Check for a Jira ticket" }.fetch("env").fetch("TICKET_PREFIXES")
+  ' "$workflow")"
+  export TICKET_PREFIXES
   export HAS_NO_TICKET_LABEL=false
   export FILE_LIST_COMPLETE=true
   export PR_BODY_FILE="${work_dir}/body.txt"
@@ -50,6 +54,47 @@ set_files() { printf '%s\n' "$1" > "$CHANGED_FILES_FILE"; }
   set_body "[AI-1498] thing"
   run bash "$check_script"
   [ "$status" -eq 0 ]
+}
+
+@test "accepts the HOTT prefix" {
+  set_body "HOTT-123"
+  run bash "$check_script"
+  [ "$status" -eq 0 ]
+}
+
+@test "accepts MYOTT in an app change description without an exemption" {
+  set_body $'## Ticket:\n[MYOTT-610](https://transformuk.atlassian.net/browse/MYOTT-610)'
+  run bash "$check_script"
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Pass: ticket found"
+}
+
+@test "workflow configures all supported ticket prefixes" {
+  [ "$TICKET_PREFIXES" = "HMRC|AI|HOTT|MYOTT" ]
+}
+
+@test "rejects MYOTT keys without ticket boundaries or a number" {
+  for body in "NOTMYOTT-610" "_MYOTT-610" "MYOTT-610suffix" "MYOTT-610_suffix" "myott-610" "MYOTT-"; do
+    set_body "$body"
+    run bash "$check_script"
+    [ "$status" -eq 1 ]
+  done
+}
+
+@test "ignores MYOTT keys hidden in HTML comments" {
+  for body in '<!-- MYOTT-610 -->' $'<!-- notes\nMYOTT-610\n-->' $'<!-- notes\nMYOTT-610'; do
+    set_body "$body"
+    run bash "$check_script"
+    [ "$status" -eq 1 ]
+  done
+}
+
+@test "accepts MYOTT outside HTML comments" {
+  for body in $'MYOTT-610\n<!-- notes' $'<!-- notes -->\nMYOTT-610'; do
+    set_body "$body"
+    run bash "$check_script"
+    [ "$status" -eq 0 ]
+  done
 }
 
 @test "fails when an app change has no ticket" {
