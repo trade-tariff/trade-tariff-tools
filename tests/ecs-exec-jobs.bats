@@ -45,7 +45,8 @@ case "$1 $2" in
   "ecs describe-services")
     case "$(arg_value --services "$@")" in
       admin|identity)
-        printf '{"services":[{"serviceName":"%s","status":"ACTIVE"}],"failures":[]}' "$(arg_value --services "$@")"
+        service="$(arg_value --services "$@")"
+        printf '{"services":[{"serviceName":"%s","status":"ACTIVE","taskDefinition":"arn:aws:ecs:eu-west-2:844815912454:task-definition/%s-844815912454:12"}],"failures":[]}' "$service" "$service"
         ;;
       *)
         printf '{"services":[],"failures":[{"reason":"MISSING"}]}'
@@ -56,6 +57,12 @@ case "$1 $2" in
     case "$(arg_value --task-definition "$@")" in
       admin-job-844815912454)
         printf '{"taskDefinition":{"taskDefinitionArn":"arn:aws:ecs:eu-west-2:844815912454:task-definition/admin-job-844815912454:7"}}'
+        ;;
+      arn:aws:ecs:eu-west-2:844815912454:task-definition/admin-844815912454:12)
+        printf '{"taskDefinition":{"containerDefinitions":[{"name":"admin","logConfiguration":{"options":{"awslogs-group":"platform-logs-development-admin"}}}]}}'
+        ;;
+      arn:aws:ecs:eu-west-2:844815912454:task-definition/identity-844815912454:12)
+        printf '{"taskDefinition":{"containerDefinitions":[{"name":"identity","logConfiguration":{"options":{}}}]}}'
         ;;
       *)
         echo "An error occurred (ClientException): Unable to describe task definition." >&2
@@ -111,6 +118,9 @@ case "$1 $2" in
   "ecs stop-task")
     printf '%s\n' "$*" > "$TEST_CAPTURE_DIR/stop-task-args.txt"
     printf '{}'
+    ;;
+  "logs tail")
+    printf '%s\n' "$*" > "$TEST_CAPTURE_DIR/logs-tail-args.txt"
     ;;
   "ecs execute-command")
     printf '%s\n' "$*" > "$TEST_CAPTURE_DIR/execute-command-args.txt"
@@ -236,4 +246,19 @@ run_ecs() {
   [ "$status" -ne 0 ]
   assert_contains "$output" "Could not find an active task definition for family 'missing-job-844815912454'"
   [ ! -f "$tmpdir/capture/run-task-args.txt" ]
+}
+
+@test "ecs logs tails the log group in the service's task definition" {
+  run env TEST_CAPTURE_DIR="$tmpdir/capture" TEST_SELECT_SERVICE=admin "$repo_root/bin/ecs" logs --no-follow
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Log group: platform-logs-development-admin"
+  assert_contains "$(cat "$tmpdir/capture/logs-tail-args.txt")" "logs tail platform-logs-development-admin --log-stream-name-prefix ecs/admin"
+}
+
+@test "ecs logs uses the platform log group when the task definition names none" {
+  run env TEST_CAPTURE_DIR="$tmpdir/capture" TEST_SELECT_SERVICE=identity "$repo_root/bin/ecs" logs --no-follow
+
+  [ "$status" -eq 0 ]
+  assert_contains "$(cat "$tmpdir/capture/logs-tail-args.txt")" "logs tail platform-logs-development --log-stream-name-prefix ecs/identity"
 }
