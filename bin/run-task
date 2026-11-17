@@ -140,12 +140,22 @@ run_task() {
   log_stream_name="ecs/${task}/${task_id}"
   echo -e "Found log stream with name: ${log_stream_name}\n"
 
-  aws logs get-log-events                           \
-    --log-group-name "platform-logs-${environment}" \
-    --log-stream-name "${log_stream_name}"          \
-    --query 'events[*].message'                     \
-    --no-cli-pager                                  \
-    --start-from-head                               \
+  # Services that have their own log group name it in the task definition.
+  log_group=$(aws ecs describe-task-definition                       \
+    --task-definition "${task_definition}"                           \
+    --region "${AWS_REGION}"                                         \
+    --query "taskDefinition.containerDefinitions[?name=='${task}'] | [0].logConfiguration.options.\"awslogs-group\"" \
+    --output text 2>/dev/null) || true
+  if [ -z "${log_group}" ] || [ "${log_group}" = "None" ]; then
+    log_group="platform-logs-${environment}"
+  fi
+
+  aws logs get-log-events                  \
+    --log-group-name "${log_group}"        \
+    --log-stream-name "${log_stream_name}" \
+    --query 'events[*].message'            \
+    --no-cli-pager                         \
+    --start-from-head                      \
   | jq -r '.[]'
 
   task_exit_code=$(aws ecs describe-tasks     \

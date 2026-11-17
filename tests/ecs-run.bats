@@ -101,6 +101,10 @@ JSON
       "backend-job-382373577178")
         printf '{"taskDefinition":{"taskDefinitionArn":"arn:aws:ecs:eu-west-2:382373577178:task-definition/backend-job-382373577178:901"}}'
         ;;
+      arn:aws:ecs:*:task-definition/backend-job-*)
+        jq -cn --arg group "${TEST_TASK_LOG_GROUP:-}" \
+          '{taskDefinition: {containerDefinitions: [{name: "backend-job", logConfiguration: {options: (if $group == "" then {} else {"awslogs-group": $group} end)}}]}}'
+        ;;
       *)
         echo "unexpected task definition family: $task_definition" >&2
         exit 1
@@ -381,4 +385,43 @@ STUB
   assert_contains "$output" "Task failed (exit code: 23)"
   assert_contains "$output" "Stopped reason: Essential container in task exited"
   assert_contains "$output" "Container reason: test reason"
+}
+
+@test "ecs run tails the log group in the task definition" {
+  write_common_stubs
+  mkdir -p "$tmpdir/capture"
+
+  run env \
+    TEST_CAPTURE_DIR="$tmpdir/capture" \
+    TEST_TASK_LOG_GROUP=platform-logs-staging-backend-job \
+    TASK_POLL_SECONDS=0 \
+    FINAL_LOG_FLUSH_SECONDS=0 \
+    "$repo_root/bin/ecs" \
+    run \
+    --environment staging \
+    --yes \
+    backend-database-replication
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Logs: platform-logs-staging-backend-job/ecs/backend-job/<task-id>"
+  assert_contains "$(cat "$tmpdir/capture/logs-tail-args.txt")" "logs tail platform-logs-staging-backend-job --log-stream-name-prefix ecs/backend-job/task-123"
+}
+
+@test "ecs run tails the platform log group when the task definition names none" {
+  write_common_stubs
+  mkdir -p "$tmpdir/capture"
+
+  run env \
+    TEST_CAPTURE_DIR="$tmpdir/capture" \
+    TASK_POLL_SECONDS=0 \
+    FINAL_LOG_FLUSH_SECONDS=0 \
+    "$repo_root/bin/ecs" \
+    run \
+    --environment staging \
+    --yes \
+    backend-database-replication
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "Logs: platform-logs-staging/ecs/backend-job/<task-id>"
+  assert_contains "$(cat "$tmpdir/capture/logs-tail-args.txt")" "logs tail platform-logs-staging --log-stream-name-prefix ecs/backend-job/task-123"
 }
