@@ -13,12 +13,17 @@ inputs:
     description: 'The number of commits to fetch. 0 fetches all history.'
     required: false
     default: '1'
+  client-id:
+    description: 'The client ID of a GitHub App that can read the repository. Leave empty to use the default token.'
+    required: false
+    default: ''
   app-id:
-    description: 'The GitHub App ID of an app that can read the repository. Leave empty to use the default token.'
+    description: 'Deprecated. Use client-id.'
+    deprecationMessage: "Use 'client-id' instead."
     required: false
     default: ''
   private-key:
-    description: 'The private key of that GitHub App. Leave empty to use the default token.'
+    description: 'The private key of the client-id GitHub App. Leave empty to use the default token.'
     required: false
     default: ''
 
@@ -41,10 +46,10 @@ runs:
     # the job ends.
     - name: Mint a read-only token for the repository
       id: token
-      if: ${{ inputs.app-id != '' && inputs.private-key != '' && inputs.repository != github.repository }}
+      if: ${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' && inputs.repository != github.repository }}
       uses: actions/create-github-app-token@v3.3.0
       with:
-        client-id: ${{ inputs.app-id }}
+        client-id: ${{ inputs.client-id || inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ steps.target.outputs.owner }}
         repositories: ${{ steps.target.outputs.name }}

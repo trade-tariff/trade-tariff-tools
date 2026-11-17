@@ -23,8 +23,8 @@ on:
     secrets:
       pr-bot-app-id:
         description: >-
-          trade-tariff-pr-bot GitHub App client ID, from the org-level
-          TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable.
+          Deprecated and not used. The workflow reads the org-level
+          TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers.
         required: false
       pr-bot-app-private-key:
         description: >-
@@ -54,13 +54,12 @@ jobs:
     env:
       # Booleans, not values: the secrets context is unavailable to a step `if:`.
       PR_BOT_APP_CONFIGURED: >-
-        ${{ secrets['pr-bot-app-id'] != ''
-        && secrets['pr-bot-app-private-key'] != '' }}
+        ${{ secrets['pr-bot-app-private-key'] != '' }}
     steps:
       - name: Fail fast when no credentials were passed
         if: env.PR_BOT_APP_CONFIGURED != 'true'
         run: |
-          echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-id and pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable and TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY secret."
+          echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY secret."
           exit 1
 
       - name: Mint trade-tariff-pr-bot token
@@ -68,7 +67,7 @@ jobs:
         if: env.PR_BOT_APP_CONFIGURED == 'true'
         uses: actions/create-github-app-token@v3.3.0
         with:
-          client-id: ${{ secrets['pr-bot-app-id'] }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets['pr-bot-app-private-key'] }}
           permission-actions: read
           permission-checks: read

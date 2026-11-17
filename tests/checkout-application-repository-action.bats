@@ -9,7 +9,7 @@ setup() {
 }
 
 @test "the token is minted only with app credentials and only for another repo" {
-  run grep -Fx "      if: \${{ inputs.app-id != '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
+  run grep -Fx "      if: \${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
   [ "$status" -eq 0 ]
 }
 
@@ -33,11 +33,14 @@ setup() {
 
 @test "the optional inputs default to a plain checkout of the repo" {
   local input
-  for input in ref app-id private-key; do
+  for input in ref client-id private-key; do
     run grep -Fx -A 3 "  ${input}:" "$action"
     assert_contains "$output" '    required: false'
     assert_contains "$output" "    default: ''"
   done
+  run grep -Fx -A 4 '  app-id:' "$action"
+  assert_contains "$output" 'deprecationMessage: '
+  assert_contains "$output" "    default: ''"
   run grep -Fx -A 3 '  fetch-depth:' "$action"
   assert_contains "$output" "    default: '1'"
 }
@@ -65,15 +68,15 @@ setup() {
   done
 }
 
-@test "every app repo checkout gets both app secrets" {
+@test "every app repo checkout gets the client ID variable and the key secret" {
   local name file
   for name in deploy-ecs deploy-ecs-v2; do
     file="$workflows/$name.yml"
     run grep -c -F "$new_action" "$file"
     [ "$output" -eq 6 ]
-    # Count only the action inputs. The secrets that go to the e2e job start
-    # with checkout-app-, so these patterns skip them.
-    run grep -c -E '^[[:space:]]+app-id: .*secrets\.checkout-app-id' "$file"
+    # Count only the client-id inputs of the checkout action steps, not the
+    # one that goes to the Terraform modules action.
+    run awk -v action="$new_action" 'index($0, action) {n = 6; next} n > 0 {n--; if ($0 ~ /client-id: .*vars\.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID/) c++} END {print c + 0}' "$file"
     [ "$output" -eq 6 ]
     run grep -c -E '^[[:space:]]+private-key: .*secrets\.checkout-app-private-key' "$file"
     [ "$output" -eq 6 ]
@@ -82,7 +85,7 @@ setup() {
   file="$workflows/destroy-ecs.yml"
   run grep -c -F "$new_action" "$file"
   [ "$output" -eq 1 ]
-  run grep -c -F 'secrets.checkout-app-id' "$file"
+  run awk -v action="$new_action" 'index($0, action) {n = 6; next} n > 0 {n--; if ($0 ~ /client-id: .*vars\.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID/) c++} END {print c + 0}' "$file"
   [ "$output" -eq 1 ]
   run grep -c -F 'secrets.checkout-app-private-key' "$file"
   [ "$output" -eq 1 ]
@@ -106,11 +109,11 @@ setup() {
   done
 }
 
-@test "the multi-app workflows forward all four app secrets to the deploy workflow" {
+@test "the multi-app workflows forward both key secrets to the deploy workflow" {
   local name file secret
   for name in deploy-multi-ecs deploy-multi-ecs-v2; do
     file="$workflows/$name.yml"
-    for secret in modules-app-id modules-app-private-key checkout-app-id checkout-app-private-key; do
+    for secret in modules-app-private-key checkout-app-private-key; do
       run grep -E "^      ${secret}: \"?\\\$\{\{ secrets\.${secret} \}\}\"?$" "$file"
       [ "$status" -eq 0 ] || fail "$name does not forward $secret"
     done

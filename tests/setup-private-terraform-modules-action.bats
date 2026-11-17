@@ -12,7 +12,7 @@ first_line_of() {
 }
 
 @test "the token is minted only when both app credentials are given" {
-  run grep -Fx "      if: \${{ inputs.app-id != '' && inputs.private-key != '' }}" "$action"
+  run grep -Fx "      if: \${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' }}" "$action"
   [ "$status" -eq 0 ]
 }
 
@@ -22,8 +22,12 @@ first_line_of() {
 }
 
 @test "both inputs are optional and default to empty" {
-  run grep -Fx -A 3 '  app-id:' "$action"
+  run grep -Fx -A 3 '  client-id:' "$action"
   assert_contains "$output" '    required: false'
+  assert_contains "$output" "    default: ''"
+
+  run grep -Fx -A 4 '  app-id:' "$action"
+  assert_contains "$output" 'deprecationMessage: '
   assert_contains "$output" "    default: ''"
 
   run grep -Fx -A 3 '  private-key:' "$action"
@@ -76,7 +80,7 @@ first_line_of() {
     [ -n "$init" ] || fail "$name has no terraform init"
     [ "$login" -lt "$init" ] || fail "$name logs in after terraform init"
 
-    run grep -F 'app-id: ${{ inputs.modules-app-id }}' "$file"
+    run grep -F 'client-id: ${{ inputs.modules-client-id || inputs.modules-app-id }}' "$file"
     [ "$status" -eq 0 ]
     run grep -F 'private-key: ${{ inputs.modules-app-private-key }}' "$file"
     [ "$status" -eq 0 ]
@@ -87,9 +91,11 @@ first_line_of() {
   local name file
   for name in terraform-plan terraform-apply terraform-destroy rollback; do
     file="$repo_root/.github/actions/$name/action.yml"
-    run grep -Fx -A 3 '  modules-app-id:' "$file"
+    run grep -Fx -A 3 '  modules-client-id:' "$file"
     assert_contains "$output" '    required: false'
     assert_contains "$output" "    default: ''"
+    run grep -Fx -A 4 '  modules-app-id:' "$file"
+    assert_contains "$output" 'deprecationMessage: '
     run grep -Fx -A 3 '  modules-app-private-key:' "$file"
     assert_contains "$output" '    required: false'
     assert_contains "$output" "    default: ''"
@@ -105,8 +111,8 @@ first_line_of() {
     [ -n "$login" ] || fail "$name does not log in before migrations"
     [ "$login" -lt "$migrate" ] || fail "$name logs in after db-migrate"
 
-    # plan, apply and rollback each get both secrets.
-    run grep -c 'modules-app-id: ' "$file"
+    # plan, apply and rollback each get the client ID variable and the key secret.
+    run grep -c 'modules-client-id: .*vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID' "$file"
     [ "$output" -eq 3 ]
     run grep -c 'modules-app-private-key: ' "$file"
     [ "$output" -eq 3 ]
@@ -124,9 +130,9 @@ first_line_of() {
   done
 }
 
-@test "destroy-ecs forwards both secrets to terraform-destroy" {
+@test "destroy-ecs passes the client ID variable and the key secret to terraform-destroy" {
   local file="$repo_root/.github/workflows/destroy-ecs.yml"
-  run grep -F 'modules-app-id: ${{ secrets.modules-app-id }}' "$file"
+  run grep -F 'modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}' "$file"
   [ "$status" -eq 0 ]
   run grep -F 'modules-app-private-key: ${{ secrets.modules-app-private-key }}' "$file"
   [ "$status" -eq 0 ]

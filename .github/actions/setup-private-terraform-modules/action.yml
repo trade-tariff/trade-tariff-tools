@@ -2,12 +2,17 @@ name: 'Setup private Terraform modules'
 description: 'Lets git read the private trade-tariff-platform-terraform-modules repo over HTTPS, so terraform init can download modules. Does nothing when no app credentials are given.'
 
 inputs:
+  client-id:
+    description: 'The client ID of a GitHub App that can read the Terraform modules repo. Leave empty to skip.'
+    required: false
+    default: ''
   app-id:
-    description: 'The GitHub App ID of an app that can read the Terraform modules repo. Leave empty to skip.'
+    description: 'Deprecated. Use client-id.'
+    deprecationMessage: "Use 'client-id' instead."
     required: false
     default: ''
   private-key:
-    description: 'The private key of that GitHub App. Leave empty to skip.'
+    description: 'The private key of the client-id GitHub App. Leave empty to skip.'
     required: false
     default: ''
 
@@ -18,10 +23,10 @@ runs:
     # revokes it when the job ends.
     - name: Mint a read-only token for the Terraform modules repo
       id: token
-      if: ${{ inputs.app-id != '' && inputs.private-key != '' }}
+      if: ${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' }}
       uses: actions/create-github-app-token@v3.3.0
       with:
-        client-id: ${{ inputs.app-id }}
+        client-id: ${{ inputs.client-id || inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: trade-tariff
         repositories: trade-tariff-platform-terraform-modules
