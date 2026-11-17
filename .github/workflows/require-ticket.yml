@@ -92,7 +92,7 @@ jobs:
           HAS_NO_TICKET_LABEL: ${{ steps.pr.outputs.has_no_ticket_label }}
           HAS_APP_DIR: ${{ steps.pr.outputs.has_app_dir }}
           FILE_LIST_COMPLETE: ${{ steps.pr.outputs.file_list_complete }}
-          TICKET_PREFIXES: HMRC|AI|HOTT
+          TICKET_PREFIXES: HMRC|AI|HOTT|MYOTT
         run: |
           # Fails when a PR changes files under app/ but names no Jira ticket.
           # Exit 0 = pass or exempt. Exit 1 = blocked.
