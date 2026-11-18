@@ -77,8 +77,9 @@ setup() {
     # one that goes to the Terraform modules action.
     run awk -v action="$new_action" 'index($0, action) {n = 6; next} n > 0 {n--; if ($0 ~ /client-id: .*vars\.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID/) c++} END {print c + 0}' "$file"
     [ "$output" -eq 6 ]
+    # One more for the PR lookup token in the notify job.
     run grep -c -E '^[[:space:]]+private-key: .*secrets\.checkout-app-private-key' "$file"
-    [ "$output" -eq 6 ]
+    [ "$output" -eq 7 ]
   done
 
   file="$workflows/destroy-ecs.yml"

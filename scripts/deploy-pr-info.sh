@@ -21,8 +21,10 @@ append_message_output() {
 gh_api() {
   local output
 
-  if output="$(gh api "$@" 2>/dev/null)"; then
+  if output="$(gh api "$@" 2>&1)"; then
     printf '%s\n' "$output"
+  else
+    echo "::warning::GitHub API call failed: $1 ${output//$'\n'/ }" >&2
   fi
 }
 
