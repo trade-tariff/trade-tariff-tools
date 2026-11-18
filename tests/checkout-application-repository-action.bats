@@ -130,8 +130,10 @@ setup() {
 @test "the workflows warn when a caller passes a deprecated app ID secret" {
   local name
   for name in deploy-ecs deploy-ecs-v2 destroy-ecs e2e-tests e2e-tests-v2; do
-    run grep -F 'DEPRECATED_SECRETS_SET: ' "$workflows/$name.yml"
-    [ "$status" -eq 0 ] || fail "$name does not check the deprecated secrets"
+    run grep -Fx -A 2 '    env:' "$workflows/$name.yml"
+    assert_contains "$output" 'DEPRECATED_SECRETS_SET: '
+    run grep -E "if: \"?env\.DEPRECATED_SECRETS_SET == 'true'\"?$" "$workflows/$name.yml"
+    [ "$status" -eq 0 ] || fail "$name does not gate the warning with a step if"
     run grep -F '::warning::checkout-app-id' "$workflows/$name.yml"
     [ "$status" -eq 0 ] || fail "$name does not warn about checkout-app-id"
   done

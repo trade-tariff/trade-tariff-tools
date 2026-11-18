@@ -45,6 +45,9 @@ permissions:
 jobs:
   destroy:
     runs-on: ubuntu-latest
+    env:
+      # A boolean, not a value: the secrets context is unavailable to a step `if:`.
+      DEPRECATED_SECRETS_SET: ${{ secrets.checkout-app-id != '' || secrets.modules-app-id != '' }}
     steps:
       - name: Allow only uat
         env:
@@ -56,12 +59,8 @@ jobs:
           fi
 
       - name: Warn about deprecated app ID secrets
-        env:
-          DEPRECATED_SECRETS_SET: ${{ secrets.checkout-app-id != '' || secrets.modules-app-id != '' }}
-        run: |
-          if [[ "$DEPRECATED_SECRETS_SET" == "true" ]]; then
-            echo "::warning::checkout-app-id and modules-app-id are deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove them from the caller."
-          fi
+        if: env.DEPRECATED_SECRETS_SET == 'true'
+        run: echo "::warning::checkout-app-id and modules-app-id are deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove them from the caller."
 
       - uses: trade-tariff/trade-tariff-tools/.github/actions/checkout-application-repository@main
         with:
