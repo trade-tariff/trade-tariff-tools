@@ -11,7 +11,7 @@ teardown() {
   rm -rf "$tmpdir"
 }
 
-@test "run-task uses an explicit task definition ARN when supplied" {
+run_dev_hub_job() {
   capture="$tmpdir/capture"
   mkdir -p "$capture"
 
@@ -46,6 +46,9 @@ case "$1 $2" in
     echo "run-task should fetch logs by task id, not the newest stream" >&2
     exit 1
     ;;
+  "ecs describe-task-definition")
+    printf '%s\n' "${TEST_TASK_LOG_GROUP:-None}"
+    ;;
   "logs get-log-events")
     printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/get-log-events.txt"
     printf '["migration ok"]'
@@ -67,15 +70,28 @@ STUB
 
   explicit_arn="arn:aws:ecs:eu-west-2:123456789012:task-definition/dev-hub-job-123456789012:252"
 
-  run env AWS_REGION=eu-west-2 TEST_CAPTURE_DIR="$capture" "$repo_root/bin/run-task" \
+  run env AWS_REGION=eu-west-2 TEST_CAPTURE_DIR="$capture" "$@" "$repo_root/bin/run-task" \
     -e development \
     -t dev-hub-job \
     -d "$explicit_arn" \
     -o '{"containerOverrides":[{"name":"dev-hub-job"}]}'
+}
+
+@test "run-task uses an explicit task definition ARN when supplied" {
+  run_dev_hub_job
 
   [ "$status" -eq 0 ]
   [ "$(cat "$capture/run-task-definition.txt")" = "$explicit_arn" ]
   assert_not_contains "$(cat "$capture/aws-calls.txt")" "ecs list-task-definitions"
   assert_not_contains "$(cat "$capture/aws-calls.txt")" "logs describe-log-streams"
   assert_contains "$(cat "$capture/get-log-events.txt")" "--log-stream-name ecs/dev-hub-job/task-123"
+  assert_contains "$(cat "$capture/get-log-events.txt")" "--log-group-name platform-logs-development "
+}
+
+@test "run-task reads logs from the log group in the task definition" {
+  run_dev_hub_job TEST_TASK_LOG_GROUP=platform-logs-development-dev-hub-job
+
+  [ "$status" -eq 0 ]
+  assert_contains "$(cat "$capture/aws-calls.txt")" "ecs describe-task-definition --task-definition $explicit_arn"
+  assert_contains "$(cat "$capture/get-log-events.txt")" "--log-group-name platform-logs-development-dev-hub-job "
 }
