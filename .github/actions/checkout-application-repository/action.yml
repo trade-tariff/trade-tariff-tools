@@ -17,11 +17,6 @@ inputs:
     description: 'The client ID of a GitHub App that can read the repository. Leave empty to use the default token.'
     required: false
     default: ''
-  app-id:
-    description: 'Deprecated. Use client-id.'
-    deprecationMessage: "Use 'client-id' instead."
-    required: false
-    default: ''
   private-key:
     description: 'The private key of the client-id GitHub App. Leave empty to use the default token.'
     required: false
@@ -42,7 +37,7 @@ runs:
         } >> "$GITHUB_OUTPUT"
 
     - name: Check the client ID
-      if: ${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' && inputs.repository != github.repository }}
+      if: ${{ inputs.client-id == '' && inputs.private-key != '' && inputs.repository != github.repository }}
       shell: bash
       run: echo "::error::A private key was given but the client ID is empty. Check that the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable is visible to this repository." && exit 1
 
@@ -51,10 +46,10 @@ runs:
     # the job ends.
     - name: Mint a read-only token for the repository
       id: token
-      if: ${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' && inputs.repository != github.repository }}
+      if: ${{ inputs.client-id != '' && inputs.private-key != '' && inputs.repository != github.repository }}
       uses: actions/create-github-app-token@v3.3.0
       with:
-        client-id: ${{ inputs.client-id || inputs.app-id }}
+        client-id: ${{ inputs.client-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ steps.target.outputs.owner }}
         repositories: ${{ steps.target.outputs.name }}

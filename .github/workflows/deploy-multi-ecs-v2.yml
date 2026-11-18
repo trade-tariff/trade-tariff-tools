@@ -36,14 +36,8 @@ on:
       waf_bypass_token:
         description: "Secret token sent in X-WAF-Bypass header to bypass WAF bot control"
         required: false
-      modules-app-id:
-        description: "Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers."
-        required: false
       modules-app-private-key:
         description: "Private key of the trade-tariff-pr-bot GitHub App"
-        required: false
-      checkout-app-id:
-        description: "Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers."
         required: false
       checkout-app-private-key:
         description: "Private key of the trade-tariff-pr-bot GitHub App"
@@ -90,9 +84,7 @@ jobs:
     secrets:
       slack-webhook: "${{ secrets.slack-webhook }}"
       basic-password: "${{ secrets.basic-password }}"
-      modules-app-id: "${{ secrets.modules-app-id }}"
       modules-app-private-key: "${{ secrets.modules-app-private-key }}"
-      checkout-app-id: "${{ secrets.checkout-app-id }}"
       checkout-app-private-key: "${{ secrets.checkout-app-private-key }}"
 
   e2e-test:

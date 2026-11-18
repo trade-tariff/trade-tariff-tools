@@ -9,7 +9,7 @@ setup() {
 }
 
 @test "the token is minted only with app credentials and only for another repo" {
-  run grep -Fx "      if: \${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
+  run grep -Fx "      if: \${{ inputs.client-id != '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
   [ "$status" -eq 0 ]
 }
 
@@ -38,9 +38,8 @@ setup() {
     assert_contains "$output" '    required: false'
     assert_contains "$output" "    default: ''"
   done
-  run grep -Fx -A 4 '  app-id:' "$action"
-  assert_contains "$output" 'deprecationMessage: '
-  assert_contains "$output" "    default: ''"
+  run grep -c -E '^  app-id:' "$action"
+  [ "$output" -eq 0 ]
   run grep -Fx -A 3 '  fetch-depth:' "$action"
   assert_contains "$output" "    default: '1'"
 }
@@ -102,8 +101,6 @@ setup() {
   local name file
   for name in deploy-ecs deploy-ecs-v2 destroy-ecs deploy-multi-ecs deploy-multi-ecs-v2; do
     file="$workflows/$name.yml"
-    run grep -Fx -A 2 '      checkout-app-id:' "$file"
-    assert_contains "$output" 'required: false'
     run grep -Fx -A 2 '      checkout-app-private-key:' "$file"
     assert_contains "$output" 'required: false'
   done
@@ -121,28 +118,16 @@ setup() {
 }
 
 @test "a private key without a client ID fails before the token step" {
-  run grep -Fx "      if: \${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
+  run grep -Fx "      if: \${{ inputs.client-id == '' && inputs.private-key != '' && inputs.repository != github.repository }}" "$action"
   [ "$status" -eq 0 ]
   run grep -F '::error::A private key was given but the client ID is empty.' "$action"
   [ "$status" -eq 0 ]
 }
 
-@test "the workflows warn when a caller passes a deprecated app ID secret" {
+@test "the shared workflows no longer accept the app ID secrets" {
   local name
-  for name in deploy-ecs deploy-ecs-v2 destroy-ecs e2e-tests e2e-tests-v2; do
-    run grep -Fx -A 2 '    env:' "$workflows/$name.yml"
-    assert_contains "$output" 'DEPRECATED_SECRETS_SET: '
-    run grep -E "if: \"?env\.DEPRECATED_SECRETS_SET == 'true'\"?$" "$workflows/$name.yml"
-    [ "$status" -eq 0 ] || fail "$name does not gate the warning with a step if"
-    run grep -F '::warning::checkout-app-id' "$workflows/$name.yml"
-    [ "$status" -eq 0 ] || fail "$name does not warn about checkout-app-id"
-  done
-}
-
-@test "the multi-app workflows forward the deprecated IDs only to the deploy workflow" {
-  local name
-  for name in deploy-multi-ecs deploy-multi-ecs-v2; do
-    run grep -c -E '^      (checkout|modules)-app-id: ' "$workflows/$name.yml"
-    [ "$output" -eq 2 ] || fail "$name forwards the deprecated IDs $output times"
+  for name in deploy-ecs deploy-ecs-v2 deploy-multi-ecs deploy-multi-ecs-v2 destroy-ecs e2e-tests e2e-tests-v2; do
+    run grep -c -E '(checkout|modules)-app-id' "$workflows/$name.yml"
+    [ "$output" -eq 0 ] || fail "$name still names an app ID secret"
   done
 }
