@@ -19,7 +19,11 @@ append_message_output() {
 }
 
 gh_api() {
-  gh api "$@" 2>/dev/null || true
+  local output
+
+  if output="$(gh api "$@" 2>/dev/null)"; then
+    printf '%s\n' "$output"
+  fi
 }
 
 fetch_pr() {
@@ -116,7 +120,7 @@ fi
 pr_title="$(echo "$pr_data" | jq -r '.title')"
 pr_number="$(echo "$pr_data" | jq -r '.number')"
 pr_url="$(echo "$pr_data" | jq -r '.html_url')"
-risk_label="$(echo "$pr_data" | jq -r '[.labels[].name | select(test("risk"))] | .[0] // empty')"
+risk_label="$(echo "$pr_data" | jq -r '[(.labels // [])[].name | select(test("risk"))] | .[0] // empty')"
 
 message="${fallback}"$'\n'"*<${pr_url}|#${pr_number} — ${pr_title}>*"
 
