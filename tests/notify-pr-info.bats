@@ -360,3 +360,37 @@ STUB
   run grep -E "^[[:space:]]+actions:[[:space:]]+(read|write)" "$workflow"
   [ "$status" -eq 1 ]
 }
+
+@test "outputs only the fallback message when the API call fails with an error body" {
+  cat > "$stub_bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' '{"message":"Resource not accessible by integration","status":"403"}'
+exit 1
+STUB
+  chmod +x "$stub_bin/gh"
+
+  PR_NUMBER="123" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  assert_contains "$output_content" "Deploy to production success"
+  assert_not_contains "$output_content" "#"
+  assert_not_contains "$output_content" "Resource not accessible"
+}
+
+@test "outputs the pull request without a risk line when the pull request has no labels" {
+  cat > "$stub_bin/gh" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == "api" && "$2" == "repos/trade-tariff/example/pulls/123" ]]; then
+  printf '%s\n' '{"number":123,"title":"Unlabelled PR","html_url":"https://github.com/trade-tariff/example/pull/123"}'
+fi
+STUB
+  chmod +x "$stub_bin/gh"
+
+  PR_NUMBER="123" run_script
+
+  [ "$status" -eq 0 ]
+  output_content="$(cat "$GITHUB_OUTPUT")"
+  assert_contains "$output_content" "<https://github.com/trade-tariff/example/pull/123|#123 — Unlabelled PR>"
+  assert_not_contains "$output_content" "Risk:"
+}
