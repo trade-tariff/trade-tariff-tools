@@ -26,16 +26,16 @@ on:
         required: false
     secrets:
       modules-app-id:
-        description: GitHub App ID that can read the private Terraform modules repo
+        description: Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers.
         required: false
       modules-app-private-key:
-        description: Private key of that GitHub App
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
       checkout-app-id:
-        description: GitHub App ID that can read the application repo when it is private
+        description: Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers.
         required: false
       checkout-app-private-key:
-        description: Private key of that GitHub App
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
 
 permissions:
@@ -45,6 +45,9 @@ permissions:
 jobs:
   destroy:
     runs-on: ubuntu-latest
+    env:
+      # A boolean, not a value: the secrets context is unavailable to a step `if:`.
+      DEPRECATED_SECRETS_SET: ${{ secrets.checkout-app-id != '' || secrets.modules-app-id != '' }}
     steps:
       - name: Allow only uat
         env:
@@ -55,11 +58,15 @@ jobs:
             exit 1
           fi
 
+      - name: Warn about deprecated app ID secrets
+        if: env.DEPRECATED_SECRETS_SET == 'true'
+        run: echo "::warning::checkout-app-id and modules-app-id are deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove them from the caller."
+
       - uses: trade-tariff/trade-tariff-tools/.github/actions/checkout-application-repository@main
         with:
           repository: ${{ inputs.checkout-repo }}
           ref: ${{ inputs.checkout-ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
 
       - id: environment-config
@@ -72,5 +79,5 @@ jobs:
         with:
           environment: ${{ inputs.environment }}
           role-to-assume: ${{ steps.environment-config.outputs.deploy-role-arn }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}

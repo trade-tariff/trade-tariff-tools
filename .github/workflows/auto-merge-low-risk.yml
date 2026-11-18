@@ -23,8 +23,8 @@ on:
     secrets:
       pr-bot-app-id:
         description: >-
-          trade-tariff-pr-bot GitHub App client ID, from the org-level
-          TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable.
+          Deprecated and not used. The workflow reads the org-level
+          TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers.
         required: false
       pr-bot-app-private-key:
         description: >-
@@ -54,21 +54,32 @@ jobs:
     env:
       # Booleans, not values: the secrets context is unavailable to a step `if:`.
       PR_BOT_APP_CONFIGURED: >-
-        ${{ secrets['pr-bot-app-id'] != ''
-        && secrets['pr-bot-app-private-key'] != '' }}
+        ${{ secrets['pr-bot-app-private-key'] != '' }}
+      PR_BOT_DEPRECATED_ID_SET: ${{ secrets['pr-bot-app-id'] != '' }}
     steps:
       - name: Fail fast when no credentials were passed
         if: env.PR_BOT_APP_CONFIGURED != 'true'
         run: |
-          echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-id and pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable and TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY secret."
+          echo "::error::No credentials passed to auto-merge-low-risk.yml. Pass pr-bot-app-private-key from the org-level TRADE_TARIFF_PR_BOT_GITHUB_APP_PRIVATE_KEY secret."
           exit 1
+
+      - name: Fail fast when the client ID variable is empty
+        if: vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID == ''
+        run: |
+          echo "::error::The client ID is empty. Check that the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable is visible to this repository."
+          exit 1
+
+      - name: Warn about the deprecated pr-bot-app-id secret
+        if: env.PR_BOT_DEPRECATED_ID_SET == 'true'
+        run: |
+          echo "::warning::pr-bot-app-id is deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from the caller."
 
       - name: Mint trade-tariff-pr-bot token
         id: app-token
         if: env.PR_BOT_APP_CONFIGURED == 'true'
         uses: actions/create-github-app-token@v3.3.0
         with:
-          client-id: ${{ secrets['pr-bot-app-id'] }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets['pr-bot-app-private-key'] }}
           permission-actions: read
           permission-checks: read

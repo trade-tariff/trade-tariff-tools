@@ -57,16 +57,16 @@ on:
         description: The Slack webhook URL to send notifications to
         required: true
       modules-app-id:
-        description: GitHub App ID that can read the private Terraform modules repo
+        description: Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers.
         required: false
       modules-app-private-key:
-        description: Private key of that GitHub App
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
       checkout-app-id:
-        description: GitHub App ID that can read the application repo when it is private and is not the calling repo
+        description: Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers.
         required: false
       checkout-app-private-key:
-        description: Private key of that GitHub App
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
       basic-password:
         description: The basic auth password
@@ -97,7 +97,14 @@ jobs:
       previous_docker_tag: ${{ steps.config.outputs.previous_docker_tag }}
       ruby_version: ${{ steps.config.outputs.ruby_version }}
       slack_channel: ${{ steps.config.outputs.slack_channel }}
+    env:
+      # A boolean, not a value: the secrets context is unavailable to a step `if:`.
+      DEPRECATED_SECRETS_SET: ${{ secrets.checkout-app-id != '' || secrets.modules-app-id != '' }}
     steps:
+      - name: Warn about deprecated app ID secrets
+        if: env.DEPRECATED_SECRETS_SET == 'true'
+        run: echo "::warning::checkout-app-id and modules-app-id are deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove them from the caller."
+
       - id: actual-ref
         run: |
           ACTUAL_REPO="${{ inputs.checkout-repo || github.repository }}"
@@ -119,7 +126,7 @@ jobs:
         with:
           repository: ${{ steps.actual-ref.outputs.actual_repo }}
           ref: ${{ steps.actual-ref.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
 
       - id: environment-config
@@ -179,14 +186,14 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@main
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
         with:
@@ -206,7 +213,7 @@ jobs:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
           fetch-depth: 0
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       # db-migrate runs terraform init, so git needs the token first.
       # terraform-apply logs in again on its own, so deploys without migrations
@@ -216,7 +223,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main
         if: ${{ inputs.migrate || inputs.force-migrate }}
         with:
-          app-id: ${{ secrets.modules-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.modules-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate || inputs.force-migrate }}
@@ -233,7 +240,7 @@ jobs:
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
           vars: ${{ inputs.terraform-vars }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
 
   tag:
@@ -247,7 +254,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@main
         with:
@@ -264,7 +271,6 @@ jobs:
     secrets:
       basic_password: ${{ secrets.basic-password }}
       waf_bypass_token: ${{ secrets.waf_bypass_token }}
-      checkout-app-id: ${{ secrets.checkout-app-id }}
       checkout-app-private-key: ${{ secrets.checkout-app-private-key }}
 
   e2e-test-fpo:
@@ -296,14 +302,14 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/rollback@main
         with:
           environment: ${{ inputs.environment }}
           previous-ref: ${{ needs.configure.outputs.previous_docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
 
   notify:
@@ -321,7 +327,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - id: workflow-source
         env:

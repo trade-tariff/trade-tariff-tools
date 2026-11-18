@@ -30,25 +30,24 @@ setup() {
   done
 }
 
-@test "both e2e workflows pass the secrets to the action" {
+@test "both e2e workflows pass the client ID variable and the key secret to the action" {
   local workflow
   for workflow in e2e-tests e2e-tests-v2; do
-    run grep -F 'secrets.checkout-app-id' "$workflows/$workflow.yml"
+    run grep -E 'client-id: "?\$\{\{ vars\.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID \}\}' "$workflows/$workflow.yml"
     [ "$status" -eq 0 ]
     run grep -F 'secrets.checkout-app-private-key' "$workflows/$workflow.yml"
     [ "$status" -eq 0 ]
   done
 }
 
-@test "every deploy workflow forwards the secrets to its e2e job" {
+@test "every deploy workflow forwards the key secret to its e2e job" {
   local workflow
   for workflow in deploy-ecs deploy-ecs-v2 deploy-multi-ecs deploy-multi-ecs-v2; do
     # The e2e job block runs from its uses: line to the next blank line.
     run awk '/e2e-tests(-v2)?\.yml@main/{found=1} found{print} found && /^$/{exit}' "$workflows/$workflow.yml"
     [ "$status" -eq 0 ]
-    assert_contains "$output" 'checkout-app-id: '
     assert_contains "$output" 'checkout-app-private-key: '
-    assert_contains "$output" 'secrets.checkout-app-id'
     assert_contains "$output" 'secrets.checkout-app-private-key'
+    [[ "$output" != *'checkout-app-id: '* ]] || fail "$workflow still forwards checkout-app-id"
   done
 }

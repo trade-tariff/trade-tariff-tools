@@ -691,7 +691,7 @@ EOF
   run grep -F 'uses: actions/create-github-app-token@v' "$workflow"
   [ "$status" -eq 0 ]
 
-  run grep -F "client-id: \${{ secrets['pr-bot-app-id'] }}" "$workflow"
+  run grep -F 'client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}' "$workflow"
   [ "$status" -eq 0 ]
 
   run grep -F "private-key: \${{ secrets['pr-bot-app-private-key'] }}" "$workflow"
@@ -746,4 +746,13 @@ EOF
   # Presence booleans only: no env may be assigned a bare secret value.
   run grep -E "^ +[A-Z_]+: \\\$\{\{ secrets\[[^]]+\] \}\}$" "$workflow"
   [ "$status" -ne 0 ]
+}
+
+@test "reusable workflow fails fast when the client ID variable is empty" {
+  workflow="$repo_root/.github/workflows/auto-merge-low-risk.yml"
+
+  run grep -F "if: vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID == ''" "$workflow"
+  [ "$status" -eq 0 ]
+  run grep -F "if: env.PR_BOT_DEPRECATED_ID_SET == 'true'" "$workflow"
+  [ "$status" -eq 0 ]
 }
