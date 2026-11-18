@@ -19,10 +19,10 @@ setup() {
   done
 }
 
-@test "both e2e workflows declare the two checkout secrets as optional" {
+@test "both e2e workflows declare the checkout key secret as optional" {
   local workflow secret
   for workflow in e2e-tests e2e-tests-v2; do
-    for secret in checkout-app-id checkout-app-private-key; do
+    for secret in checkout-app-private-key; do
       run grep -F -A 3 "      ${secret}:" "$workflows/$workflow.yml"
       [ "$status" -eq 0 ]
       assert_contains "$output" 'required: false'

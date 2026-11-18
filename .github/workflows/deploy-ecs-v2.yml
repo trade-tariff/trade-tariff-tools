@@ -62,14 +62,8 @@ on:
       slack-webhook:
         description: "The Slack webhook URL to send notifications to"
         required: true
-      modules-app-id:
-        description: "Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers."
-        required: false
       modules-app-private-key:
         description: "Private key of the trade-tariff-pr-bot GitHub App"
-        required: false
-      checkout-app-id:
-        description: "Deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove it from callers."
         required: false
       checkout-app-private-key:
         description: "Private key of the trade-tariff-pr-bot GitHub App"
@@ -97,14 +91,7 @@ jobs:
       previous_docker_tag: "${{ steps.config.outputs.previous_docker_tag }}"
       ruby_version: "${{ steps.config.outputs.ruby_version }}"
       slack_channel: "${{ steps.config.outputs.slack_channel }}"
-    env:
-      # A boolean, not a value: the secrets context is unavailable to a step `if:`.
-      DEPRECATED_SECRETS_SET: "${{ secrets.checkout-app-id != '' || secrets.modules-app-id != '' }}"
     steps:
-      - name: "Warn about deprecated app ID secrets"
-        if: "env.DEPRECATED_SECRETS_SET == 'true'"
-        run: echo "::warning::checkout-app-id and modules-app-id are deprecated and not used. The workflow reads the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable. Remove them from the caller."
-
       - id: "actual-ref"
         env:
           CHECKOUT_REPO: "${{ inputs.checkout-repo }}"

@@ -12,7 +12,7 @@ first_line_of() {
 }
 
 @test "the token is minted only when both app credentials are given" {
-  run grep -Fx "      if: \${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' }}" "$action"
+  run grep -Fx "      if: \${{ inputs.client-id != '' && inputs.private-key != '' }}" "$action"
   [ "$status" -eq 0 ]
 }
 
@@ -26,9 +26,8 @@ first_line_of() {
   assert_contains "$output" '    required: false'
   assert_contains "$output" "    default: ''"
 
-  run grep -Fx -A 4 '  app-id:' "$action"
-  assert_contains "$output" 'deprecationMessage: '
-  assert_contains "$output" "    default: ''"
+  run grep -c -E '^  app-id:' "$action"
+  [ "$output" -eq 0 ]
 
   run grep -Fx -A 3 '  private-key:' "$action"
   assert_contains "$output" '    required: false'
@@ -80,7 +79,7 @@ first_line_of() {
     [ -n "$init" ] || fail "$name has no terraform init"
     [ "$login" -lt "$init" ] || fail "$name logs in after terraform init"
 
-    run grep -F 'client-id: ${{ inputs.modules-client-id || inputs.modules-app-id }}' "$file"
+    run grep -F 'client-id: ${{ inputs.modules-client-id }}' "$file"
     [ "$status" -eq 0 ]
     run grep -F 'private-key: ${{ inputs.modules-app-private-key }}' "$file"
     [ "$status" -eq 0 ]
@@ -94,8 +93,8 @@ first_line_of() {
     run grep -Fx -A 3 '  modules-client-id:' "$file"
     assert_contains "$output" '    required: false'
     assert_contains "$output" "    default: ''"
-    run grep -Fx -A 4 '  modules-app-id:' "$file"
-    assert_contains "$output" 'deprecationMessage: '
+    run grep -c -E '^  modules-app-id:' "$file"
+    [ "$output" -eq 0 ]
     run grep -Fx -A 3 '  modules-app-private-key:' "$file"
     assert_contains "$output" '    required: false'
     assert_contains "$output" "    default: ''"
@@ -123,8 +122,6 @@ first_line_of() {
   local name file
   for name in deploy-ecs deploy-ecs-v2 destroy-ecs; do
     file="$repo_root/.github/workflows/$name.yml"
-    run grep -Fx -A 2 '      modules-app-id:' "$file"
-    assert_contains "$output" 'required: false'
     run grep -Fx -A 2 '      modules-app-private-key:' "$file"
     assert_contains "$output" 'required: false'
   done
@@ -139,6 +136,6 @@ first_line_of() {
 }
 
 @test "a private key without a client ID fails before the token step" {
-  run grep -Fx "      if: \${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' }}" "$action"
+  run grep -Fx "      if: \${{ inputs.client-id == '' && inputs.private-key != '' }}" "$action"
   [ "$status" -eq 0 ]
 }

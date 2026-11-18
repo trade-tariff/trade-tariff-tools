@@ -19,11 +19,6 @@ inputs:
     description: 'Client ID of a GitHub App that can read the private Terraform modules repo. Leave empty to skip.'
     required: false
     default: ''
-  modules-app-id:
-    description: 'Deprecated. Use modules-client-id.'
-    deprecationMessage: "Use 'modules-client-id' instead."
-    required: false
-    default: ''
   modules-app-private-key:
     description: 'Private key of the modules-client-id GitHub App. Leave empty to skip.'
     required: false
@@ -49,7 +44,7 @@ runs:
         terraform_version: 1.12
     - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main
       with:
-        client-id: ${{ inputs.modules-client-id || inputs.modules-app-id }}
+        client-id: ${{ inputs.modules-client-id }}
         private-key: ${{ inputs.modules-app-private-key }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
       shell: bash

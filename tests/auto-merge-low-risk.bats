@@ -753,6 +753,6 @@ EOF
 
   run grep -F "if: vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID == ''" "$workflow"
   [ "$status" -eq 0 ]
-  run grep -F "if: env.PR_BOT_DEPRECATED_ID_SET == 'true'" "$workflow"
-  [ "$status" -eq 0 ]
+  run grep -c -F 'pr-bot-app-id' "$workflow"
+  [ "$output" -eq 0 ]
 }

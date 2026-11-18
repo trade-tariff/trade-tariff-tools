@@ -6,11 +6,6 @@ inputs:
     description: 'The client ID of a GitHub App that can read the Terraform modules repo. Leave empty to skip.'
     required: false
     default: ''
-  app-id:
-    description: 'Deprecated. Use client-id.'
-    deprecationMessage: "Use 'client-id' instead."
-    required: false
-    default: ''
   private-key:
     description: 'The private key of the client-id GitHub App. Leave empty to skip.'
     required: false
@@ -20,7 +15,7 @@ runs:
   using: 'composite'
   steps:
     - name: Check the client ID
-      if: ${{ inputs.client-id == '' && inputs.app-id == '' && inputs.private-key != '' }}
+      if: ${{ inputs.client-id == '' && inputs.private-key != '' }}
       shell: bash
       run: echo "::error::A private key was given but the client ID is empty. Check that the org-level TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID variable is visible to this repository." && exit 1
 
@@ -28,10 +23,10 @@ runs:
     # revokes it when the job ends.
     - name: Mint a read-only token for the Terraform modules repo
       id: token
-      if: ${{ (inputs.client-id || inputs.app-id) != '' && inputs.private-key != '' }}
+      if: ${{ inputs.client-id != '' && inputs.private-key != '' }}
       uses: actions/create-github-app-token@v3.3.0
       with:
-        client-id: ${{ inputs.client-id || inputs.app-id }}
+        client-id: ${{ inputs.client-id }}
         private-key: ${{ inputs.private-key }}
         owner: trade-tariff
         repositories: trade-tariff-platform-terraform-modules
