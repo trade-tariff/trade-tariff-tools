@@ -448,7 +448,10 @@ logs_main() {
     local environment
     environment="${cluster##*-}"
 
-    local log_group="platform-logs-${environment}"
+    local task_def log_group
+    task_def=$(aws ecs describe-services --cluster "$cluster" --services "$service" --region "$region" \
+        | jq -r '.services[0].taskDefinition // empty')
+    log_group=$(task_log_group "$task_def" "$service" "$environment" "$region")
     local stream_prefix="ecs/${service}"
 
     echo "Log group: $log_group" >&2
@@ -581,6 +584,23 @@ latest_active_task_definition() {
     echo "$latest"
 }
 
+# Services that have their own log group name it in the task definition.
+# Others write to platform-logs-<environment>.
+task_log_group() {
+    local task_def="$1"
+    local container="$2"
+    local environment="$3"
+    local region="${4:-$REGION}"
+
+    local log_group
+    log_group=$(aws ecs describe-task-definition --task-definition "$task_def" --region "$region" 2>/dev/null \
+        | jq -r --arg name "$container" \
+            'first(.taskDefinition.containerDefinitions[]? | select(.name == $name) | .logConfiguration.options["awslogs-group"] // empty)' \
+        2>/dev/null) || true
+
+    echo "${log_group:-platform-logs-${environment}}"
+}
+
 eventbridge_target_for_rule() {
     local rule_name="$1"
     local cluster="$2"
@@ -609,8 +629,8 @@ eventbridge_target_for_rule() {
 tail_task_logs() {
     local cluster="$1"
     local task_arn="$2"
-    local environment="$3"
-    local container="$4"
+    local container="$3"
+    local log_group="$4"
 
     local task_id
     task_id=$(echo "$task_arn" | awk -F'/' '{print $NF}')
@@ -636,7 +656,6 @@ tail_task_logs() {
         error_exit "Task did not start within expected time ($MAX_WAIT_TIME seconds)"
     fi
 
-    local log_group="platform-logs-${environment}"
     local stream_prefix="ecs/${container}/${task_id}"
 
     echo "Task status is $task_status. Tailing logs (Ctrl+C to detach)..." >&2
@@ -834,7 +853,9 @@ run_main() {
     echo "Command: $command" >&2
     echo "EventBridge task definition: $event_task_def_arn" >&2
     echo "Latest active task definition: $task_def_arn" >&2
-    echo "Logs: platform-logs-${environment}/ecs/${container}/<task-id>" >&2
+    local log_group
+    log_group=$(task_log_group "$task_def_arn" "$container" "$environment")
+    echo "Logs: ${log_group}/ecs/${container}/<task-id>" >&2
     echo "Tail logs: $tail" >&2
 
     if [[ "$assume_yes" == false ]]; then
@@ -883,7 +904,7 @@ run_main() {
         return
     fi
 
-    tail_task_logs "$cluster" "$task_arn" "$environment" "$container"
+    tail_task_logs "$cluster" "$task_arn" "$container" "$log_group"
 }
 
 dispatch_print_usage() {
