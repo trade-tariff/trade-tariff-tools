@@ -360,10 +360,19 @@ jobs:
             echo "rollback_message=" >> "$GITHUB_OUTPUT"
           fi
 
+      - id: "pr-token"
+        continue-on-error: true
+        uses: "actions/create-github-app-token@v3.3.0"
+        with:
+          client-id: "${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}"
+          private-key: "${{ secrets.checkout-app-private-key }}"
+          repositories: "${{ github.event.repository.name }}"
+          permission-pull-requests: "read"
+
       - id: "pr-info"
         continue-on-error: true
         env:
-          GH_TOKEN: "${{ github.token }}"
+          GH_TOKEN: "${{ steps.pr-token.outputs.token || github.token }}"
           DEPLOY_SHA: "${{ needs.configure.outputs.docker_tag }}"
           PR_NUMBER: "${{ github.event.pull_request.number }}"
           REPO: "${{ github.repository }}"
