@@ -6,6 +6,11 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixpkgs-ruby = {
+      url = "github:bobvanderlinden/nixpkgs-ruby/189ac8d78384c79bbf93fc311a09cc30e23c5937";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
   };
 
   outputs =
@@ -14,12 +19,16 @@
       nixpkgs,
       flake-utils,
       pre-commit-hooks,
+      nixpkgs-ruby,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ nixpkgs-ruby.overlays.default ];
+        };
         runtimeDeps = [
           pkgs.awscli2
           pkgs.jq
@@ -247,7 +256,7 @@
             reviewBats
             pkgs.nodejs_24
             pkgs.yarn
-            pkgs.ruby
+            pkgs."ruby-3.4.13"
             pkgs.curl
             pkgs.jq
             (pkgs.python3.withPackages (ps: [
