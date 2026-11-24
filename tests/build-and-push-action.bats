@@ -149,3 +149,25 @@ image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production:7852
   run grep -F 'REGION: ${{ inputs.region }}' "$action"
   [ "$status" -eq 0 ]
 }
+
+@test "builds and pushes a multi-arch image when PLATFORMS is set" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" BUILD_ARGS="--build-arg RUBY_VERSION=3.4.7 --build-arg ALPINE_VERSION=3.24" "$script"
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx build --provenance=false --platform linux/amd64,linux/arm64 --push -t "$image" --build-arg RUBY_VERSION=3.4.7 --build-arg ALPINE_VERSION=3.24 .)" ]
+  [ ! -f "$tmpdir/aws-args.txt" ]
+}
+
+@test "builds a multi-arch image without BUILD_ARGS" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" "$script"
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx build --provenance=false --platform linux/amd64,linux/arm64 --push -t "$image" .)" ]
+}
+
+@test "succeeds when the multi-arch push fails and the tag already exists" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" DOCKER_EXIT=1 AWS_EXIT=0 "$script"
+
+  [ "$status" -eq 0 ]
+  assert_contains "$output" "::notice::Image $image already exists in ECR"
+}

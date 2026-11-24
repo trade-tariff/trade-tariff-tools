@@ -16,6 +16,10 @@ same immutable tag first, treat the push as successful.
 Environment:
   IMAGE_NAME  (required) Full image name: <registry>/<repository>:<tag>.
   REGION      (optional, default: eu-west-2) AWS region of the ECR repository.
+  PLATFORMS   (optional) Comma-separated platforms. When set, build the image
+              for these platforms with docker buildx from the current
+              directory and push one multi-arch tag.
+  BUILD_ARGS  (optional) Extra docker buildx arguments, used with PLATFORMS.
 
 Exit codes:
   0  Image pushed, or the tag already exists in ECR.
@@ -50,7 +54,19 @@ repository_and_tag="${IMAGE_NAME#*/}"
 repository="${repository_and_tag%:*}"
 tag="${repository_and_tag##*:}"
 
-if docker push "$IMAGE_NAME"; then
+push() {
+  if [[ -z "${PLATFORMS:-}" ]]; then
+    docker push "$IMAGE_NAME"
+    return
+  fi
+
+  # The per-platform builds that Trivy scanned fill the build cache, so this build reuses their layers.
+  local build_args
+  read -ra build_args <<< "${BUILD_ARGS:-}"
+  docker buildx build --provenance=false --platform "$PLATFORMS" --push -t "$IMAGE_NAME" ${build_args[@]+"${build_args[@]}"} .
+}
+
+if push; then
   exit 0
 fi
 

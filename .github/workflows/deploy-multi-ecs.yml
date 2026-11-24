@@ -68,6 +68,7 @@ jobs:
       app-name: ${{ matrix.app.name }}
       checkout-ref: ${{ matrix.app.ref }}
       checkout-repo: ${{ matrix.app.repo }}
+      platforms: ${{ matrix.app.platforms || 'linux/amd64' }}
       environment: ${{ inputs.environment }}
       migrate: ${{ inputs.migrate && toJson(matrix.app.migrate) == 'true' }}
       notify: false

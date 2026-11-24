@@ -21,6 +21,11 @@ on:
         type: string
         default: ''
         required: false
+      platforms:
+        description: Comma-separated platforms for the Docker image (e.g. 'linux/amd64,linux/arm64')
+        type: string
+        default: 'linux/amd64'
+        required: false
       checkout-repo:
         description: The repository to checkout (defaults to current repo)
         type: string
@@ -188,6 +193,7 @@ jobs:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+          platforms: ${{ inputs.platforms }}
 
   deploy:
     runs-on: ubuntu-latest
