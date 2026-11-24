@@ -56,17 +56,11 @@ on:
       slack-webhook:
         description: The Slack webhook URL to send notifications to
         required: true
-      modules-app-id:
-        description: GitHub App ID that can read the private Terraform modules repo
-        required: false
       modules-app-private-key:
-        description: Private key of that GitHub App
-        required: false
-      checkout-app-id:
-        description: GitHub App ID that can read the application repo when it is private and is not the calling repo
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
       checkout-app-private-key:
-        description: Private key of that GitHub App
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
       basic-password:
         description: The basic auth password
@@ -119,7 +113,7 @@ jobs:
         with:
           repository: ${{ steps.actual-ref.outputs.actual_repo }}
           ref: ${{ steps.actual-ref.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
 
       - id: environment-config
@@ -179,14 +173,14 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/terraform-plan@main
         with:
           environment: ${{ inputs.environment }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
         with:
@@ -206,7 +200,7 @@ jobs:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
           fetch-depth: 0
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       # db-migrate runs terraform init, so git needs the token first.
       # terraform-apply logs in again on its own, so deploys without migrations
@@ -216,7 +210,7 @@ jobs:
       - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main
         if: ${{ inputs.migrate || inputs.force-migrate }}
         with:
-          app-id: ${{ secrets.modules-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.modules-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/db-migrate@main
         if: ${{ inputs.migrate || inputs.force-migrate }}
@@ -233,7 +227,7 @@ jobs:
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
           vars: ${{ inputs.terraform-vars }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
 
   tag:
@@ -247,7 +241,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/tag-production@main
         with:
@@ -264,7 +258,6 @@ jobs:
     secrets:
       basic_password: ${{ secrets.basic-password }}
       waf_bypass_token: ${{ secrets.waf_bypass_token }}
-      checkout-app-id: ${{ secrets.checkout-app-id }}
       checkout-app-private-key: ${{ secrets.checkout-app-private-key }}
 
   e2e-test-fpo:
@@ -296,14 +289,14 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - uses: trade-tariff/trade-tariff-tools/.github/actions/rollback@main
         with:
           environment: ${{ inputs.environment }}
           previous-ref: ${{ needs.configure.outputs.previous_docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
 
   notify:
@@ -321,7 +314,7 @@ jobs:
         with:
           repository: ${{ needs.configure.outputs.actual_repo }}
           ref: ${{ needs.configure.outputs.actual_ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
       - id: workflow-source
         env:
@@ -369,10 +362,20 @@ jobs:
           WORKFLOW_REF: ${{ github.workflow_ref }}
         run: .trade-tariff-tools/scripts/deploy-run-superseded.sh
 
+      - id: pr-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@v3.3.0
+        with:
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
+          private-key: ${{ secrets.checkout-app-private-key }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: read
+          permission-pull-requests: read
+
       - id: pr-info
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.pr-token.outputs.token || github.token }}
           DEPLOY_SHA: ${{ needs.configure.outputs.docker_tag }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}

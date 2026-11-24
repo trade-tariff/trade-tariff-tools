@@ -21,11 +21,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v7.0.0
+    - uses: actions/checkout@v7.0.1
       with:
         token: ${{ inputs.github-token }}
 
-    - uses: ruby/setup-ruby@v1.338.0
+    - uses: ruby/setup-ruby@v1.343.0
       with:
         bundler-cache: ${{ inputs.bundler-cache }}
 

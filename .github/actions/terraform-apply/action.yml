@@ -19,12 +19,12 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
-  modules-app-id:
-    description: 'GitHub App ID that can read the private Terraform modules repo. Leave empty to skip.'
+  modules-client-id:
+    description: 'Client ID of a GitHub App that can read the private Terraform modules repo. Leave empty to skip.'
     required: false
     default: ''
   modules-app-private-key:
-    description: 'Private key of that GitHub App. Leave empty to skip.'
+    description: 'Private key of the modules-client-id GitHub App. Leave empty to skip.'
     required: false
     default: ''
   vars:
@@ -43,7 +43,7 @@ runs:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
     - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-private-terraform-modules@main
       with:
-        app-id: ${{ inputs.modules-app-id }}
+        client-id: ${{ inputs.modules-client-id }}
         private-key: ${{ inputs.modules-app-private-key }}
     - run: cd terraform && terraform init -backend-config=backends/${{ inputs.environment }}.tfbackend
       shell: bash

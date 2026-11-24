@@ -25,17 +25,11 @@ on:
         default: main
         required: false
     secrets:
-      modules-app-id:
-        description: GitHub App ID that can read the private Terraform modules repo
-        required: false
       modules-app-private-key:
-        description: Private key of that GitHub App
-        required: false
-      checkout-app-id:
-        description: GitHub App ID that can read the application repo when it is private
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
       checkout-app-private-key:
-        description: Private key of that GitHub App
+        description: Private key of the trade-tariff-pr-bot GitHub App
         required: false
 
 permissions:
@@ -59,7 +53,7 @@ jobs:
         with:
           repository: ${{ inputs.checkout-repo }}
           ref: ${{ inputs.checkout-ref }}
-          app-id: ${{ secrets.checkout-app-id }}
+          client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.checkout-app-private-key }}
 
       - id: environment-config
@@ -72,5 +66,5 @@ jobs:
         with:
           environment: ${{ inputs.environment }}
           role-to-assume: ${{ steps.environment-config.outputs.deploy-role-arn }}
-          modules-app-id: ${{ secrets.modules-app-id }}
+          modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}

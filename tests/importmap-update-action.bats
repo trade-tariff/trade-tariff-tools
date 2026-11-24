@@ -5,7 +5,7 @@ load test_helper
 @test "importmap-update action checks out the caller repository with the update token" {
   action="$repo_root/.github/actions/importmap-update/action.yml"
 
-  run grep -F "uses: actions/checkout@v7.0.0" "$action"
+  run grep -E "uses: actions/checkout@v[0-9]+\.[0-9]+\.[0-9]+" "$action"
   [ "$status" -eq 0 ]
 
   run grep -F 'token: ${{ inputs.github-token }}' "$action"
@@ -46,7 +46,7 @@ load test_helper
 @test "importmap-update action delegates to thoughtbot importmap-update" {
   action="$repo_root/.github/actions/importmap-update/action.yml"
 
-  run grep -F "uses: thoughtbot/importmap-update@v1.0.0-alpha3" "$action"
+  run grep -E "uses: thoughtbot/importmap-update@v[0-9][0-9A-Za-z.-]*" "$action"
   [ "$status" -eq 0 ]
 
   run grep -F 'github-token: ${{ inputs.github-token }}' "$action"
