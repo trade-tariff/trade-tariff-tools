@@ -49,6 +49,15 @@ runs:
         fi
       shell: bash
 
+    - name: Check existing image platforms
+      if: steps.check-image.outputs.exists == 'true' && inputs.platforms != 'linux/amd64'
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.ecr-url }}:${{ inputs.ref }}
+        REGION: ${{ inputs.region }}
+        PLATFORMS: ${{ inputs.platforms }}
+      run: '"${{ github.action_path }}/check-platforms.sh"'
+
     - name: Log in to Amazon ECR
       if: steps.check-image.outputs.exists == 'false'
       uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
@@ -107,24 +116,29 @@ runs:
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       uses: docker/setup-buildx-action@v4.4.1
 
-    # Build and load each platform on its own, so that Trivy scans every image before the push.
-    - name: Build multi-arch images
+    # Push without a tag, scan what was pushed, then tag the scanned digest. The tag never points at unscanned content.
+    - name: Build and push multi-arch image by digest
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       id: build-multi-arch
       shell: bash
       env:
+        ECR_URL: ${{ inputs.ecr-url }}
         PLATFORMS: ${{ inputs.platforms }}
         BUILD_ARGS: ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
       run: |
         REF=${{ inputs.ref }}
-        IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
+        METADATA="$RUNNER_TEMP/build-metadata.json"
 
         echo "$REF" > REVISION
-        for platform in ${PLATFORMS//,/ }; do
-          # shellcheck disable=SC2086
-          docker buildx build --provenance=false --platform "$platform" --load -t "$IMAGE_NAME-${platform//\//-}" . $BUILD_ARGS
-        done
-        echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+        # shellcheck disable=SC2086
+        docker buildx build --provenance=false --platform "$PLATFORMS" \
+          --output "type=image,name=$ECR_URL,push-by-digest=true,name-canonical=true,push=true" \
+          --metadata-file "$METADATA" . $BUILD_ARGS
+        DIGEST=$(jq -r '."containerimage.digest"' "$METADATA")
+        {
+          echo "image_name=$ECR_URL:$REF"
+          echo "source_image=$ECR_URL@$DIGEST"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Set up Trivy
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
@@ -132,15 +146,15 @@ runs:
       with:
         version: v0.70.0
 
-    - name: Scan multi-arch images for vulnerabilities
+    - name: Scan multi-arch image for vulnerabilities
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       shell: bash
       env:
-        IMAGE_NAME: ${{ steps.build-multi-arch.outputs.image_name }}
+        SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }}
         PLATFORMS: ${{ inputs.platforms }}
       run: |
         for platform in ${PLATFORMS//,/ }; do
-          trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 "$IMAGE_NAME-${platform//\//-}"
+          trivy image --image-src remote --platform "$platform" --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 "$SOURCE_IMAGE"
         done
 
     - name: Push multi-arch image
@@ -148,7 +162,7 @@ runs:
       shell: bash
       env:
         IMAGE_NAME: ${{ steps.build-multi-arch.outputs.image_name }}
+        SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }}
         REGION: ${{ inputs.region }}
         PLATFORMS: ${{ inputs.platforms }}
-        BUILD_ARGS: ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
       run: '"${{ github.action_path }}/push-image.sh"'

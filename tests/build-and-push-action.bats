@@ -17,6 +17,7 @@ STUB
   cat > "$stub_bin/aws" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$TEST_CAPTURE_DIR/aws-args.txt"
+[[ "$2" == "batch-get-image" ]] && printf '%s\n' "${AWS_MANIFEST:-}"
 exit "${AWS_EXIT:-0}"
 STUB
 
@@ -150,24 +151,36 @@ image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production:7852
   [ "$status" -eq 0 ]
 }
 
-@test "builds and pushes a multi-arch image when PLATFORMS is set" {
-  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" BUILD_ARGS="--build-arg RUBY_VERSION=3.4.7 --build-arg ALPINE_VERSION=3.24" "$script"
+source_image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production@sha256:abc123"
+multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd64"}},{"platform":{"os":"linux","architecture":"arm64"}}]}'
+
+@test "tags the scanned multi-arch digest when PLATFORMS is set" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image" "$script"
 
   [ "$status" -eq 0 ]
-  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx build --provenance=false --platform linux/amd64,linux/arm64 --push -t "$image" --build-arg RUBY_VERSION=3.4.7 --build-arg ALPINE_VERSION=3.24 .)" ]
+  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx imagetools create -t "$image" "$source_image")" ]
   [ ! -f "$tmpdir/aws-args.txt" ]
 }
 
-@test "builds a multi-arch image without BUILD_ARGS" {
+@test "requires SOURCE_IMAGE with PLATFORMS" {
   run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" "$script"
 
-  [ "$status" -eq 0 ]
-  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx build --provenance=false --platform linux/amd64,linux/arm64 --push -t "$image" .)" ]
+  [ "$status" -eq 2 ]
+  assert_contains "$output" "Missing required environment variable: SOURCE_IMAGE"
+  [ ! -f "$tmpdir/docker-args.txt" ]
 }
 
-@test "succeeds when the multi-arch push fails and the tag already exists" {
-  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" DOCKER_EXIT=1 AWS_EXIT=0 "$script"
+@test "succeeds when another run pushed a multi-arch tag with every platform" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image" DOCKER_EXIT=1 AWS_EXIT=0 AWS_MANIFEST="$multi_arch_manifest" "$script"
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "::notice::Image $image already exists in ECR"
+  assert_contains "$output" "has a build for every platform"
+}
+
+@test "fails when another run pushed the tag without every platform" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image" DOCKER_EXIT=1 AWS_EXIT=0 AWS_MANIFEST='{"schemaVersion":2,"layers":[]}' "$script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "::error::Image $image has no build for linux/arm64"
 }
