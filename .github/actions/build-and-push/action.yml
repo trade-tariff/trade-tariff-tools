@@ -16,12 +16,18 @@ inputs:
     required: false
     default: ''
   platforms:
-    description: 'Comma-separated target platforms. Give more than one (for example linux/amd64,linux/arm64) to push one multi-arch tag.'
+    description: 'Comma-separated target platforms: linux/amd64 (required) and optionally linux/arm64. Give both to push one multi-arch tag.'
     required: false
     default: 'linux/amd64'
 runs:
   using: 'composite'
   steps:
+    - name: Validate platforms
+      shell: bash
+      env:
+        PLATFORMS: ${{ inputs.platforms }}
+      run: '"${{ github.action_path }}/validate-platforms.sh"'
+
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.role-to-assume }}
@@ -123,22 +129,10 @@ runs:
       shell: bash
       env:
         ECR_URL: ${{ inputs.ecr-url }}
+        REF: ${{ inputs.ref }}
         PLATFORMS: ${{ inputs.platforms }}
         BUILD_ARGS: ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
-      run: |
-        REF=${{ inputs.ref }}
-        METADATA="$RUNNER_TEMP/build-metadata.json"
-
-        echo "$REF" > REVISION
-        # shellcheck disable=SC2086
-        docker buildx build --provenance=false --platform "$PLATFORMS" \
-          --output "type=image,name=$ECR_URL,push-by-digest=true,name-canonical=true,push=true" \
-          --metadata-file "$METADATA" . $BUILD_ARGS
-        DIGEST=$(jq -r '."containerimage.digest"' "$METADATA")
-        {
-          echo "image_name=$ECR_URL:$REF"
-          echo "source_image=$ECR_URL@$DIGEST"
-        } >> "$GITHUB_OUTPUT"
+      run: '"${{ github.action_path }}/build-multi-arch.sh"'
 
     - name: Set up Trivy
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
@@ -152,10 +146,7 @@ runs:
       env:
         SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }}
         PLATFORMS: ${{ inputs.platforms }}
-      run: |
-        for platform in ${PLATFORMS//,/ }; do
-          trivy image --image-src remote --platform "$platform" --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 "$SOURCE_IMAGE"
-        done
+      run: '"${{ github.action_path }}/scan-image.sh"'
 
     - name: Push multi-arch image
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'

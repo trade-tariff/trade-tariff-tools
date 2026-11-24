@@ -38,17 +38,24 @@ single_manifest='{"schemaVersion":2,"config":{},"layers":[]}'
   assert_contains "$aws_args" "$(printf -- '--registry-id\n123456789012')"
 }
 
-@test "matches a platform with a variant on os and architecture" {
-  run env IMAGE_NAME="$image" PLATFORMS="linux/arm64/v8" AWS_MANIFEST="$multi_arch_manifest" "$script"
+@test "matches a platform with or without the variant of the index entry" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/arm64/v8,linux/arm64" AWS_MANIFEST="$multi_arch_manifest" "$script"
 
   [ "$status" -eq 0 ]
+}
+
+@test "does not match a different variant" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/arm/v6" AWS_MANIFEST='{"manifests":[{"platform":{"os":"linux","architecture":"arm","variant":"v7"}}]}' "$script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "has no build for linux/arm/v6. It has linux/arm/v7."
 }
 
 @test "fails when the index has no build for a platform" {
   run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64,linux/s390x" AWS_MANIFEST="$multi_arch_manifest" "$script"
 
   [ "$status" -eq 1 ]
-  assert_contains "$output" "::error::Image $image has no build for linux/s390x. It has linux/amd64,linux/arm64."
+  assert_contains "$output" "::error::Image $image has no build for linux/s390x. It has linux/amd64,linux/arm64/v8."
   assert_contains "$output" "deploy a new commit to build a new tag"
 }
 

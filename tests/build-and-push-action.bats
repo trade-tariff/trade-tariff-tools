@@ -184,3 +184,41 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
   [ "$status" -eq 1 ]
   assert_contains "$output" "::error::Image $image has no build for linux/arm64"
 }
+
+@test "multi-arch steps call the action scripts with their environment" {
+  run ruby -ryaml -e '
+    steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
+    expect = {
+      "validate-platforms.sh" => %w[PLATFORMS],
+      "check-platforms.sh" => %w[IMAGE_NAME REGION PLATFORMS],
+      "build-multi-arch.sh" => %w[ECR_URL REF PLATFORMS BUILD_ARGS],
+      "scan-image.sh" => %w[SOURCE_IMAGE PLATFORMS],
+    }
+    expect.each do |script, vars|
+      step = steps.find { |s| s.fetch("run", "") == %("${{ github.action_path }}/#{script}") }
+      abort "#{script} must be called from a step" unless step
+      missing = vars - step.fetch("env", {}).keys
+      abort "#{script} step is missing env #{missing.join(",")}" unless missing.empty?
+    end
+    validate = steps.index { |s| s.fetch("run", "").include?("validate-platforms.sh") }
+    abort "Platforms must be validated before any other step" unless validate == 0
+    build = steps.find { |s| s["id"] == "build-multi-arch" }
+    scan = steps.index { |s| s.fetch("run", "").include?("scan-image.sh") }
+    push = steps.index { |s| s["name"] == "Push multi-arch image" }
+    abort "The scan must run on the built digest" unless steps[scan].dig("env", "SOURCE_IMAGE") == "${{ steps.build-multi-arch.outputs.source_image }}"
+    abort "The push must tag the scanned digest" unless steps[push].dig("env", "SOURCE_IMAGE") == "${{ steps.build-multi-arch.outputs.source_image }}"
+    abort "The scan must run before the push" unless steps.index(build) < scan && scan < push
+    scripts = steps.map { |s| s.fetch("run", "") }.join("\n")
+    abort "Multi-arch steps must not rebuild or load images" if scripts.match?(/buildx build|--load/)
+  ' "$repo_root/.github/actions/build-and-push/action.yml"
+
+  [ "$status" -eq 0 ]
+}
+
+@test "tag-production copies the whole manifest instead of pulling one platform" {
+  action="$(cat "$repo_root/.github/actions/tag-production/action.yml")"
+
+  assert_contains "$action" 'docker buildx imagetools create -t "$RELEASE_IMAGE_NAME" "$EXISTING_IMAGE_NAME"'
+  assert_not_contains "$action" "docker pull"
+  assert_not_contains "$action" "docker push"
+}

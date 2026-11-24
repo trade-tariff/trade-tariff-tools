@@ -74,15 +74,22 @@ if ! manifest="$(aws ecr batch-get-image \
 fi
 
 available="$(jq -r '
-  if .manifests then [.manifests[].platform | "\(.os)/\(.architecture)"] else ["linux/amd64"] end
+  if .manifests
+  then [.manifests[].platform | "\(.os)/\(.architecture)" + (if .variant then "/\(.variant)" else "" end)]
+  else ["linux/amd64"]
+  end
   | join(",")
 ' <<< "$manifest")"
 
+# An entry with a variant also matches a request without one: linux/arm64 matches linux/arm64/v8.
+matchable=",$available,"
+for entry in ${available//,/ }; do
+  matchable+="$(cut -d/ -f1,2 <<< "$entry"),"
+done
+
 missing=()
 for platform in ${PLATFORMS//,/ }; do
-  # Compare os/architecture only, so linux/arm64/v8 matches linux/arm64.
-  os_arch="$(cut -d/ -f1,2 <<< "$platform")"
-  if [[ ",$available," != *",$os_arch,"* ]]; then
+  if [[ "$matchable" != *",$platform,"* ]]; then
     missing+=("$platform")
   fi
 done
