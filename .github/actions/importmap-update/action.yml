@@ -29,7 +29,7 @@ runs:
       with:
         bundler-cache: ${{ inputs.bundler-cache }}
 
-    - uses: thoughtbot/importmap-update@v1.0.0-alpha3
+    - uses: thoughtbot/importmap-update@v1
       with:
         config-file: ${{ github.action_path }}/importmap-updates.yml
         github-token: ${{ inputs.github-token }}
