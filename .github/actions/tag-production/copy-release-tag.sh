@@ -48,6 +48,8 @@ for name in ECR_URL REF; do
 done
 
 region="${REGION:-eu-west-2}"
+registry_host="${ECR_URL%%/*}"
+registry_id="${registry_host%%.*}"
 repository="${ECR_URL#*/}"
 existing_image="$ECR_URL:$REF"
 release_image="$ECR_URL:release-$(date +"%Y%m%d-%H%M")"
@@ -58,7 +60,8 @@ aws ecr get-login-password --region "$region" \
 if ! aws ecr describe-images \
   --repository-name "$repository" \
   --image-ids imageTag="$REF" \
-  --region "$region" > /dev/null 2>&1; then
+  --region "$region" \
+  --registry-id "$registry_id" > /dev/null 2>&1; then
   echo "::error::Image $existing_image not found in ECR. Fatal skipping tagging"
   exit 1
 fi

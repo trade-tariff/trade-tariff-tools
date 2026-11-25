@@ -12,7 +12,8 @@ setup() {
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$TEST_CAPTURE_DIR/docker-calls.txt"
 [[ "$1" == "login" ]] && cat > /dev/null
-exit "${DOCKER_EXIT:-0}"
+[[ "$1" == "buildx" ]] && exit "${COPY_EXIT:-0}"
+exit 0
 STUB
 
   cat > "$stub_bin/aws" <<'STUB'
@@ -44,7 +45,7 @@ ecr_url="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production"
   assert_contains "$docker_calls" "login --username AWS --password-stdin $ecr_url"
   assert_contains "$docker_calls" "buildx imagetools create --prefer-index=false -t $ecr_url:release-20261125-0900 $ecr_url:7852bee"
   assert_not_contains "$docker_calls" "pull"
-  assert_contains "$(cat "$tmpdir/aws-calls.txt")" "ecr describe-images --repository-name tariff-admin-production --image-ids imageTag=7852bee --region eu-west-2"
+  assert_contains "$(cat "$tmpdir/aws-calls.txt")" "ecr describe-images --repository-name tariff-admin-production --image-ids imageTag=7852bee --region eu-west-2 --registry-id 123456789012"
   assert_contains "$output" "::notice::Successfully pushed $ecr_url:release-20261125-0900"
 }
 
@@ -57,9 +58,10 @@ ecr_url="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production"
 }
 
 @test "fails when the copy fails" {
-  run env ECR_URL="$ecr_url" REF="7852bee" DOCKER_EXIT=1 "$script"
+  run env ECR_URL="$ecr_url" REF="7852bee" COPY_EXIT=1 "$script"
 
   [ "$status" -eq 1 ]
+  assert_contains "$(cat "$tmpdir/docker-calls.txt")" "buildx imagetools create"
   assert_not_contains "$output" "Successfully pushed"
 }
 
