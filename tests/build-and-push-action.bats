@@ -215,10 +215,53 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
   [ "$status" -eq 0 ]
 }
 
-@test "tag-production copies the whole manifest instead of pulling one platform" {
-  action="$(cat "$repo_root/.github/actions/tag-production/action.yml")"
+@test "tag-production keeps the docker push for amd64 and copies the manifest for multi-arch" {
+  run ruby -ryaml -e '
+    steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
+    default = steps.find { |s| s["if"] == "inputs.platforms == #{39.chr}linux/amd64#{39.chr}" }
+    abort "The amd64 step must keep docker pull, tag and push" unless default && default.fetch("run").match?(/docker pull.*docker tag.*docker push/m)
+    copy = steps.find { |s| s.fetch("run", "") == %("${{ github.action_path }}/copy-release-tag.sh") }
+    abort "The multi-arch step must call copy-release-tag.sh" unless copy && copy["if"] == "inputs.platforms != #{39.chr}linux/amd64#{39.chr}"
+    missing = %w[ECR_URL REF REGION] - copy.fetch("env", {}).keys
+    abort "copy-release-tag.sh step is missing env #{missing.join(",")}" unless missing.empty?
+  ' "$repo_root/.github/actions/tag-production/action.yml"
 
-  assert_contains "$action" 'docker buildx imagetools create -t "$RELEASE_IMAGE_NAME" "$EXISTING_IMAGE_NAME"'
-  assert_not_contains "$action" "docker pull"
-  assert_not_contains "$action" "docker push"
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy workflows pass platforms to build-and-push and tag-production" {
+  for workflow in deploy-ecs.yml deploy-ecs-v2.yml; do
+    run ruby -ryaml -e '
+      jobs = YAML.load_file(ARGV.fetch(0)).fetch("jobs")
+      %w[build-and-push tag-production].each do |action|
+        steps = jobs.values.flat_map { |j| j.fetch("steps", []) }.select { |s| s.fetch("uses", "").include?("/actions/#{action}@") }
+        abort "#{action} must be used" if steps.empty?
+        steps.each { |s| abort "#{action} must get platforms" unless s.dig("with", "platforms") == "${{ inputs.platforms }}" }
+      end
+    ' "$repo_root/.github/workflows/$workflow"
+
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "single-platform push clears PLATFORMS from the caller environment" {
+  run ruby -ryaml -e '
+    steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
+    push = steps.find { |s| s["name"] == "Push image" }
+    abort "Push image must set PLATFORMS to an empty value" unless push.fetch("env", {}).key?("PLATFORMS") && push.dig("env", "PLATFORMS") == ""
+  ' "$repo_root/.github/actions/build-and-push/action.yml"
+
+  [ "$status" -eq 0 ]
+}
+
+@test "third-party actions in build-and-push are pinned to a commit" {
+  run ruby -ryaml -e '
+    steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
+    %w[docker/setup-qemu-action docker/setup-buildx-action aquasecurity/setup-trivy].each do |name|
+      step = steps.find { |s| s.fetch("uses", "").start_with?("#{name}@") }
+      abort "#{name} must be pinned to a commit SHA" unless step && step.fetch("uses").match?(/@[0-9a-f]{40}$/)
+    end
+  ' "$repo_root/.github/actions/build-and-push/action.yml"
+
+  [ "$status" -eq 0 ]
 }

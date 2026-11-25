@@ -39,6 +39,24 @@ setup() {
   assert_contains "$output" "::error::Platform linux/s390x is not supported."
 }
 
+@test "rejects a list with spaces" {
+  for platforms in "linux/amd64 linux/arm64" "linux/amd64, linux/arm64" " linux/amd64"; do
+    run env PLATFORMS="$platforms" "$script"
+
+    [ "$status" -eq 1 ]
+    assert_contains "$output" "must be a comma-separated list without spaces"
+  done
+}
+
+@test "rejects an empty entry" {
+  for platforms in "linux/amd64," ",linux/amd64" "linux/amd64,,linux/arm64"; do
+    run env PLATFORMS="$platforms" "$script"
+
+    [ "$status" -eq 1 ]
+    assert_contains "$output" "must be a comma-separated list without spaces"
+  done
+}
+
 @test "requires PLATFORMS" {
   run env -u PLATFORMS "$script"
 

@@ -44,8 +44,15 @@ if [[ -z "${PLATFORMS:-}" ]]; then
   exit 2
 fi
 
+# docker buildx receives PLATFORMS unchanged, so reject any spelling that it would not accept.
+if [[ ! "$PLATFORMS" =~ ^[^,[:space:]]+(,[^,[:space:]]+)*$ ]]; then
+  echo "::error::Platforms '$PLATFORMS' must be a comma-separated list without spaces, for example linux/amd64,linux/arm64."
+  exit 1
+fi
+
 has_amd64=false
-for platform in ${PLATFORMS//,/ }; do
+IFS=, read -ra platforms <<< "$PLATFORMS"
+for platform in "${platforms[@]}"; do
   case "$platform" in
     linux/amd64)
       has_amd64=true

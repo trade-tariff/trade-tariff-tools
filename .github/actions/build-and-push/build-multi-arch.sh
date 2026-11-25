@@ -14,6 +14,10 @@ Build a multi-arch image from the Dockerfile in the current directory and push
 it to ECR by digest, without a tag. A later step scans the digest and then
 tags it, so a tag never points at unscanned content.
 
+The build uses --provenance=false, the same as the single-platform build.
+Provenance attestations add an unknown/unknown entry to the index, and nothing
+reads them today. Remove the flag to turn them back on.
+
 Environment:
   ECR_URL     (required) ECR repository URL: <registry>/<repository>.
   REF         (required) Image tag. The script writes it to REVISION.

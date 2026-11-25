@@ -254,6 +254,7 @@ jobs:
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
           ref: ${{ needs.configure.outputs.docker_tag }}
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
+          platforms: ${{ inputs.platforms }}
 
   e2e-test-tariff:
     if: ${{ inputs.test-flavour == 'tariff' }}

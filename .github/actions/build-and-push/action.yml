@@ -110,17 +110,19 @@ runs:
       env:
         IMAGE_NAME: ${{ steps.build-image.outputs.image_name }}
         REGION: ${{ inputs.region }}
+        # Clear any PLATFORMS from the caller job, so that push-image.sh does a docker push.
+        PLATFORMS: ''
       run: '"${{ github.action_path }}/push-image.sh"'
 
     - name: Set up QEMU
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
-      uses: docker/setup-qemu-action@v4.4.0
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       with:
         platforms: ${{ inputs.platforms }}
 
     - name: Set up Docker Buildx
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
-      uses: docker/setup-buildx-action@v4.4.1
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     # Push without a tag, scan what was pushed, then tag the scanned digest. The tag never points at unscanned content.
     - name: Build and push multi-arch image by digest
@@ -136,7 +138,7 @@ runs:
 
     - name: Set up Trivy
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
-      uses: aquasecurity/setup-trivy@v0.3.1
+      uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
       with:
         version: v0.70.0
 
