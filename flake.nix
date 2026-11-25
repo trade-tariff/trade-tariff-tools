@@ -70,6 +70,7 @@
           export TMPDIR=/workspace/.review/tmp PRE_COMMIT_HOME=/workspace/.review/pre-commit
           export npm_config_ignore_scripts=true YARN_IGNORE_SCRIPTS=true YARN_OFFLINE=true YARN_CACHE_FOLDER="$TMPDIR/yarn-cache"
           export CI=true AWS_EC2_METADATA_DISABLED=true
+          unset GIT_CONFIG_GLOBAL
           mkdir -p "$TMPDIR"
         '';
 
@@ -259,6 +260,7 @@
             pkgs."ruby-3.4.13"
             pkgs.curl
             pkgs.jq
+            pkgs.perl
             (pkgs.python3.withPackages (ps: [
               ps.requests
               ps.openpyxl

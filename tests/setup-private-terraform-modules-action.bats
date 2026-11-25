@@ -56,14 +56,14 @@ first_line_of() {
   awk '/^      run: \|/ {found=1; next} found && /^        / {sub(/^        /, ""); print; next} found {exit}' "$action" > "$script"
   [ -s "$script" ]
 
-  HOME="$home_dir" GIT_CONFIG_NOSYSTEM=1 TOKEN=dummy-token bash "$script"
+  HOME="$home_dir" GIT_CONFIG_GLOBAL="$home_dir/.gitconfig" GIT_CONFIG_NOSYSTEM=1 TOKEN=dummy-token bash "$script"
 
-  run env HOME="$home_dir" GIT_CONFIG_NOSYSTEM=1 git ls-remote --get-url "https://github.com/trade-tariff/$modules_repo.git"
+  run env HOME="$home_dir" GIT_CONFIG_GLOBAL="$home_dir/.gitconfig" GIT_CONFIG_NOSYSTEM=1 git ls-remote --get-url "https://github.com/trade-tariff/$modules_repo.git"
   # Build the expected URL in parts so secret scanners do not flag a fake token.
   local user_info="x-access-token:dummy-token"
   [ "$output" = "https://${user_info}@github.com/trade-tariff/$modules_repo.git" ]
 
-  run env HOME="$home_dir" GIT_CONFIG_NOSYSTEM=1 git ls-remote --get-url "https://github.com/trade-tariff/trade-tariff-backend.git"
+  run env HOME="$home_dir" GIT_CONFIG_GLOBAL="$home_dir/.gitconfig" GIT_CONFIG_NOSYSTEM=1 git ls-remote --get-url "https://github.com/trade-tariff/trade-tariff-backend.git"
   [ "$output" = "https://github.com/trade-tariff/trade-tariff-backend.git" ]
 
   rm -rf "$home_dir"
