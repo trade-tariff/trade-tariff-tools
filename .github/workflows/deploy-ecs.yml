@@ -176,7 +176,7 @@ jobs:
 
       - id: build-arm64
         if: contains(inputs.platforms, 'linux/arm64')
-        uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
+        uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@HMRC-2829-native-arm64-test
         with:
           build-args: "RUBY_VERSION=${{ steps.config.outputs.ruby_version }} ALPINE_VERSION=3.24 ${{ inputs.build-args }}"
           ecr-url: ${{ steps.config.outputs.ecr_url }}
@@ -202,7 +202,7 @@ jobs:
           role-to-assume: ${{ needs.configure.outputs.iam_role_arn }}
           modules-client-id: ${{ vars.TRADE_TARIFF_PR_BOT_GITHUB_CLIENT_ID }}
           modules-app-private-key: ${{ secrets.modules-app-private-key }}
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/build-and-push@HMRC-2829-native-arm64-test
         with:
           build-args: "RUBY_VERSION=${{ needs.configure.outputs.ruby_version }} ALPINE_VERSION=3.24 ${{ inputs.build-args }}"
           ecr-url: ${{ needs.configure.outputs.ecr_url }}
