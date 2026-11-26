@@ -86,8 +86,10 @@ permissions:
 
 jobs:
   configure:
-    runs-on: "ubuntu-latest"
+    # Multi-arch apps build the arm64 image natively here, so this job runs on an arm64 runner for them.
+    runs-on: "${{ contains(inputs.platforms, 'linux/arm64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}"
     outputs:
+      arm64_image: "${{ steps.build-arm64.outputs.source-image }}"
       actual_repo: "${{ steps.actual-ref.outputs.actual_repo }}"
       actual_ref: "${{ steps.actual-ref.outputs.actual_ref }}"
       docker_tag: "${{ steps.config.outputs.docker_tag }}"
@@ -191,6 +193,17 @@ jobs:
             printf 'docker_tag=%s\n' "$(git rev-parse --short HEAD)"
           } >> "$GITHUB_OUTPUT"
 
+      - id: "build-arm64"
+        if: "${{ contains(inputs.platforms, 'linux/arm64') }}"
+        uses: "trade-tariff/trade-tariff-tools/.github/actions/build-and-push@main"
+        with:
+          build-args: "RUBY_VERSION=${{ steps.config.outputs.ruby_version }} ALPINE_VERSION=3.24 ${{ inputs.build-args }}"
+          ecr-url: "${{ steps.config.outputs.ecr_url }}"
+          ref: "${{ steps.config.outputs.docker_tag }}"
+          role-to-assume: "${{ steps.config.outputs.iam_role_arn }}"
+          platforms: "linux/arm64"
+          digest-only: "true"
+
   build:
     runs-on: "ubuntu-latest"
     needs: "configure"
@@ -215,6 +228,7 @@ jobs:
           ref: "${{ needs.configure.outputs.docker_tag }}"
           role-to-assume: "${{ needs.configure.outputs.iam_role_arn }}"
           platforms: "${{ inputs.platforms }}"
+          arm64-image: "${{ needs.configure.outputs.arm64_image }}"
 
   deploy:
     runs-on: "ubuntu-latest"

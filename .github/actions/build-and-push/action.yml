@@ -19,6 +19,18 @@ inputs:
     description: 'Comma-separated target platforms: linux/amd64 (required) and optionally linux/arm64. Give both to push one multi-arch tag.'
     required: false
     default: 'linux/amd64'
+  digest-only:
+    description: 'Build and scan the image on this runner, and push it by digest without a tag. Requires platforms linux/arm64 and an arm64 runner.'
+    required: false
+    default: 'false'
+  arm64-image:
+    description: 'The scanned linux/arm64 image by digest, from a digest-only run on an arm64 runner. Required when platforms includes linux/arm64.'
+    required: false
+    default: ''
+outputs:
+  source-image:
+    description: 'The image that this run pushed by digest: <registry>/<repository>@<digest>.'
+    value: ${{ steps.build-multi-arch.outputs.source_image }}
 runs:
   using: 'composite'
   steps:
@@ -26,6 +38,7 @@ runs:
       shell: bash
       env:
         PLATFORMS: ${{ inputs.platforms }}
+        DIGEST_ONLY: ${{ inputs.digest-only }}
       run: '"${{ github.action_path }}/validate-platforms.sh"'
 
     - uses: aws-actions/configure-aws-credentials@v6
@@ -114,25 +127,21 @@ runs:
         PLATFORMS: ''
       run: '"${{ github.action_path }}/push-image.sh"'
 
-    - name: Set up QEMU
-      if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
-      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-      with:
-        platforms: ${{ inputs.platforms }}
-
     - name: Set up Docker Buildx
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-    # Push without a tag, scan what was pushed, then tag the scanned digest. The tag never points at unscanned content.
-    - name: Build and push multi-arch image by digest
+    # Each platform builds natively on its own runner. A digest-only run builds its one platform.
+    # Otherwise this runner builds linux/amd64 and the tag adds arm64-image.
+    # Push without a tag, scan what was pushed, then tag the scanned digests. The tag never points at unscanned content.
+    - name: Build and push image by digest
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       id: build-multi-arch
       shell: bash
       env:
         ECR_URL: ${{ inputs.ecr-url }}
         REF: ${{ inputs.ref }}
-        PLATFORMS: ${{ inputs.platforms }}
+        PLATFORMS: ${{ inputs.digest-only == 'true' && inputs.platforms || 'linux/amd64' }}
         BUILD_ARGS: ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
       run: '"${{ github.action_path }}/build-multi-arch.sh"'
 
@@ -142,20 +151,20 @@ runs:
       with:
         version: v0.70.0
 
-    - name: Scan multi-arch image for vulnerabilities
+    - name: Scan image by digest for vulnerabilities
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       shell: bash
       env:
         SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }}
-        PLATFORMS: ${{ inputs.platforms }}
+        PLATFORMS: ${{ inputs.digest-only == 'true' && inputs.platforms || 'linux/amd64' }}
       run: '"${{ github.action_path }}/scan-image.sh"'
 
     - name: Push multi-arch image
-      if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
+      if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64' && inputs.digest-only != 'true'
       shell: bash
       env:
         IMAGE_NAME: ${{ steps.build-multi-arch.outputs.image_name }}
-        SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }}
+        SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }} ${{ inputs.arm64-image }}
         REGION: ${{ inputs.region }}
         PLATFORMS: ${{ inputs.platforms }}
       run: '"${{ github.action_path }}/push-image.sh"'

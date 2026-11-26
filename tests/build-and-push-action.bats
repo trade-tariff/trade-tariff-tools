@@ -152,13 +152,23 @@ image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production:7852
 }
 
 source_image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production@sha256:abc123"
+arm64_image="123456789012.dkr.ecr.eu-west-2.amazonaws.com/tariff-admin-production@sha256:def456"
 multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd64"}},{"platform":{"os":"linux","architecture":"arm64"}}]}'
 
-@test "tags the scanned multi-arch digest when PLATFORMS is set" {
-  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image" "$script"
+@test "tags the scanned digest of each platform when PLATFORMS is set" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image $arm64_image" "$script"
 
   [ "$status" -eq 0 ]
-  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx imagetools create -t "$image" "$source_image")" ]
+  [ "$(cat "$tmpdir/docker-args.txt")" = "$(printf '%s\n' buildx imagetools create -t "$image" "$source_image" "$arm64_image")" ]
+  [ ! -f "$tmpdir/aws-args.txt" ]
+}
+
+@test "fails without Docker calls when a platform has no source image" {
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image " "$script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "::error::Got 1 source images for 2 platforms"
+  [ ! -f "$tmpdir/docker-args.txt" ]
   [ ! -f "$tmpdir/aws-args.txt" ]
 }
 
@@ -171,7 +181,7 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
 }
 
 @test "succeeds when another run pushed a multi-arch tag with every platform" {
-  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image" DOCKER_EXIT=1 AWS_EXIT=0 AWS_MANIFEST="$multi_arch_manifest" "$script"
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image $arm64_image" DOCKER_EXIT=1 AWS_EXIT=0 AWS_MANIFEST="$multi_arch_manifest" "$script"
 
   [ "$status" -eq 0 ]
   assert_contains "$output" "::notice::Image $image already exists in ECR"
@@ -179,7 +189,7 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
 }
 
 @test "fails when another run pushed the tag without every platform" {
-  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image" DOCKER_EXIT=1 AWS_EXIT=0 AWS_MANIFEST='{"schemaVersion":2,"layers":[]}' "$script"
+  run env IMAGE_NAME="$image" PLATFORMS="linux/amd64,linux/arm64" SOURCE_IMAGE="$source_image $arm64_image" DOCKER_EXIT=1 AWS_EXIT=0 AWS_MANIFEST='{"schemaVersion":2,"layers":[]}' "$script"
 
   [ "$status" -eq 1 ]
   assert_contains "$output" "::error::Image $image has no build for linux/arm64"
@@ -189,7 +199,7 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
   run ruby -ryaml -e '
     steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
     expect = {
-      "validate-platforms.sh" => %w[PLATFORMS],
+      "validate-platforms.sh" => %w[PLATFORMS DIGEST_ONLY],
       "check-platforms.sh" => %w[IMAGE_NAME REGION PLATFORMS],
       "build-multi-arch.sh" => %w[ECR_URL REF PLATFORMS BUILD_ARGS],
       "scan-image.sh" => %w[SOURCE_IMAGE PLATFORMS],
@@ -206,7 +216,14 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
     scan = steps.index { |s| s.fetch("run", "").include?("scan-image.sh") }
     push = steps.index { |s| s["name"] == "Push multi-arch image" }
     abort "The scan must run on the built digest" unless steps[scan].dig("env", "SOURCE_IMAGE") == "${{ steps.build-multi-arch.outputs.source_image }}"
-    abort "The push must tag the scanned digest" unless steps[push].dig("env", "SOURCE_IMAGE") == "${{ steps.build-multi-arch.outputs.source_image }}"
+    native = "${{ inputs.digest-only == #{39.chr}true#{39.chr} && inputs.platforms || #{39.chr}linux/amd64#{39.chr} }}"
+    abort "The build must build only the native platform" unless build.dig("env", "PLATFORMS") == native
+    abort "The scan must scan the built platform" unless steps[scan].dig("env", "PLATFORMS") == native
+    abort "The push must tag the scanned digest and the arm64 image" unless steps[push].dig("env", "SOURCE_IMAGE") == "${{ steps.build-multi-arch.outputs.source_image }} ${{ inputs.arm64-image }}"
+    abort "A digest-only run must not push a tag" unless steps[push].fetch("if").end_with?("&& inputs.digest-only != #{39.chr}true#{39.chr}")
+    output = YAML.load_file(ARGV.fetch(0)).dig("outputs", "source-image", "value")
+    abort "The action must output the pushed digest" unless output == "${{ steps.build-multi-arch.outputs.source_image }}"
+    abort "Builds must be native, without QEMU" if steps.any? { |s| s.fetch("uses", "").include?("setup-qemu-action") }
     abort "The scan must run before the push" unless steps.index(build) < scan && scan < push
     scripts = steps.map { |s| s.fetch("run", "") }.join("\n")
     abort "Multi-arch steps must not rebuild or load images" if scripts.match?(/buildx build|--load/)
@@ -234,10 +251,31 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
     run ruby -ryaml -e '
       jobs = YAML.load_file(ARGV.fetch(0)).fetch("jobs")
       %w[build-and-push tag-production].each do |action|
-        steps = jobs.values.flat_map { |j| j.fetch("steps", []) }.select { |s| s.fetch("uses", "").include?("/actions/#{action}@") }
+        steps = jobs.values.flat_map { |j| j.fetch("steps", []) }.select { |s| s.fetch("uses", "").include?("/actions/#{action}@") && s.dig("with", "digest-only") != "true" }
         abort "#{action} must be used" if steps.empty?
         steps.each { |s| abort "#{action} must get platforms" unless s.dig("with", "platforms") == "${{ inputs.platforms }}" }
       end
+    ' "$repo_root/.github/workflows/$workflow"
+
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "deploy workflows build arm64 natively in configure and pass it to the build" {
+  for workflow in deploy-ecs.yml deploy-ecs-v2.yml; do
+    run ruby -ryaml -e '
+      jobs = YAML.load_file(ARGV.fetch(0)).fetch("jobs")
+      configure = jobs.fetch("configure")
+      runner = "${{ contains(inputs.platforms, #{39.chr}linux/arm64#{39.chr}) && #{39.chr}ubuntu-24.04-arm#{39.chr} || #{39.chr}ubuntu-latest#{39.chr} }}"
+      abort "configure must run on arm64 only for arm64 platforms" unless configure.fetch("runs-on") == runner
+      step = configure.fetch("steps").find { |s| s["id"] == "build-arm64" }
+      abort "configure must build arm64 with build-and-push" unless step && step.fetch("uses").include?("/actions/build-and-push@")
+      abort "The arm64 build must run only for arm64 platforms" unless step.fetch("if").include?("contains(inputs.platforms, #{39.chr}linux/arm64#{39.chr})")
+      abort "The arm64 build must be digest-only for linux/arm64" unless step.dig("with", "platforms") == "linux/arm64" && step.dig("with", "digest-only") == "true"
+      abort "configure must output the arm64 image" unless configure.dig("outputs", "arm64_image") == "${{ steps.build-arm64.outputs.source-image }}"
+      build = jobs.fetch("build").fetch("steps").find { |s| s.fetch("uses", "").include?("/actions/build-and-push@") }
+      abort "build must get the arm64 image" unless build.dig("with", "arm64-image") == "${{ needs.configure.outputs.arm64_image }}"
+      abort "build must run on amd64" unless jobs.fetch("build").fetch("runs-on") == "ubuntu-latest"
     ' "$repo_root/.github/workflows/$workflow"
 
     [ "$status" -eq 0 ]
@@ -257,7 +295,7 @@ multi_arch_manifest='{"manifests":[{"platform":{"os":"linux","architecture":"amd
 @test "third-party actions in build-and-push are pinned to a commit" {
   run ruby -ryaml -e '
     steps = YAML.load_file(ARGV.fetch(0)).fetch("runs").fetch("steps")
-    %w[docker/setup-qemu-action docker/setup-buildx-action aquasecurity/setup-trivy].each do |name|
+    %w[docker/setup-buildx-action aquasecurity/setup-trivy].each do |name|
       step = steps.find { |s| s.fetch("uses", "").start_with?("#{name}@") }
       abort "#{name} must be pinned to a commit SHA" unless step && step.fetch("uses").match?(/@[0-9a-f]{40}$/)
     end

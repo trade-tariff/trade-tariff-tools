@@ -57,6 +57,28 @@ setup() {
   done
 }
 
+@test "accepts a digest-only linux/arm64 build on an arm64 runner" {
+  run env PLATFORMS="linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
+
+  [ "$status" -eq 0 ]
+}
+
+@test "rejects a digest-only build of other platforms" {
+  for platforms in "linux/amd64" "linux/amd64,linux/arm64"; do
+    run env PLATFORMS="$platforms" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
+
+    [ "$status" -eq 1 ]
+    assert_contains "$output" "::error::A digest-only build needs platforms linux/arm64, not $platforms."
+  done
+}
+
+@test "rejects a digest-only build on a runner that is not arm64" {
+  run env PLATFORMS="linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=X64 "$script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "::error::A digest-only build needs an arm64 runner. This runner is X64."
+}
+
 @test "requires PLATFORMS" {
   run env -u PLATFORMS "$script"
 
