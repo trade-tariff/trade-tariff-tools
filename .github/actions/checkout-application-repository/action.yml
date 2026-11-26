@@ -47,7 +47,7 @@ runs:
     - name: Mint a read-only token for the repository
       id: token
       if: ${{ inputs.client-id != '' && inputs.private-key != '' && inputs.repository != github.repository }}
-      uses: actions/create-github-app-token@v3.3.0
+      uses: actions/create-github-app-token@v3.4.0
       with:
         client-id: ${{ inputs.client-id }}
         private-key: ${{ inputs.private-key }}
