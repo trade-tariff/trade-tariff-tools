@@ -12,6 +12,10 @@ inputs:
   region:
     required: false
     default: 'eu-west-2'
+  platforms:
+    description: 'Platforms of the image. With more than linux/amd64, copy the whole multi-arch manifest.'
+    required: false
+    default: 'linux/amd64'
 runs:
   using: 'composite'
   steps:
@@ -19,7 +23,8 @@ runs:
       with:
         role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: ${{ inputs.region }}
-    - run: |
+    - if: inputs.platforms == 'linux/amd64'
+      run: |
         REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
         REF=${{ inputs.ref }}
         EXISTING_IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
@@ -46,3 +51,12 @@ runs:
 
         echo "::notice::Successfully built and pushed $RELEASE_IMAGE_NAME"
       shell: bash
+
+    - name: Copy multi-arch release tag
+      if: inputs.platforms != 'linux/amd64'
+      shell: bash
+      env:
+        ECR_URL: ${{ inputs.ecr-url }}
+        REF: ${{ inputs.ref }}
+        REGION: ${{ inputs.region }}
+      run: '"${{ github.action_path }}/copy-release-tag.sh"'

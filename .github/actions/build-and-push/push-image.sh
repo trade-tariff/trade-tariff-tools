@@ -14,8 +14,13 @@ Push a Docker image to ECR. If the push fails because another run pushed the
 same immutable tag first, treat the push as successful.
 
 Environment:
-  IMAGE_NAME  (required) Full image name: <registry>/<repository>:<tag>.
-  REGION      (optional, default: eu-west-2) AWS region of the ECR repository.
+  IMAGE_NAME    (required) Full image name: <registry>/<repository>:<tag>.
+  REGION        (optional, default: eu-west-2) AWS region of the ECR repository.
+  PLATFORMS     (optional) Comma-separated platforms. When set, tag
+                SOURCE_IMAGE as IMAGE_NAME instead of a docker push. If another
+                run pushed the tag first, check that it has every platform.
+  SOURCE_IMAGE  (required with PLATFORMS) Multi-arch image that is already in
+                ECR: <registry>/<repository>@<digest>.
 
 Exit codes:
   0  Image pushed, or the tag already exists in ECR.
@@ -43,6 +48,11 @@ if [[ -z "${IMAGE_NAME:-}" ]]; then
   exit 2
 fi
 
+if [[ -n "${PLATFORMS:-}" && -z "${SOURCE_IMAGE:-}" ]]; then
+  echo "Missing required environment variable: SOURCE_IMAGE" >&2
+  exit 2
+fi
+
 region="${REGION:-eu-west-2}"
 registry_host="${IMAGE_NAME%%/*}"
 registry_id="${registry_host%%.*}"
@@ -50,7 +60,16 @@ repository_and_tag="${IMAGE_NAME#*/}"
 repository="${repository_and_tag%:*}"
 tag="${repository_and_tag##*:}"
 
-if docker push "$IMAGE_NAME"; then
+push() {
+  if [[ -z "${PLATFORMS:-}" ]]; then
+    docker push "$IMAGE_NAME"
+    return
+  fi
+
+  docker buildx imagetools create -t "$IMAGE_NAME" "$SOURCE_IMAGE"
+}
+
+if push; then
   exit 0
 fi
 
@@ -62,6 +81,9 @@ if aws ecr describe-images \
   --region "$region" \
   --registry-id "$registry_id" > /dev/null 2>&1; then
   echo "::notice::Image $IMAGE_NAME already exists in ECR. Another run pushed it first."
+  if [[ -n "${PLATFORMS:-}" ]]; then
+    exec "$(dirname "${BASH_SOURCE[0]}")/check-platforms.sh"
+  fi
   exit 0
 fi
 
