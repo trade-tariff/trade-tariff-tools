@@ -91,7 +91,8 @@ jobs:
     outputs:
       arm64_image: ${{ steps.build-arm64.outputs.source-image }}
       actual_repo: ${{ steps.actual-ref.outputs.actual_repo }}
-      actual_ref: ${{ steps.actual-ref.outputs.actual_ref }}
+      # The commit that configure checked out, so later jobs build and deploy the same code.
+      actual_ref: ${{ steps.config.outputs.commit_sha }}
       docker_tag: ${{ steps.config.outputs.docker_tag }}
       ecr_url: ${{ steps.config.outputs.ecr_url }}
       iam_role_arn: ${{ steps.config.outputs.iam_role_arn }}
@@ -170,6 +171,7 @@ jobs:
             echo "ruby_version=$(cat .ruby-version)"
             echo "slack_channel=${{ steps.environment-config.outputs.slack-channel }}"
             echo "docker_tag=$(git rev-parse --short HEAD)"
+            echo "commit_sha=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
       - id: build-arm64
@@ -180,7 +182,7 @@ jobs:
           ecr-url: ${{ steps.config.outputs.ecr_url }}
           ref: ${{ steps.config.outputs.docker_tag }}
           role-to-assume: ${{ steps.config.outputs.iam_role_arn }}
-          platforms: linux/arm64
+          platforms: ${{ inputs.platforms }}
           digest-only: 'true'
 
   build:

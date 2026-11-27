@@ -112,11 +112,11 @@ setup() {
     abort "Config values must pass through env" unless config.fetch("env") == expected_env
     source = config.fetch("run")
     abort "Config values must not be inserted into Bash source" if source.include?("${{")
-    abort "app-name must be a nonempty single token" unless source.include?(%q{[[ -z "$APP_NAME" || -z "$REPO_NAME" || "$APP_NAME" == *[[:space:]]* ]]})
+    abort "app-name must be a valid ECR repository name" unless source.include?(%q{[[ ! "$APP_NAME" =~ ^[a-z0-9][a-z0-9._-]*$ || -z "$REPO_NAME" ]]})
     abort "service prefixes must be quoted" unless source.include?(%q{[[ "$SERVICE_NAME" == "$APP_NAME"* || "$SERVICE_NAME" == "$REPO_NAME"* ]]})
     abort "ruby-version must be checked for control characters" unless source.include?(%q{if [[ "${!OUTPUT_NAME}" == *[[:cntrl:]]* ]]; then})
     quote = "\x27"
-    %w[ecr_url iam_role_arn previous_docker_tag ruby_version slack_channel docker_tag].each do |name|
+    %w[ecr_url iam_role_arn previous_docker_tag ruby_version slack_channel docker_tag commit_sha].each do |name|
       abort "#{name} must use a fixed printf format" unless source.include?("printf #{quote}#{name}=%s\\n#{quote}")
     end
   ' "$WORKFLOW_FILE"

@@ -17,11 +17,11 @@ Environment:
   IMAGE_NAME    (required) Full image name: <registry>/<repository>:<tag>.
   REGION        (optional, default: eu-west-2) AWS region of the ECR repository.
   PLATFORMS     (optional) Comma-separated platforms. When set, tag
-                SOURCE_IMAGE as IMAGE_NAME instead of a docker push. If another
-                run pushed the tag first, check that it has every platform.
+                SOURCE_IMAGE as IMAGE_NAME instead of a docker push, then
+                check that the tag has every platform.
   SOURCE_IMAGE  (required with PLATFORMS) Space-separated images that are
-                already in ECR, one for each platform:
-                <registry>/<repository>@<digest>.
+                already in the IMAGE_NAME repository, one different digest for
+                each platform: <registry>/<repository>@sha256:<digest>.
 
 Exit codes:
   0  Image pushed, or the tag already exists in ECR.
@@ -61,6 +61,16 @@ if [[ -n "${PLATFORMS:-}" ]]; then
     echo "::error::Got ${#source_images[@]} source images for ${#platforms[@]} platforms ($PLATFORMS). Each platform needs its own scanned image."
     exit 1
   fi
+  for source_image in "${source_images[@]}"; do
+    if [[ ! "$source_image" =~ ^"${IMAGE_NAME%:*}"@sha256:[0-9a-f]{64}$ ]]; then
+      echo "::error::Source image $source_image is not a digest in ${IMAGE_NAME%:*}."
+      exit 1
+    fi
+  done
+  if (( $(printf '%s\n' "${source_images[@]}" | sort -u | wc -l) != ${#source_images[@]} )); then
+    echo "::error::Source images $SOURCE_IMAGE are not different digests."
+    exit 1
+  fi
 fi
 
 region="${REGION:-eu-west-2}"
@@ -80,6 +90,9 @@ push() {
 }
 
 if push; then
+  if [[ -n "${PLATFORMS:-}" ]]; then
+    exec "$(dirname "${BASH_SOURCE[0]}")/check-platforms.sh"
+  fi
   exit 0
 fi
 

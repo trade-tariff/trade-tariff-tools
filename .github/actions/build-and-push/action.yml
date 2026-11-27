@@ -20,7 +20,7 @@ inputs:
     required: false
     default: 'linux/amd64'
   digest-only:
-    description: 'Build and scan the image on this runner, and push it by digest without a tag. Requires platforms linux/arm64 and an arm64 runner.'
+    description: 'Build and scan only the linux/arm64 image on this runner, and push it by digest without a tag. Requires linux/arm64 in platforms and an arm64 runner.'
     required: false
     default: 'false'
   arm64-image:
@@ -48,23 +48,29 @@ runs:
 
     - name: Check if image already exists in ECR
       id: check-image
+      env:
+        ECR_URL: ${{ inputs.ecr-url }}
+        REF: ${{ inputs.ref }}
+        REGION: ${{ inputs.region }}
       run: |
-        REPO_NAME=$(echo "${{ inputs.ecr-url }}" | cut -d'/' -f2)
-        REGISTRY_ID=$(echo "${{ inputs.ecr-url }}" | cut -d'.' -f1)
+        REPO_NAME=$(echo "$ECR_URL" | cut -d'/' -f2)
+        REGISTRY_ID=$(echo "$ECR_URL" | cut -d'.' -f1)
         echo "registry-id=$REGISTRY_ID" >> "$GITHUB_OUTPUT"
-        REF=${{ inputs.ref }}
-        IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
+        IMAGE_NAME="$ECR_URL:$REF"
 
-        if aws ecr describe-images \
+        if result=$(aws ecr describe-images \
           --repository "$REPO_NAME" \
           --image-ids imageTag="$REF" \
-          --region "${{ inputs.region }}" \
-          --registry-id "$REGISTRY_ID" > /dev/null 2>&1; then
+          --region "$REGION" \
+          --registry-id "$REGISTRY_ID" 2>&1); then
           echo "::notice::Image $IMAGE_NAME already exists in ECR. Skipping build and push."
           echo "exists=true" >> "$GITHUB_OUTPUT"
-        else
+        elif [[ "$result" == *ImageNotFoundException* ]]; then
           echo "::notice::Image $IMAGE_NAME not found in ECR. Proceeding with build and push."
           echo "exists=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "::error::Could not check $IMAGE_NAME in ECR: $result"
+          exit 1
         fi
       shell: bash
 
@@ -86,9 +92,12 @@ runs:
     - name: Extract build arguments
       if: steps.check-image.outputs.exists == 'false'
       id: extract-build-args
+      env:
+        INPUT_BUILD_ARGS: ${{ inputs.build-args }}
       run: |
+        read -ra args <<< "$INPUT_BUILD_ARGS"
         build_args=""
-        for arg in ${{ inputs.build-args }}; do
+        for arg in ${args[@]+"${args[@]}"}; do
           build_args="$build_args --build-arg $arg"
         done
 
@@ -99,12 +108,14 @@ runs:
     - name: Build image
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms == 'linux/amd64'
       id: build-image
+      env:
+        IMAGE_NAME: ${{ inputs.ecr-url }}:${{ inputs.ref }}
+        REF: ${{ inputs.ref }}
+        BUILD_ARGS: ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
       run: |
-        REF=${{ inputs.ref }}
-        IMAGE_NAME="${{ inputs.ecr-url }}:$REF"
-
+        read -ra build_args <<< "$BUILD_ARGS"
         echo "$REF" > REVISION
-        docker build --provenance=false -t "$IMAGE_NAME" . ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
+        docker build --provenance=false -t "$IMAGE_NAME" . ${build_args[@]+"${build_args[@]}"}
         echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
       shell: bash
 
@@ -131,7 +142,7 @@ runs:
       if: steps.check-image.outputs.exists == 'false' && inputs.platforms != 'linux/amd64'
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-    # Each platform builds natively on its own runner. A digest-only run builds its one platform.
+    # Each platform builds natively on its own runner. A digest-only run builds linux/arm64.
     # Otherwise this runner builds linux/amd64 and the tag adds arm64-image.
     # Push without a tag, scan what was pushed, then tag the scanned digests. The tag never points at unscanned content.
     - name: Build and push image by digest
@@ -141,7 +152,7 @@ runs:
       env:
         ECR_URL: ${{ inputs.ecr-url }}
         REF: ${{ inputs.ref }}
-        PLATFORMS: ${{ inputs.digest-only == 'true' && inputs.platforms || 'linux/amd64' }}
+        PLATFORMS: ${{ inputs.digest-only == 'true' && 'linux/arm64' || 'linux/amd64' }}
         BUILD_ARGS: ${{ steps.extract-build-args.outputs.BUILD_ARGS }}
       run: '"${{ github.action_path }}/build-multi-arch.sh"'
 
@@ -156,7 +167,7 @@ runs:
       shell: bash
       env:
         SOURCE_IMAGE: ${{ steps.build-multi-arch.outputs.source_image }}
-        PLATFORMS: ${{ inputs.digest-only == 'true' && inputs.platforms || 'linux/amd64' }}
+        PLATFORMS: ${{ inputs.digest-only == 'true' && 'linux/arm64' || 'linux/amd64' }}
       run: '"${{ github.action_path }}/scan-image.sh"'
 
     - name: Push multi-arch image

@@ -14,14 +14,14 @@ Check the platforms input of the build-and-push action. Every image must keep
 a linux/amd64 build, so that a deploy with the default platform can always use
 an existing tag.
 
-A digest-only run builds the arm64 half of a multi-arch image natively, so it
-must get linux/arm64 alone and run on an arm64 runner.
+A digest-only run builds the arm64 half of a multi-arch image natively, so the
+platforms must include linux/arm64 and the runner must be arm64.
 
 Environment:
   PLATFORMS    (required) Comma-separated platforms. Allowed values are
                linux/amd64 and linux/arm64. linux/amd64 is required.
-  DIGEST_ONLY  (optional, default: false) When true, PLATFORMS must be
-               linux/arm64 and RUNNER_ARCH must be ARM64.
+  DIGEST_ONLY  (optional, default: false) true or false. When true, PLATFORMS
+               must include linux/arm64 and RUNNER_ARCH must be ARM64.
   RUNNER_ARCH  (optional) Runner architecture, set by GitHub Actions.
 
 Exit codes:
@@ -56,16 +56,11 @@ if [[ ! "$PLATFORMS" =~ ^[^,[:space:]]+(,[^,[:space:]]+)*$ ]]; then
   exit 1
 fi
 
-if [[ "${DIGEST_ONLY:-false}" == true ]]; then
-  if [[ "$PLATFORMS" != linux/arm64 ]]; then
-    echo "::error::A digest-only build needs platforms linux/arm64, not $PLATFORMS."
-    exit 1
-  fi
-  if [[ "${RUNNER_ARCH:-}" != ARM64 ]]; then
-    echo "::error::A digest-only build needs an arm64 runner. This runner is ${RUNNER_ARCH:-unknown}."
-    exit 1
-  fi
-  exit 0
+digest_only="${DIGEST_ONLY:-false}"
+# GitHub Actions compares strings without case, so accept only the exact values.
+if [[ "$digest_only" != true && "$digest_only" != false ]]; then
+  echo "::error::digest-only must be true or false, not $digest_only."
+  exit 1
 fi
 
 has_amd64=false
@@ -87,4 +82,15 @@ done
 if [[ "$has_amd64" != true ]]; then
   echo "::error::Platforms $PLATFORMS must include linux/amd64."
   exit 1
+fi
+
+if [[ "$digest_only" == true ]]; then
+  if [[ ",$PLATFORMS," != *,linux/arm64,* ]]; then
+    echo "::error::A digest-only build needs linux/arm64 in platforms $PLATFORMS."
+    exit 1
+  fi
+  if [[ "${RUNNER_ARCH:-}" != ARM64 ]]; then
+    echo "::error::A digest-only build needs an arm64 runner. This runner is ${RUNNER_ARCH:-unknown}."
+    exit 1
+  fi
 fi

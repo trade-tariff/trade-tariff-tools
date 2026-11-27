@@ -57,26 +57,40 @@ setup() {
   done
 }
 
-@test "accepts a digest-only linux/arm64 build on an arm64 runner" {
-  run env PLATFORMS="linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
+@test "accepts a digest-only build of linux/amd64,linux/arm64 on an arm64 runner" {
+  run env PLATFORMS="linux/amd64,linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
 
   [ "$status" -eq 0 ]
 }
 
-@test "rejects a digest-only build of other platforms" {
-  for platforms in "linux/amd64" "linux/amd64,linux/arm64"; do
-    run env PLATFORMS="$platforms" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
+@test "rejects a digest-only build without linux/arm64" {
+  run env PLATFORMS="linux/amd64" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
 
-    [ "$status" -eq 1 ]
-    assert_contains "$output" "::error::A digest-only build needs platforms linux/arm64, not $platforms."
-  done
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "::error::A digest-only build needs linux/arm64 in platforms linux/amd64."
+}
+
+@test "rejects a digest-only build of linux/arm64 alone before the build" {
+  run env PLATFORMS="linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=ARM64 "$script"
+
+  [ "$status" -eq 1 ]
+  assert_contains "$output" "::error::Platforms linux/arm64 must include linux/amd64."
 }
 
 @test "rejects a digest-only build on a runner that is not arm64" {
-  run env PLATFORMS="linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=X64 "$script"
+  run env PLATFORMS="linux/amd64,linux/arm64" DIGEST_ONLY=true RUNNER_ARCH=X64 "$script"
 
   [ "$status" -eq 1 ]
   assert_contains "$output" "::error::A digest-only build needs an arm64 runner. This runner is X64."
+}
+
+@test "rejects digest-only values other than true and false" {
+  for value in TRUE True yes 1; do
+    run env PLATFORMS="linux/amd64" DIGEST_ONLY="$value" "$script"
+
+    [ "$status" -eq 1 ]
+    assert_contains "$output" "::error::digest-only must be true or false, not $value."
+  done
 }
 
 @test "requires PLATFORMS" {
